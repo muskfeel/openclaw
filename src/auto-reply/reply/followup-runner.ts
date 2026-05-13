@@ -18,12 +18,13 @@ import {
   buildAgentRuntimeDeliveryPlan,
   buildAgentRuntimeOutcomePlan,
 } from "../../agents/runtime-plan/build.js";
-import { updateSessionStore, type SessionEntry } from "../../config/sessions.js";
-import { readSessionEntry } from "../../config/sessions/store-load.js";
+import type { SessionEntry } from "../../config/sessions.js";
+import { patchSessionEntry } from "../../config/sessions/store.js";
 import type { TypingMode } from "../../config/types.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { formatErrorMessage } from "../../infra/errors.js";
+import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
 import { shouldPreserveUserFacingSessionStateForInputProvenance } from "../../sessions/input-provenance.js";
 import { readStringValue } from "../../shared/string-coerce.js";
@@ -231,7 +232,6 @@ export function createFollowupRunner(params: {
   sessionEntry?: SessionEntry;
   sessionStore?: Record<string, SessionEntry>;
   sessionKey?: string;
-  storePath?: string;
   defaultModel: string;
   agentCfgContextTokens?: number;
   toolProgressDetail?: "explain" | "raw";
@@ -243,7 +243,6 @@ export function createFollowupRunner(params: {
     sessionEntry,
     sessionStore,
     sessionKey,
-    storePath,
     defaultModel,
     agentCfgContextTokens,
     toolProgressDetail,
@@ -544,7 +543,6 @@ export function createFollowupRunner(params: {
         sessionEntry: activeSessionEntry,
         sessionStore,
         sessionKey: replySessionKey,
-        storePath,
         isHeartbeat: opts?.isHeartbeat === true,
         replyOperation,
       });
@@ -606,19 +604,22 @@ export function createFollowupRunner(params: {
         clearAutoFallbackPrimaryProbeSelection(entry);
         sessionStore[replySessionKey] = entry;
         activeSessionEntry = entry;
-        if (!storePath) {
+        const agentId = resolveAgentIdFromSessionKey(replySessionKey);
+        if (!agentId) {
           return;
         }
-        await updateSessionStore(storePath, (store) => {
-          const persistedEntry = store[replySessionKey];
-          if (!persistedEntry) {
-            return;
-          }
-          if (!entryMatchesAutoFallbackPrimaryProbe(persistedEntry, probe)) {
-            return;
-          }
-          clearAutoFallbackPrimaryProbeSelection(persistedEntry);
-          store[replySessionKey] = persistedEntry;
+        await patchSessionEntry({
+          agentId,
+          sessionKey: replySessionKey,
+          fallbackEntry: entry,
+          update: (persistedEntry) => {
+            if (!entryMatchesAutoFallbackPrimaryProbe(persistedEntry, probe)) {
+              return persistedEntry;
+            }
+            const nextEntry = { ...persistedEntry };
+            clearAutoFallbackPrimaryProbeSelection(nextEntry);
+            return nextEntry;
+          },
         });
       };
       fallbackProvider = run.provider;
@@ -764,6 +765,7 @@ export function createFollowupRunner(params: {
                       provider: run.messageProvider,
                     }),
                     agentAccountId: run.agentAccountId,
+                    senderIsOwner: run.senderIsOwner,
                     disableTools: opts?.disableTools,
                     abortSignal: runAbortSignal,
                   },
@@ -815,7 +817,7 @@ export function createFollowupRunner(params: {
                 senderName: run.senderName,
                 senderUsername: run.senderUsername,
                 senderE164: run.senderE164,
-                sessionFile: run.sessionFile,
+                senderIsOwner: run.senderIsOwner,
                 agentDir: run.agentDir,
                 workspaceDir: run.workspaceDir,
                 cwd: run.cwd,
@@ -980,9 +982,8 @@ export function createFollowupRunner(params: {
           allowAsyncLoad: false,
         }) ?? DEFAULT_CONTEXT_TOKENS;
 
-      if (storePath && replySessionKey) {
+      if (replySessionKey) {
         await persistRunSessionUsage({
-          storePath,
           sessionKey: replySessionKey,
           cfg: runtimeConfig,
           usage,
@@ -1021,20 +1022,18 @@ export function createFollowupRunner(params: {
       }
 
       let deliveryPayloads = finalPayloads;
-      if (autoCompactionCount > 0) {
+      if (autoCompactionCount > 0 && replySessionKey) {
         const previousSessionId = run.sessionId;
         const count = await incrementRunCompactionCount({
           cfg: runtimeConfig,
           sessionEntry: activeSessionEntry,
           sessionStore,
           sessionKey: replySessionKey,
-          storePath,
           amount: autoCompactionCount,
           compactionTokensAfter: runResult.meta?.agentMeta?.compactionTokensAfter,
           lastCallUsage: runResult.meta?.agentMeta?.lastCallUsage,
           contextTokensUsed,
           newSessionId: runResult.meta?.agentMeta?.sessionId,
-          newSessionFile: runResult.meta?.agentMeta?.sessionFile,
         });
         const refreshedSessionEntry =
           replySessionKey && sessionStore ? sessionStore[replySessionKey] : undefined;
@@ -1045,7 +1044,6 @@ export function createFollowupRunner(params: {
               key: queueKey,
               previousSessionId,
               nextSessionId: refreshedSessionEntry.sessionId,
-              nextSessionFile: refreshedSessionEntry.sessionFile,
             });
           }
         }

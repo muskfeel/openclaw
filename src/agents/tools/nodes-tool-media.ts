@@ -15,6 +15,7 @@ import {
 import { parseDurationMs } from "../../cli/parse-duration.js";
 import { imageMimeFromFormat } from "../../media/mime.js";
 import { normalizeLowercaseStringOrEmpty } from "../../shared/string-coerce.js";
+import type { AgentToolResult } from "../agent-core-contract.js";
 import type { ImageSanitizationLimits } from "../image-sanitization.js";
 import type { AgentToolResult } from "../runtime/index.js";
 import { sanitizeToolResultImages } from "../tool-images.js";
@@ -57,7 +58,7 @@ type ExecuteNodeMediaActionParams = {
 
 export async function executeNodeMediaAction(
   input: ExecuteNodeMediaActionParams,
-): Promise<AgentToolResult<unknown>> {
+): Promise<AgentToolResult> {
   switch (input.action) {
     case "camera_snap":
       return await executeCameraSnap(input);
@@ -76,7 +77,7 @@ async function executeCameraSnap({
   gatewayOpts,
   modelHasVision,
   imageSanitization,
-}: ExecuteNodeMediaActionParams): Promise<AgentToolResult<unknown>> {
+}: ExecuteNodeMediaActionParams): Promise<AgentToolResult> {
   const node = requireString(params, "node");
   const resolvedNode = await resolveNode(gatewayOpts, node);
   const nodeId = resolvedNode.nodeId;
@@ -107,7 +108,7 @@ async function executeCameraSnap({
     throw new Error("facing=both is not allowed when deviceId is set");
   }
 
-  const content: AgentToolResult<unknown>["content"] = [];
+  const content: AgentToolResult["content"] = [];
   const details: Array<Record<string, unknown>> = [];
 
   for (const facing of facings) {
@@ -179,7 +180,7 @@ async function executePhotosLatest({
   gatewayOpts,
   modelHasVision,
   imageSanitization,
-}: ExecuteNodeMediaActionParams): Promise<AgentToolResult<unknown>> {
+}: ExecuteNodeMediaActionParams): Promise<AgentToolResult> {
   const node = requireString(params, "node");
   const resolvedNode = await resolveNode(gatewayOpts, node);
   const nodeId = resolvedNode.nodeId;
@@ -223,7 +224,7 @@ async function executePhotosLatest({
     );
   }
 
-  const content: AgentToolResult<unknown>["content"] = [];
+  const content: AgentToolResult["content"] = [];
   const details: Array<Record<string, unknown>> = [];
 
   for (const [index, photoRaw] of photos.entries()) {
@@ -286,7 +287,7 @@ async function executePhotosLatest({
 async function executeCameraClip({
   params,
   gatewayOpts,
-}: ExecuteNodeMediaActionParams): Promise<AgentToolResult<unknown>> {
+}: ExecuteNodeMediaActionParams): Promise<AgentToolResult> {
   const node = requireString(params, "node");
   const resolvedNode = await resolveNode(gatewayOpts, node);
   const nodeId = resolvedNode.nodeId;
@@ -337,7 +338,7 @@ async function executeCameraClip({
 async function executeScreenRecord({
   params,
   gatewayOpts,
-}: ExecuteNodeMediaActionParams): Promise<AgentToolResult<unknown>> {
+}: ExecuteNodeMediaActionParams): Promise<AgentToolResult> {
   const node = requireString(params, "node");
   const nodeId = await resolveNodeId(gatewayOpts, node);
   const durationMs = Math.min(

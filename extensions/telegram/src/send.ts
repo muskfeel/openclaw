@@ -713,18 +713,7 @@ export async function sendMessageTelegram(
         buildTextParams(index === chunks.length - 1),
       );
       const messageId = resolveTelegramMessageIdOrThrow(res, context);
-      recordSentMessage(chatId, messageId, cfg);
-      await recordOutboundMessageForPromptContext({
-        cfg,
-        account,
-        chatId,
-        message: res,
-        messageId,
-        text: chunk.plainText,
-        ...(acceptedParams?.message_thread_id !== undefined
-          ? { messageThreadId: acceptedParams.message_thread_id }
-          : {}),
-      });
+      recordSentMessage(chatId, messageId, { accountId: account.accountId });
       lastMessageId = String(messageId);
       lastChatId = String(res?.chat?.id ?? chatId);
       lastAcceptedParams = acceptedParams;
@@ -964,18 +953,7 @@ export async function sendMessageTelegram(
     const result = await sendMedia(mediaSender.label, mediaSender.sender);
     const mediaMessageId = resolveTelegramMessageIdOrThrow(result, "media send");
     const resolvedChatId = String(result?.chat?.id ?? chatId);
-    recordSentMessage(chatId, mediaMessageId, cfg);
-    await recordOutboundMessageForPromptContext({
-      cfg,
-      account,
-      chatId,
-      message: result,
-      messageId: mediaMessageId,
-      ...(caption ? { text: caption } : {}),
-      ...(mediaParams.message_thread_id !== undefined
-        ? { messageThreadId: mediaParams.message_thread_id }
-        : {}),
-    });
+    recordSentMessage(chatId, mediaMessageId, { accountId: account.accountId });
     logTelegramOutboundSendOk({
       accountId: account.accountId,
       chatId: resolvedChatId,
@@ -1562,7 +1540,7 @@ export async function sendStickerTelegram(
 
   const messageId = resolveTelegramMessageIdOrThrow(result, "sticker send");
   const resolvedChatId = String(result?.chat?.id ?? chatId);
-  recordSentMessage(chatId, messageId, opts.cfg);
+  recordSentMessage(chatId, messageId, { accountId: account.accountId });
   recordChannelActivity({
     channel: "telegram",
     accountId: account.accountId,
@@ -1667,7 +1645,7 @@ export async function sendPollTelegram(
   const messageId = resolveTelegramMessageIdOrThrow(result, "poll send");
   const resolvedChatId = String(result?.chat?.id ?? chatId);
   const pollId = result?.poll?.id;
-  recordSentMessage(chatId, messageId, opts.cfg);
+  recordSentMessage(chatId, messageId, { accountId: account.accountId });
 
   recordChannelActivity({
     channel: "telegram",

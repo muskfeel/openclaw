@@ -1,6 +1,6 @@
 import type { AgentMessage } from "openclaw/plugin-sdk/agent-core";
-import type { AssistantMessage, ThinkingContent, UserMessage, Usage } from "openclaw/plugin-sdk/llm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AssistantMessage, UserMessage, Usage } from "./pi-ai-contract.js";
 import {
   expectOpenAIResponsesStrictSanitizeCall,
   loadSanitizeSessionHistoryWithCleanMocks,

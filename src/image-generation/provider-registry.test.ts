@@ -4,9 +4,8 @@ import type { ImageGenerationProviderPlugin } from "../plugins/types.js";
 
 type ProviderRegistryModule = typeof import("./provider-registry.js");
 
-const resolvePluginCapabilityProvidersMock = vi.hoisted(() =>
-  vi.fn<() => ImageGenerationProviderPlugin[]>(() => []),
-);
+const resolvePluginCapabilityProvidersMock = vi.hoisted(() => vi.fn());
+
 vi.mock("../plugins/capability-provider-runtime.js", () => ({
   resolvePluginCapabilityProviders: resolvePluginCapabilityProvidersMock,
 }));
@@ -44,7 +43,7 @@ async function loadProviderRegistry(): Promise<ProviderRegistryModule> {
 }
 
 describe("image-generation provider registry", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     resolvePluginCapabilityProvidersMock.mockReset();
     resolvePluginCapabilityProvidersMock.mockReturnValue([]);

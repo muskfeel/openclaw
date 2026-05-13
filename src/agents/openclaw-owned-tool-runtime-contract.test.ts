@@ -6,10 +6,8 @@ import {
 } from "openclaw/plugin-sdk/agent-runtime-test-contracts";
 import type { ExtensionContext } from "openclaw/plugin-sdk/agent-sessions";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { toToolDefinitions } from "./agent-tool-definition-adapter.js";
-import { createBaseToolHandlerState } from "./agent-tool-handler-state.test-helpers.js";
-import { wrapToolWithBeforeToolCallHook } from "./agent-tools.before-tool-call.js";
-import type { MessagingToolSend } from "./embedded-agent-messaging.types.js";
+import type { ExtensionContext } from "./agent-extension-contract.js";
+import type { MessagingToolSend } from "./pi-embedded-messaging.types.js";
 import {
   handleToolExecutionEnd,
   handleToolExecutionStart,
@@ -95,7 +93,7 @@ async function waitForAfterToolCall(hooks: {
   await vi.waitFor(() => {
     expect(hooks.afterToolCall).toHaveBeenCalledTimes(1);
   });
-  const call = hooks.afterToolCall.mock.calls.at(0);
+  const call = hooks.afterToolCall.mock.calls[0];
   if (!call) {
     throw new Error("Expected afterToolCall hook call");
   }

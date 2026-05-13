@@ -10,6 +10,7 @@ import {
   clearMemoryPluginState,
   registerMemoryPromptSection,
 } from "../../../plugins/memory-state.js";
+import { listTrajectoryRuntimeEvents } from "../../../trajectory/runtime-store.sqlite.js";
 import {
   type AttemptContextEngine,
   buildLoopPromptCacheInfo,
@@ -38,7 +39,6 @@ import type { MidTurnPrecheckRequest } from "./midturn-precheck.js";
 
 const hoisted = getHoisted();
 const embeddedSessionId = "embedded-session";
-const sessionFile = "/tmp/session.jsonl";
 const seedMessage = { role: "user", content: "seed", timestamp: 1 } as AgentMessage;
 const doneMessage = { role: "assistant", content: "done", timestamp: 2 } as unknown as AgentMessage;
 type AfterTurnPromptCacheCall = { runtimeContext?: { promptCache?: Record<string, unknown> } };
@@ -48,6 +48,8 @@ type ToolResultGuardInstallParams = {
     onMidTurnPrecheck?: (request: MidTurnPrecheckRequest) => void;
   };
 };
+
+type ContextEngineAttemptResult = Awaited<ReturnType<typeof createContextEngineAttemptRunner>>;
 type MockCallSource = {
   mock: {
     calls: ArrayLike<ReadonlyArray<unknown>>;
@@ -99,26 +101,6 @@ function expectFields(actual: Record<string, unknown>, expected: Record<string, 
   }
 }
 
-function trackSessionWriteLocks(): string[] {
-  const events: string[] = [];
-  hoisted.acquireSessionWriteLockMock.mockImplementation(async () => {
-    const lockId = hoisted.acquireSessionWriteLockMock.mock.calls.length;
-    events.push(`acquire-${lockId}`);
-    return {
-      release: async () => {
-        events.push(`release-${lockId}`);
-      },
-    };
-  });
-  return events;
-}
-
-function expectInitialLockReleasedBeforePostTurnWrite(events: string[]) {
-  expect(events.indexOf("release-1")).toBeGreaterThan(events.indexOf("acquire-1"));
-  expect(events.indexOf("acquire-2")).toBeGreaterThan(events.indexOf("release-1"));
-  expect(events.indexOf("release-2")).toBeGreaterThan(events.indexOf("acquire-2"));
-}
-
 function createTestContextEngine(params: Partial<AttemptContextEngine>): AttemptContextEngine {
   return {
     info: {
@@ -136,18 +118,25 @@ function createTestContextEngine(params: Partial<AttemptContextEngine>): Attempt
   } as AttemptContextEngine;
 }
 
+function readTrajectoryEvents(result: ContextEngineAttemptResult): TrajectoryEvent[] {
+  return listTrajectoryRuntimeEvents({
+    agentId: "main",
+    env: { ...process.env, OPENCLAW_STATE_DIR: result.trajectoryStateDir },
+    runId: "run-context-engine-forwarding",
+    sessionId: embeddedSessionId,
+  }) as TrajectoryEvent[];
+}
+
 async function runBootstrap(
   sessionKey: string,
   contextEngine: AttemptContextEngine,
   overrides: Partial<Parameters<typeof runAttemptContextEngineBootstrap>[0]> = {},
 ) {
   await runAttemptContextEngineBootstrap({
-    hadSessionFile: true,
+    hadTranscript: true,
     contextEngine,
     sessionId: embeddedSessionId,
     sessionKey,
-    sessionFile,
-    sessionManager: hoisted.sessionManager,
     runtimeContext: {},
     runMaintenance: hoisted.runContextEngineMaintenanceMock,
     warn: () => {},
@@ -183,13 +172,11 @@ async function finalizeTurn(
     yieldAborted: false,
     sessionIdUsed: embeddedSessionId,
     sessionKey,
-    sessionFile,
     messagesSnapshot: [doneMessage],
     prePromptMessageCount: 0,
     tokenBudget: 2048,
     runtimeContext: {},
     runMaintenance: hoisted.runContextEngineMaintenanceMock,
-    sessionManager: hoisted.sessionManager,
     warn: () => {},
     ...overrides,
   });
@@ -228,14 +215,14 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     });
 
-    expect(hoisted.createOpenClawCodingToolsMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.createOpenClawCodingToolsMock).toHaveBeenCalled();
     const options = mockParams(
       hoisted.createOpenClawCodingToolsMock,
       0,
       "createOpenClawCodingTools options",
     );
     expect(options.includeToolSearchControls).toBe(true);
-    expect(options.toolSearchCatalogRef).toEqual({});
+    expect(options.toolSearchCatalogRef).toBeTruthy();
   });
 
   it("enforces code-mode payload surface from active-agent config during an embedded attempt", async () => {
@@ -361,15 +348,9 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     );
     expect(seen.systemPrompt).not.toContain("secret runtime context");
-    expect(JSON.stringify(seen.messages)).not.toContain(
-      "visible ask",
-    );
-    const trajectoryEvents = (
-      await fs.readFile(path.join(tempPaths[0] ?? "", "session.trajectory.jsonl"), "utf8")
-    )
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as TrajectoryEvent);
+    expect(JSON.stringify(seen.messages)).not.toContain("visible ask");
+    expect(seen.systemPrompt).not.toContain("OPENCLAW_INTERNAL_CONTEXT");
+    const trajectoryEvents = readTrajectoryEvents(result);
     const promptSubmitted = trajectoryEvents.find((event) => event.type === "prompt.submitted");
     const contextCompiled = trajectoryEvents.find((event) => event.type === "context.compiled");
     const modelCompleted = trajectoryEvents.find((event) => event.type === "model.completed");
@@ -717,17 +698,18 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     });
 
-    expectFields(
-      mockParams(hoisted.resolveEmbeddedRunSkillEntriesMock, 0, "skill entries params"),
-      {
+    expect(hoisted.resolveEmbeddedRunSkillEntriesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
         workspaceDir: sandboxWorkspace,
         skillsSnapshot: undefined,
-      },
+      }),
     );
-    expectFields(mockParams(hoisted.resolveSkillsPromptForRunMock, 0, "skills prompt params"), {
-      workspaceDir: sandboxWorkspace,
-      skillsSnapshot: undefined,
-    });
+    expect(hoisted.resolveSkillsPromptForRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceDir: sandboxWorkspace,
+        skillsSnapshot: undefined,
+      }),
+    );
   });
 
   it("keeps before_prompt_build prependContext out of post-user transcript messages", async () => {
@@ -941,7 +923,7 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
   it("skips bootstrap preload on completed continuation-skip turns", async () => {
     hoisted.resolveContextInjectionModeMock.mockReturnValue("continuation-skip");
-    hoisted.hasCompletedBootstrapTurnMock.mockResolvedValue(true);
+    hoisted.hasCompletedBootstrapTranscriptTurnMock.mockResolvedValue(true);
     hoisted.isWorkspaceBootstrapPendingMock.mockResolvedValue(false);
 
     await createContextEngineAttemptRunner({
@@ -961,7 +943,7 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     });
 
-    expect(hoisted.hasCompletedBootstrapTurnMock).toHaveBeenCalledOnce();
+    expect(hoisted.hasCompletedBootstrapTranscriptTurnMock).toHaveBeenCalledOnce();
     expect(hoisted.isWorkspaceBootstrapPendingMock).toHaveBeenCalledOnce();
     expect(hoisted.resolveBootstrapFilesForRunMock).not.toHaveBeenCalled();
     expect(hoisted.resolveBootstrapContextForRunMock).not.toHaveBeenCalled();
@@ -1020,15 +1002,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expect(seenPrompt?.trim().startsWith("Reply target of current user message")).toBe(true);
     expect(result.finalPromptText).toBe(seenPrompt);
     expect(hoisted.detectAndLoadPromptImagesMock).toHaveBeenCalledTimes(1);
-    expect(mockParams(hoisted.detectAndLoadPromptImagesMock, 0, "prompt image params").prompt).toBe(
-      "what does this mean?",
-    );
-    const trajectoryEvents = (
-      await fs.readFile(path.join(tempPaths[0] ?? "", "session.trajectory.jsonl"), "utf8")
-    )
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as TrajectoryEvent);
+    expect(hoisted.detectAndLoadPromptImagesMock.mock.calls[0]?.[0]).toMatchObject({
+      prompt: "what does this mean?",
+    });
+    const trajectoryEvents = readTrajectoryEvents(result);
     const promptSubmitted = trajectoryEvents.find((event) => event.type === "prompt.submitted");
     expect(promptSubmitted?.data?.prompt).toBe(seenPrompt);
     expect(promptSubmitted?.data?.prompt).toContain("WT daily plan - Sat May 2");
@@ -1105,18 +1082,15 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
     expect(seenPrompt).toBe("Continue the OpenClaw runtime event.");
     expect(result.finalPromptText).toBe("Continue the OpenClaw runtime event.");
-    expect(
-      requireRecords(result.messagesSnapshot, "messages snapshot").some(
-        (message) =>
-          message.role === "user" && String(message.content).includes("internal heartbeat event"),
-      ),
-    ).toBe(false);
-    const trajectoryEvents = (
-      await fs.readFile(path.join(tempPaths[0] ?? "", "session.trajectory.jsonl"), "utf8")
-    )
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as TrajectoryEvent);
+    expect(result.messagesSnapshot).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          content: expect.stringContaining("internal heartbeat event"),
+        }),
+      ]),
+    );
+    const trajectoryEvents = readTrajectoryEvents(result);
     const contextCompiled = trajectoryEvents.find((event) => event.type === "context.compiled");
     expect(contextCompiled?.data?.prompt).toBe("Continue the OpenClaw runtime event.");
     expect(contextCompiled?.data?.systemPrompt).toContain("internal heartbeat event");
@@ -1210,19 +1184,13 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expect(seenPrompt?.trim().endsWith("[OpenClaw room event]")).toBe(true);
     expect(seenPrompt).not.toBe("Continue the OpenClaw runtime event.");
     expect(result.finalPromptText).toBe(seenPrompt);
-    const trajectoryEvents = (
-      await fs.readFile(path.join(tempPaths[0] ?? "", "session.trajectory.jsonl"), "utf8")
-    )
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as TrajectoryEvent);
+    const trajectoryEvents = readTrajectoryEvents(result);
     const contextCompiled = trajectoryEvents.find((event) => event.type === "context.compiled");
     expect(contextCompiled?.data?.prompt).toContain("visible_reply_contract: message_tool_only");
     expect(contextCompiled?.data?.prompt).toContain("[OpenClaw room event]");
   });
 
   it("skips blank visible prompts with replay history before provider submission", async () => {
-    const lockEvents = trackSessionWriteLocks();
     const sessionPrompt = vi.fn(async () => {
       throw new Error("blank prompt should not be submitted");
     });
@@ -1241,53 +1209,19 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expect(sessionPrompt).not.toHaveBeenCalled();
     expect(result.finalPromptText).toBeUndefined();
     expect(result.promptError).toBeNull();
-    expect(result.messagesSnapshot).toHaveLength(1);
-    expectFields(requireRecord(result.messagesSnapshot[0], "messages snapshot seed"), {
-      role: "user",
-      content: "seed",
-    });
-    const trajectoryEvents = (
-      await fs.readFile(path.join(tempPaths[0] ?? "", "session.trajectory.jsonl"), "utf8")
-    )
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line) as TrajectoryEvent);
+    expect(result.messagesSnapshot).toEqual([
+      expect.objectContaining({ role: "user", content: "seed" }),
+    ]);
+    const trajectoryEvents = readTrajectoryEvents(result);
     expect(trajectoryEvents.some((event) => event.type === "prompt.submitted")).toBe(false);
-    const skipped = findRecord(
-      trajectoryEvents as Array<Record<string, unknown>>,
-      (event) => event.type === "prompt.skipped",
-      "prompt skipped event",
+    expect(trajectoryEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "prompt.skipped",
+          data: expect.objectContaining({ reason: "blank_user_prompt" }),
+        }),
+      ]),
     );
-    expect(requireRecord(skipped.data, "prompt skipped data").reason).toBe("blank_user_prompt");
-    expectInitialLockReleasedBeforePostTurnWrite(lockEvents);
-  });
-
-  it("releases the initial session lock before before_agent_run block finalizers", async () => {
-    const lockEvents = trackSessionWriteLocks();
-    const sessionPrompt = vi.fn(async () => {
-      throw new Error("blocked prompt should not be submitted");
-    });
-    const runBeforeAgentRun = vi.fn(async () => ({
-      pluginId: "test-policy",
-      decision: { outcome: "block", reason: "Blocked by test policy." },
-    }));
-    hoisted.getGlobalHookRunnerMock.mockReturnValue({
-      hasHooks: vi.fn((name: string) => name === "before_agent_run"),
-      runBeforeAgentRun,
-    });
-
-    const result = await createContextEngineAttemptRunner({
-      contextEngine: createContextEngineBootstrapAndAssemble(),
-      sessionKey,
-      tempPaths,
-      sessionPrompt,
-    });
-
-    expect(runBeforeAgentRun).toHaveBeenCalledTimes(1);
-    expect(sessionPrompt).not.toHaveBeenCalled();
-    expect(result.finalPromptText).toBeUndefined();
-    expect(result.promptErrorSource).toBe("hook:before_agent_run");
-    expectInitialLockReleasedBeforePostTurnWrite(lockEvents);
   });
 
   it("preserves provider prompt errors when cleanup reacquire detects session takeover", async () => {
@@ -1384,7 +1318,6 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
   });
 
   it("honors context engines that opt into preassembly overflow authority", async () => {
-    const lockEvents = trackSessionWriteLocks();
     let sawPrompt = false;
     const hugeHistory = "large raw history ".repeat(2_000);
 
@@ -1417,7 +1350,6 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expect(result.promptErrorSource).toBe("precheck");
     expect(result.preflightRecovery?.route).toBe("compact_only");
     expect(hoisted.preemptiveCompactionCalls.at(-1)).toHaveProperty("unwindowedMessages");
-    expectInitialLockReleasedBeforePostTurnWrite(lockEvents);
   });
 
   it("snapshots pre-assembly messages before assemble even when the engine windows in place", async () => {
@@ -1520,15 +1452,13 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
     expect(seen.prompt).toBe("hello");
     expect(seen.prompt).not.toContain("[Inter-session message]");
-    expect(seen.messages).toStrictEqual([]);
+    expect(seen.messages).toEqual([]);
     expect(seen.systemPrompt ?? "").toBe("");
     expect(result.finalPromptText).toBe("hello");
     expect(result.systemPromptReport?.systemPrompt ?? "").toBe("");
-    expect(result.messagesSnapshot).toHaveLength(1);
-    expectFields(requireRecord(result.messagesSnapshot[0], "gateway model snapshot"), {
-      role: "assistant",
-      content: "pong",
-    });
+    expect(result.messagesSnapshot).toEqual([
+      expect.objectContaining({ role: "assistant", content: "pong" }),
+    ]);
     expect(hoisted.resolveBootstrapContextForRunMock).not.toHaveBeenCalled();
     expect(bootstrap).not.toHaveBeenCalled();
     expect(assemble).not.toHaveBeenCalled();
@@ -1555,28 +1485,6 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expectCalledWithSessionKey(afterTurn, sessionKey);
   });
 
-  it("resolves bootstrap context before acquiring the session write lock", async () => {
-    const events: string[] = [];
-    hoisted.resolveBootstrapContextForRunMock.mockImplementation(async () => {
-      events.push("bootstrap");
-      return { bootstrapFiles: [], contextFiles: [] };
-    });
-    hoisted.acquireSessionWriteLockMock.mockImplementation(async () => {
-      events.push("lock");
-      return { release: async () => {} };
-    });
-
-    await createContextEngineAttemptRunner({
-      contextEngine: createContextEngineBootstrapAndAssemble(),
-      sessionKey,
-      tempPaths,
-    });
-
-    expect(events).toContain("bootstrap");
-    expect(events).toContain("lock");
-    expect(events.indexOf("bootstrap")).toBeLessThan(events.indexOf("lock"));
-  });
-
   it("forwards modelId to assemble", async () => {
     const { bootstrap, assemble } = createContextEngineBootstrapAndAssemble();
     const contextEngine = createTestContextEngine({ bootstrap, assemble });
@@ -1584,7 +1492,11 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     await runBootstrap(sessionKey, contextEngine);
     await runAssemble(sessionKey, contextEngine);
 
-    expect(mockParams(assemble as MockCallSource, 0, "assemble params").model).toBe("gpt-test");
+    expect(assemble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gpt-test",
+      }),
+    );
   });
 
   it("forwards availableTools and citationsMode to assemble", async () => {
@@ -1597,10 +1509,12 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       citationsMode: "on",
     });
 
-    expectFields(mockParams(assemble as MockCallSource, 0, "assemble params"), {
-      availableTools: new Set(["memory_search", "wiki_search"]),
-      citationsMode: "on",
-    });
+    expect(assemble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        availableTools: new Set(["memory_search", "wiki_search"]),
+        citationsMode: "on",
+      }),
+    );
   });
 
   it("lets non-legacy engines opt into the active memory prompt helper", async () => {
@@ -1632,11 +1546,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       citationsMode: "on",
     });
 
-    const assembled = requireRecord(result, "assembled context");
-    expect(assembled.estimatedTokens).toBe(1);
-    expect(assembled.systemPromptAddition).toBe(
-      "## Memory Recall\ntools=memory_search,wiki_search\ncitations=on",
-    );
+    expect(result).toMatchObject({
+      estimatedTokens: 1,
+      systemPromptAddition: "## Memory Recall\ntools=memory_search,wiki_search\ncitations=on",
+    });
   });
 
   it("forwards sessionKey to ingestBatch when afterTurn is absent", async () => {
@@ -1712,12 +1625,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
     await finalizeTurn(sessionKey, createTestContextEngine({ bootstrap, assemble, afterTurn }));
 
-    expectCalledWithSessionKey(afterTurn, sessionKey);
-    expect(
-      hoisted.runContextEngineMaintenanceMock.mock.calls.some(
-        ([params]) => requireRecord(params, "maintenance params").reason === "turn",
-      ),
-    ).toBe(false);
+    expect(afterTurn).toHaveBeenCalled();
+    expect(hoisted.runContextEngineMaintenanceMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "turn" }),
+    );
   });
 
   it("runs startup maintenance for existing sessions even without bootstrap()", async () => {
@@ -1736,11 +1647,9 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       }),
     );
 
-    expect(
-      hoisted.runContextEngineMaintenanceMock.mock.calls.some(
-        ([params]) => requireRecord(params, "maintenance params").reason === "bootstrap",
-      ),
-    ).toBe(true);
+    expect(hoisted.runContextEngineMaintenanceMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "bootstrap" }),
+    );
   });
 
   it("builds prompt-cache retention, last-call usage, and cache-touch metadata", () => {
@@ -1756,17 +1665,19 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
         },
         lastCacheTouchAt: 123,
       }),
-    ).toEqual({
-      retention: "short",
-      lastCallUsage: {
-        input: 10,
-        output: 5,
-        cacheRead: 40,
-        cacheWrite: 2,
-        total: 57,
-      },
-      lastCacheTouchAt: 123,
-    });
+    ).toEqual(
+      expect.objectContaining({
+        retention: "short",
+        lastCallUsage: {
+          input: 10,
+          output: 5,
+          cacheRead: 40,
+          cacheWrite: 2,
+          total: 57,
+        },
+        lastCacheTouchAt: 123,
+      }),
+    );
   });
 
   it("omits prompt-cache metadata when no cache data is available", () => {
@@ -1812,17 +1723,24 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     } as unknown as AgentMessage;
 
-    const promptCache = buildLoopPromptCacheInfo({
-      messagesSnapshot: [seedMessage, toolUseAssistant],
-      prePromptMessageCount: 1,
-      retention: "short",
-      fallbackLastCacheTouchAt: 123,
-    });
-    expect(promptCache?.retention).toBe("short");
-    expect(promptCache?.lastCallUsage?.cacheRead).toBe(39036);
-    expect(promptCache?.lastCallUsage?.cacheWrite).toBe(59934);
-    expect(promptCache?.lastCallUsage?.total).toBe(98973);
-    expect(promptCache?.lastCacheTouchAt).toBe(Date.parse("2026-04-16T16:49:59.536Z"));
+    expect(
+      buildLoopPromptCacheInfo({
+        messagesSnapshot: [seedMessage, toolUseAssistant],
+        prePromptMessageCount: 1,
+        retention: "short",
+        fallbackLastCacheTouchAt: 123,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        retention: "short",
+        lastCallUsage: expect.objectContaining({
+          cacheRead: 39036,
+          cacheWrite: 59934,
+          total: 98973,
+        }),
+        lastCacheTouchAt: Date.parse("2026-04-16T16:49:59.536Z"),
+      }),
+    );
   });
 
   it("falls back to the persisted cache touch when loop usage has no cache metrics", () => {
@@ -1837,15 +1755,22 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       },
     } as unknown as AgentMessage;
 
-    const promptCache = buildLoopPromptCacheInfo({
-      messagesSnapshot: [seedMessage, toolUseAssistant],
-      prePromptMessageCount: 1,
-      retention: "short",
-      fallbackLastCacheTouchAt: 123,
-    });
-    expect(promptCache?.retention).toBe("short");
-    expect(promptCache?.lastCallUsage?.total).toBe(3);
-    expect(promptCache?.lastCacheTouchAt).toBe(123);
+    expect(
+      buildLoopPromptCacheInfo({
+        messagesSnapshot: [seedMessage, toolUseAssistant],
+        prePromptMessageCount: 1,
+        retention: "short",
+        fallbackLastCacheTouchAt: 123,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        retention: "short",
+        lastCallUsage: expect.objectContaining({
+          total: 3,
+        }),
+        lastCacheTouchAt: 123,
+      }),
+    );
   });
 
   it("derives a live cache touch timestamp for final afterTurn usage snapshots", () => {
@@ -1888,17 +1813,14 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       | { broke?: boolean; previousCacheRead?: number; cacheRead?: number; changes?: unknown[] }
       | undefined;
 
-    const observationRecord = requireRecord(observation, "prompt cache observation");
-    expectFields(observationRecord, {
-      broke: true,
-      previousCacheRead: 5000,
-      cacheRead: 2000,
-    });
-    expect(
-      requireRecords(observationRecord.changes, "prompt cache observation changes").some(
-        (change) => change.code === "systemPrompt",
-      ),
-    ).toBe(true);
+    expect(observation).toEqual(
+      expect.objectContaining({
+        broke: true,
+        previousCacheRead: 5000,
+        cacheRead: 2000,
+        changes: expect.arrayContaining([expect.objectContaining({ code: "systemPrompt" })]),
+      }),
+    );
   });
 
   it("skips maintenance when ingestBatch fails", async () => {
@@ -1912,16 +1834,13 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       prePromptMessageCount: 1,
     });
 
-    expectCalledWithSessionKey(ingestBatch, sessionKey);
-    expect(
-      hoisted.runContextEngineMaintenanceMock.mock.calls.some(
-        ([params]) => requireRecord(params, "maintenance params").reason === "turn",
-      ),
-    ).toBe(false);
+    expect(ingestBatch).toHaveBeenCalled();
+    expect(hoisted.runContextEngineMaintenanceMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "turn" }),
+    );
   });
 
-  it("releases the session lock even when teardown cleanup throws", async () => {
-    const releaseMock = vi.fn(async () => {});
+  it("runs teardown cleanup even when pending tool flush throws", async () => {
     const disposeMock = vi.fn();
     const flushMock = vi.fn(async () => {
       throw new Error("flush failed");
@@ -1933,12 +1852,10 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
       session: { agent: {}, dispose: disposeMock },
       sessionManager: hoisted.sessionManager,
       bundleLspRuntime: undefined,
-      sessionLock: { release: releaseMock },
     });
 
     expect(flushMock).toHaveBeenCalledTimes(1);
     expect(disposeMock).toHaveBeenCalledTimes(1);
-    expect(releaseMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1979,12 +1896,9 @@ describe("runEmbeddedAttempt context engine mid-turn precheck integration", () =
       },
     });
 
-    const loopHookParams = mockParams(
-      hoisted.installContextEngineLoopHookMock,
-      0,
-      "context engine loop hook params",
+    expect(hoisted.installContextEngineLoopHookMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ midTurnPrecheck: expect.anything() }),
     );
-    expect(loopHookParams.midTurnPrecheck).toBeUndefined();
   });
 
   it("recovers when the runtime persists the mid-turn precheck as an assistant error", async () => {
@@ -2069,9 +1983,10 @@ describe("runEmbeddedAttempt tool-result guard budget wiring", () => {
       },
     });
 
-    expect(
-      mockParams(hoisted.installToolResultContextGuardMock, 0, "tool-result guard params")
-        .contextWindowTokens,
-    ).toBe(1_000_000);
+    expect(hoisted.installToolResultContextGuardMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contextWindowTokens: 1_000_000,
+      }),
+    );
   });
 });

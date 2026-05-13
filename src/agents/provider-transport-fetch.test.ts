@@ -1,6 +1,7 @@
 import { Stream } from "openai/streaming";
 import type { Model } from "openclaw/plugin-sdk/llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Model } from "./pi-ai-contract.js";
 import { buildGuardedModelFetch } from "./provider-transport-fetch.js";
 
 type ProviderRequestPolicyConfigMockResult = {

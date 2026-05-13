@@ -7,7 +7,7 @@ vi.mock("../context-engine-capabilities.js", () => ({
 import type { OpenClawConfig } from "../../../config/config.js";
 import { addSession, resetProcessRegistryForTests } from "../../bash-process-registry.js";
 import { createProcessSessionFixture } from "../../bash-process-registry.test-helpers.js";
-import { wrapPluginSystemContextSection } from "../../hook-system-context-boundary.js";
+import { streamSimple } from "../../pi-ai-contract.js";
 import { SYSTEM_PROMPT_CACHE_BOUNDARY } from "../../system-prompt-cache-boundary.js";
 import { buildAgentSystemPrompt } from "../../system-prompt.js";
 import { resolveBootstrapContextTargets } from "./attempt-bootstrap-routing.js";

@@ -1,8 +1,6 @@
-import { randomUUID } from "node:crypto";
-import type { StreamFn } from "../agents/runtime/index.js";
-import { streamWithPayloadPatch } from "../llm/providers/stream-wrappers/stream-payload-utils.js";
-import { streamSimple } from "../llm/stream.js";
-import { createAssistantMessageEventStream } from "../llm/utils/event-stream.js";
+import type { StreamFn } from "../agents/agent-core-contract.js";
+import { streamSimple } from "../agents/pi-ai-contract.js";
+import { streamWithPayloadPatch } from "../agents/pi-embedded-runner/stream-payload-utils.js";
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import type { ProviderWrapStreamFnContext } from "./plugin-entry.js";
 import { parseStandalonePlainTextToolCallBlocks } from "./tool-payload.js";

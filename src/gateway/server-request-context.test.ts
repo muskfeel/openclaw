@@ -80,7 +80,7 @@ describe("createGatewayRequestContext", () => {
     const runtimeState: Pick<GatewayServerLiveState, "cronState"> = {
       cronState: {
         cron: cronA,
-        storePath: "/tmp/cron-a",
+        storeKey: "cron-a",
         cronEnabled: true,
       },
     };
@@ -142,16 +142,16 @@ describe("createGatewayRequestContext", () => {
     });
 
     expect(context.cron).toBe(cronA);
-    expect(context.cronStorePath).toBe("/tmp/cron-a");
+    expect(context.cronStoreKey).toBe("cron-a");
 
     runtimeState.cronState = {
       cron: cronB,
-      storePath: "/tmp/cron-b",
+      storeKey: "cron-b",
       cronEnabled: true,
     };
 
     expect(context.cron).toBe(cronB);
-    expect(context.cronStorePath).toBe("/tmp/cron-b");
+    expect(context.cronStoreKey).toBe("cron-b");
   });
 
   it("invalidateClientsForDevice sets the flag on matching clients without closing the socket", () => {

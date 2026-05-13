@@ -1,4 +1,4 @@
-import type { SourceReplyDeliveryMode } from "../../../auto-reply/get-reply-options.types.js";
+import { hasOutboundReplyContent } from "openclaw/plugin-sdk/reply-payload";
 import {
   createHeartbeatToolResponsePayload,
   type HeartbeatToolResponse,
@@ -22,6 +22,7 @@ import {
   normalizeOptionalLowercaseString,
   normalizeOptionalString,
 } from "../../../shared/string-coerce.js";
+import type { AssistantMessage } from "../../pi-ai-contract.js";
 import {
   BILLING_ERROR_USER_MESSAGE,
   formatAssistantErrorText,

@@ -1,3 +1,7 @@
+import {
+  getOAuthApiKey as getOAuthApiKeyFromPi,
+  refreshOpenAICodexToken as refreshOpenAICodexTokenFromPi,
+} from "openclaw/plugin-sdk/provider-ai-oauth";
 import { ensureGlobalUndiciEnvProxyDispatcher } from "openclaw/plugin-sdk/runtime-env";
 import { refreshOpenAICodexToken as refreshOpenAICodexTokenFromFlow } from "./openai-codex-oauth-flow.runtime.js";
 import type { OAuthCredentials } from "./openai-codex-oauth-types.runtime.js";

@@ -13,10 +13,8 @@ import {
   isHelpOrVersionInvocation,
   isRootHelpInvocation,
   isRootVersionInvocation,
-  normalizeGeneratedHelpCommandArgv,
-  normalizeRootHelpTargetArgv,
-  shouldMigrateState,
-  shouldMigrateStateFromPath,
+  shouldRunConfigPreflight,
+  shouldRunConfigPreflightFromPath,
 } from "./argv.js";
 
 describe("argv helpers", () => {
@@ -580,8 +578,8 @@ describe("argv helpers", () => {
     { argv: ["node", "openclaw", "agent", "--message", "hi"], expected: false },
     { argv: ["node", "openclaw", "agents", "list"], expected: true },
     { argv: ["node", "openclaw", "message", "send"], expected: true },
-  ] as const)("decides when to migrate state: $argv", ({ argv, expected }) => {
-    expect(shouldMigrateState([...argv])).toBe(expected);
+  ] as const)("decides when to run config preflight: $argv", ({ argv, expected }) => {
+    expect(shouldRunConfigPreflight([...argv])).toBe(expected);
   });
 
   it.each([
@@ -590,7 +588,7 @@ describe("argv helpers", () => {
     { path: ["config", "get"], expected: false },
     { path: ["models", "status"], expected: false },
     { path: ["agents", "list"], expected: true },
-  ])("reuses command path for migrate state decisions: $path", ({ path, expected }) => {
-    expect(shouldMigrateStateFromPath(path)).toBe(expected);
+  ])("reuses command path for config preflight decisions: $path", ({ path, expected }) => {
+    expect(shouldRunConfigPreflightFromPath(path)).toBe(expected);
   });
 });

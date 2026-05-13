@@ -3,6 +3,7 @@ import {
   requiresExecApproval,
   resolveExecApprovalAllowedDecisions,
 } from "../infra/exec-approvals.js";
+import type { AgentToolResult } from "./agent-core-contract.js";
 import {
   buildExecApprovalRequesterContext,
   buildExecApprovalTurnSourceContext,

@@ -3343,6 +3343,7 @@ describe("collectCodexRouteWarnings", () => {
         },
       } as unknown as OpenClawConfig,
       shouldRepair: true,
+      codexRuntimeReady: true,
     });
 
     expect(mocks.loadInstalledPluginIndex).not.toHaveBeenCalled();

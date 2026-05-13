@@ -1,5 +1,5 @@
-import type { StreamFn } from "../../../agents/runtime/index.js";
-import { streamSimple } from "../../stream.js";
+import type { StreamFn } from "../agent-core-contract.js";
+import { streamSimple } from "../pi-ai-contract.js";
 import { streamWithPayloadPatch } from "./stream-payload-utils.js";
 
 /**

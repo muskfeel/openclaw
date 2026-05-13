@@ -10,14 +10,13 @@ import {
   validateToolsEffectiveParams,
 } from "../protocol/index.js";
 import {
-  deliveryContextFromSession,
   getActivePluginChannelRegistryVersion,
   getActivePluginRegistryVersion,
   listAgentIds,
   loadSessionEntry,
-  resolveAgentDir,
+  readSqliteSessionDeliveryContext,
+  readSqliteSessionRoutingInfo,
   resolveEffectiveToolInventory,
-  resolveEffectiveToolInventoryRuntimeModelContext,
   resolveReplyToMode,
   resolveRuntimeConfigCacheKey,
   resolveSessionAgentId,
@@ -134,24 +133,13 @@ function scheduleToolsEffectiveRefresh(
   const task = new Promise<EffectiveToolInventoryResult>((resolve, reject) => {
     setImmediate(() => {
       try {
-        const agentDir = resolveAgentDir(context.cfg, context.agentId);
-        const runtimeModelContext = resolveEffectiveToolInventoryRuntimeModelContext({
-          cfg: context.cfg,
-          agentId: context.agentId,
-          agentDir,
-          modelProvider: context.modelProvider,
-          modelId: context.modelId,
-        });
         const value = resolveEffectiveToolInventory({
           cfg: context.cfg,
           agentId: context.agentId,
-          agentDir,
           sessionKey: context.sessionKey,
           messageProvider: context.messageProvider,
           modelProvider: context.modelProvider,
           modelId: context.modelId,
-          modelApi: runtimeModelContext.modelApi,
-          runtimeModel: runtimeModelContext.runtimeModel,
           currentChannelId: context.currentChannelId,
           currentThreadTs: context.currentThreadTs,
           accountId: context.accountId,
@@ -239,40 +227,36 @@ function resolveTrustedToolsEffectiveContext(params: {
     return null;
   }
 
-  const delivery = deliveryContextFromSession(loaded.entry);
+  const delivery = readSqliteSessionDeliveryContext({
+    agentId: loaded.agentId,
+    sessionKey: loaded.canonicalKey,
+  });
+  const routing = readSqliteSessionRoutingInfo({
+    agentId: loaded.agentId,
+    sessionKey: loaded.canonicalKey,
+  });
   const resolvedModel = resolveSessionModelRef(loaded.cfg, loaded.entry, sessionAgentId);
+  const messageProvider = delivery?.channel ?? routing?.channel ?? loaded.entry.channel;
+  const accountId = delivery?.accountId ?? routing?.accountId;
+  const threadId = delivery?.threadId ?? routing?.conversationThreadId;
   return {
     cfg: loaded.cfg,
     agentId: sessionAgentId,
     sessionKey: params.sessionKey,
     modelProvider: resolvedModel.provider,
     modelId: resolvedModel.model,
-    messageProvider:
-      delivery?.channel ??
-      loaded.entry.lastChannel ??
-      loaded.entry.channel ??
-      loaded.entry.origin?.provider,
-    accountId: delivery?.accountId ?? loaded.entry.lastAccountId ?? loaded.entry.origin?.accountId,
+    messageProvider,
+    accountId,
     currentChannelId: delivery?.to,
-    currentThreadTs:
-      delivery?.threadId != null
-        ? stringifyRouteThreadId(delivery.threadId)
-        : loaded.entry.lastThreadId != null
-          ? stringifyRouteThreadId(loaded.entry.lastThreadId)
-          : loaded.entry.origin?.threadId != null
-            ? stringifyRouteThreadId(loaded.entry.origin.threadId)
-            : undefined,
+    currentThreadTs: threadId != null ? stringifyRouteThreadId(threadId) : undefined,
     groupId: loaded.entry.groupId,
     groupChannel: loaded.entry.groupChannel,
     groupSpace: loaded.entry.space,
     replyToMode: resolveReplyToMode(
       loaded.cfg,
-      delivery?.channel ??
-        loaded.entry.lastChannel ??
-        loaded.entry.channel ??
-        loaded.entry.origin?.provider,
-      delivery?.accountId ?? loaded.entry.lastAccountId ?? loaded.entry.origin?.accountId,
-      loaded.entry.chatType ?? loaded.entry.origin?.chatType,
+      messageProvider,
+      accountId,
+      routing?.chatType ?? loaded.entry.chatType,
     ),
   };
 }

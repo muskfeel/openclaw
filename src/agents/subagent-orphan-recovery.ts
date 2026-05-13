@@ -11,16 +11,14 @@
  */
 
 import crypto from "node:crypto";
-import { getRuntimeConfig } from "../config/config.js";
 import {
-  loadSessionStore,
+  getSessionEntry,
   resolveAgentIdFromSessionKey,
-  resolveStorePath,
-  updateSessionStore,
+  upsertSessionEntry,
   type SessionEntry,
 } from "../config/sessions.js";
 import { callGateway } from "../gateway/call.js";
-import { readSessionMessagesAsync } from "../gateway/session-utils.fs.js";
+import { readSessionMessagesAsync } from "../gateway/session-transcript-readers.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveInternalSessionEffectsTranscriptPath } from "./internal-session-effects.js";
@@ -84,6 +82,75 @@ function buildResumeMessage(task: string, lastHumanMessage?: string): string {
 
   message += `Please continue where you left off.`;
   return message;
+}
+
+function buildRecoveryProgressPrompt(params: {
+  task: string;
+  attemptNumber: number;
+  maxAttempts: number;
+}): string {
+  const maxTaskLen = 160;
+  const taskLabel =
+    params.task.length > maxTaskLen ? `${params.task.slice(0, maxTaskLen)}...` : params.task;
+  return (
+    `A spawned subagent task was interrupted by a gateway restart or connection loss. ` +
+    `Automatic recovery is already in progress for "${taskLabel}" ` +
+    `(retry ${params.attemptNumber}/${params.maxAttempts}). ` +
+    `Send one brief update now in your normal voice: say the task was interrupted, ` +
+    `you are automatically resuming/retrying it, and you will report back when it either continues or truly fails. ` +
+    `Do not say the task has failed.`
+  );
+}
+
+async function announceRecoveryInProgress(params: {
+  runRecord: SubagentRunRecord;
+  attemptNumber: number;
+  maxAttempts: number;
+}): Promise<boolean> {
+  const requesterSessionKey = params.runRecord.requesterSessionKey?.trim();
+  if (!requesterSessionKey) {
+    return false;
+  }
+
+  const requesterOrigin = params.runRecord.requesterOrigin;
+  const requesterIsSubagent = isInternalAnnounceRequesterSession(requesterSessionKey);
+  let directOrigin = requesterOrigin;
+  if (!requesterIsSubagent) {
+    const { entry, deliveryContext } = loadRequesterSessionEntry(requesterSessionKey);
+    directOrigin = resolveAnnounceOrigin(entry, requesterOrigin, deliveryContext);
+  }
+
+  const prompt = buildRecoveryProgressPrompt({
+    task: params.runRecord.label || params.runRecord.task,
+    attemptNumber: params.attemptNumber,
+    maxAttempts: params.maxAttempts,
+  });
+
+  try {
+    const delivery = await deliverSubagentAnnouncement({
+      requesterSessionKey,
+      announceId: `${params.runRecord.runId}:recovery-progress`,
+      triggerMessage: prompt,
+      steerMessage: prompt,
+      summaryLine: params.runRecord.label || params.runRecord.task,
+      requesterSessionOrigin: requesterOrigin,
+      requesterOrigin,
+      completionDirectOrigin: requesterOrigin,
+      directOrigin,
+      sourceSessionKey: params.runRecord.childSessionKey,
+      sourceTool: "subagent_orphan_recovery",
+      targetRequesterSessionKey: requesterSessionKey,
+      requesterIsSubagent,
+      expectsCompletionMessage: false,
+      bestEffortDeliver: true,
+      directIdempotencyKey: buildAnnounceIdempotencyKey(
+        `${params.runRecord.runId}:recovery-progress`,
+      ),
+    });
+    return delivery.delivered;
+  } catch {
+    return false;
+  }
 }
 
 function extractMessageText(msg: unknown): string | undefined {
@@ -174,7 +241,7 @@ async function resumeOrphanedSession(params: {
  *
  * An orphaned session is one where:
  * 1. It has an active (not ended) entry in the subagent run registry
- * 2. Its session store entry has `abortedLastRun: true`
+ * 2. Its SQLite session row has `abortedLastRun: true`
  *
  * For each orphaned session found, we:
  * 1. Clear the `abortedLastRun` flag
@@ -205,8 +272,7 @@ export async function recoverOrphanedSubagentSessions(params: {
       return result;
     }
 
-    const cfg = getRuntimeConfig();
-    const storeCache = new Map<string, Record<string, SessionEntry>>();
+    const entryCache = new Map<string, SessionEntry | undefined>();
 
     for (const [runId, runRecord] of activeRuns.entries()) {
       const childSessionKey = runRecord.childSessionKey?.trim();
@@ -221,15 +287,12 @@ export async function recoverOrphanedSubagentSessions(params: {
 
       try {
         const agentId = resolveAgentIdFromSessionKey(childSessionKey);
-        const storePath = resolveStorePath(cfg.session?.store, { agentId });
-
-        let store = storeCache.get(storePath);
-        if (!store) {
-          store = loadSessionStore(storePath);
-          storeCache.set(storePath, store);
+        const cacheKey = `${agentId}\0${childSessionKey}`;
+        let entry = entryCache.get(cacheKey);
+        if (!entryCache.has(cacheKey)) {
+          entry = getSessionEntry({ agentId, sessionKey: childSessionKey });
+          entryCache.set(cacheKey, entry);
         }
-
-        const entry = store[childSessionKey];
         if (!entry) {
           result.skipped++;
           continue;
@@ -257,24 +320,30 @@ export async function recoverOrphanedSubagentSessions(params: {
         if (!recoveryGate.allowed) {
           if (recoveryGate.shouldMarkWedged) {
             try {
-              await updateSessionStore(storePath, (currentStore) => {
-                const current = currentStore[childSessionKey];
-                if (current) {
-                  markSubagentRecoveryWedged({
-                    entry: current,
-                    now,
-                    runId,
-                    reason: recoveryGate.reason,
-                  });
-                  currentStore[childSessionKey] = current;
-                }
-              });
-              markSubagentRecoveryWedged({
-                entry,
-                now,
-                runId,
-                reason: recoveryGate.reason,
-              });
+              const current = getSessionEntry({ agentId, sessionKey: childSessionKey });
+              if (current) {
+                const next: SessionEntry = { ...current };
+                markSubagentRecoveryWedged({
+                  entry: next,
+                  now,
+                  runId,
+                  reason: recoveryGate.reason,
+                });
+                upsertSessionEntry({
+                  agentId,
+                  sessionKey: childSessionKey,
+                  entry: next,
+                });
+                entry = next;
+                entryCache.set(cacheKey, next);
+              } else {
+                markSubagentRecoveryWedged({
+                  entry,
+                  now,
+                  runId,
+                  reason: recoveryGate.reason,
+                });
+              }
             } catch (err) {
               log.warn(
                 `failed to persist wedged subagent recovery marker for ${childSessionKey}: ${String(err)}`,
@@ -294,9 +363,10 @@ export async function recoverOrphanedSubagentSessions(params: {
         log.info(`found orphaned subagent session: ${childSessionKey} (run=${runId})`);
 
         const messages = await readSessionMessagesAsync(
-          entry.sessionId,
-          storePath,
-          entry.sessionFile,
+          {
+            agentId: resolveAgentIdFromSessionKey(childSessionKey),
+            sessionId: entry.sessionId,
+          },
           {
             mode: "recent",
             maxMessages: 200,
@@ -333,23 +403,30 @@ export async function recoverOrphanedSubagentSessions(params: {
           resumedSessionKeys.add(childSessionKey);
           // Only clear the aborted flag after confirmed successful resume.
           try {
-            await updateSessionStore(storePath, (currentStore) => {
-              const current = currentStore[childSessionKey];
-              if (current) {
-                current.abortedLastRun = false;
-                markSubagentRecoveryAttempt({
-                  entry: current,
-                  now: Date.now(),
-                  runId,
-                  attempt: recoveryGate.nextAttempt,
-                });
-                current.updatedAt = Date.now();
-                currentStore[childSessionKey] = current;
-              }
-            });
+            const current = getSessionEntry({ agentId, sessionKey: childSessionKey });
+            if (current) {
+              const next: SessionEntry = {
+                ...current,
+                abortedLastRun: false,
+                updatedAt: Date.now(),
+              };
+              markSubagentRecoveryAttempt({
+                entry: next,
+                now: Date.now(),
+                runId,
+                attempt: recoveryGate.nextAttempt,
+              });
+              next.updatedAt = Date.now();
+              upsertSessionEntry({
+                agentId,
+                sessionKey: childSessionKey,
+                entry: next,
+              });
+              entryCache.set(cacheKey, next);
+            }
           } catch (err) {
             log.warn(
-              `resume succeeded but failed to update session store for ${childSessionKey}: ${String(err)}`,
+              `resume succeeded but failed to update SQLite session row for ${childSessionKey}: ${String(err)}`,
             );
           }
           result.recovered++;

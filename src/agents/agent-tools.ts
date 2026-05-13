@@ -17,7 +17,22 @@ import {
 } from "../shared/string-coerce.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentConfig } from "./agent-scope.js";
-import { wrapToolWithAbortSignal } from "./agent-tools.abort.js";
+import { createApplyPatchTool } from "./apply-patch.js";
+import type { AuthProfileStore } from "./auth-profiles/types.js";
+import { describeExecTool, describeProcessTool } from "./bash-tools.descriptions.js";
+import type { ExecToolDefaults } from "./bash-tools.exec-types.js";
+import type { ProcessToolDefaults } from "./bash-tools.process.js";
+import { execSchema, processSchema } from "./bash-tools.schemas.js";
+import { listChannelAgentTools } from "./channel-tools.js";
+import { shouldSuppressManagedWebSearchTool } from "./codex-native-web-search.js";
+import type { AgentFilesystem, AgentToolArtifactStore } from "./filesystem/agent-filesystem.js";
+import { createVirtualAgentFsProjection } from "./filesystem/virtual-agent-fs-projection.js";
+import { resolveImageSanitizationLimits } from "./image-sanitization.js";
+import type { ModelAuthMode } from "./model-auth.js";
+import { resolveOpenClawPluginToolsForOptions } from "./openclaw-plugin-tools.js";
+import { createOpenClawTools } from "./openclaw-tools.js";
+import { createCodingTools, createReadTool } from "./pi-coding-agent-contract.js";
+import { wrapToolWithAbortSignal } from "./pi-tools.abort.js";
 import {
   type ToolOutcomeObserver,
   wrapToolWithBeforeToolCallHook,
@@ -39,6 +54,12 @@ import {
   createSandboxedEditTool,
   createSandboxedReadTool,
   createSandboxedWriteTool,
+  createVirtualEditTool,
+  createVirtualReadTool,
+  createVirtualWriteTool,
+  createWorkspaceScratchOverlayEditTool,
+  createWorkspaceScratchOverlayReadTool,
+  createWorkspaceScratchOverlayWriteTool,
   getToolParamsRecord,
   wrapToolMemoryFlushAppendOnlyWrite,
   wrapToolWorkspaceRootGuard,
@@ -108,29 +129,6 @@ function isOpenAIProvider(provider?: string) {
 
 const MEMORY_FLUSH_ALLOWED_TOOL_NAMES = new Set(["read", "write"]);
 
-type GuardContainerMount = {
-  containerRoot: string;
-  hostRoot: string;
-};
-
-function readOnlyAgentWorkspaceMount(
-  sandbox: SandboxContext | null | undefined,
-): GuardContainerMount[] | undefined {
-  if (
-    !sandbox ||
-    sandbox.workspaceAccess !== "ro" ||
-    sandbox.agentWorkspaceDir === sandbox.workspaceDir
-  ) {
-    return undefined;
-  }
-  return [
-    {
-      containerRoot: SANDBOX_AGENT_WORKSPACE_MOUNT,
-      hostRoot: sandbox.agentWorkspaceDir,
-    },
-  ];
-}
-
 function resolveSkillReadRoots(skillsSnapshot?: SkillSnapshot): string[] | undefined {
   const roots = new Set<string>();
   for (const skill of skillsSnapshot?.resolvedSkills ?? []) {
@@ -153,6 +151,18 @@ type BashToolsModule = typeof import("./bash-tools.js");
 const bashToolsModuleLoader = createLazyImportLoader<BashToolsModule>(
   () => import("./bash-tools.js"),
 );
+
+function readOnlyAgentWorkspaceMount(
+  sandbox: SandboxContext,
+): readonly [{ containerRoot: string; hostRoot: string }] | undefined {
+  if (
+    sandbox.workspaceAccess !== "ro" ||
+    path.resolve(sandbox.agentWorkspaceDir) === path.resolve(sandbox.workspaceDir)
+  ) {
+    return undefined;
+  }
+  return [{ containerRoot: SANDBOX_AGENT_WORKSPACE_MOUNT, hostRoot: sandbox.agentWorkspaceDir }];
+}
 
 function loadBashToolsModule(): Promise<BashToolsModule> {
   return bashToolsModuleLoader.load();
@@ -181,6 +191,59 @@ function createLazyExecTool(defaults?: ExecToolDefaults): AnyAgentTool {
     parameters: execSchema,
     execute: async (...args: Parameters<AnyAgentTool["execute"]>) =>
       (await loadTool()).execute(...args),
+  } as AnyAgentTool;
+}
+
+function isChildProcessPermissionAvailable(): boolean {
+  const permission = (
+    process as typeof process & {
+      permission?: { has(scope: string, reference?: string): boolean };
+    }
+  ).permission;
+  if (!permission) {
+    return true;
+  }
+  try {
+    return permission.has("child");
+  } catch {
+    return false;
+  }
+}
+
+function createLazyVirtualExecTool(
+  defaults: ExecToolDefaults | undefined,
+  scratch: AgentFilesystem["scratch"],
+): AnyAgentTool {
+  const baseTool = createLazyExecTool({ ...defaults, allowBackground: false });
+  return {
+    ...baseTool,
+    execute: async (...executeArgs: Parameters<AnyAgentTool["execute"]>) => {
+      const [toolCallId, rawArgs, signal, onUpdate] = executeArgs;
+      const params =
+        rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)
+          ? { ...(rawArgs as Record<string, unknown>) }
+          : {};
+      const requestedHost = typeof params.host === "string" ? params.host.trim().toLowerCase() : "";
+      if (requestedHost && requestedHost !== "auto" && requestedHost !== "gateway") {
+        throw new Error("VFS exec only supports host=auto or host=gateway.");
+      }
+      if (params.elevated === true) {
+        throw new Error("VFS exec does not support elevated host execution.");
+      }
+
+      const projection = await createVirtualAgentFsProjection(scratch);
+      try {
+        params.host = "gateway";
+        params.workdir = await projection.resolveWorkdir(
+          typeof params.workdir === "string" ? params.workdir : undefined,
+        );
+        const result = await baseTool.execute(toolCallId, params, signal, onUpdate);
+        await projection.syncBack();
+        return result;
+      } finally {
+        await projection.cleanup();
+      }
+    },
   } as AnyAgentTool;
 }
 
@@ -234,19 +297,15 @@ function applyModelProviderToolPolicy(
     modelProvider?: string;
     modelApi?: string;
     modelId?: string;
-    agentId?: string;
-    sessionKey?: string;
     agentDir?: string;
     modelCompat?: ModelCompatConfig;
     suppressManagedWebSearch?: boolean;
   },
 ): AnyAgentTool[] {
-  tools = filterLocalModelLeanTools({
-    tools,
-    config: params?.config,
-    agentId: params?.agentId,
-    sessionKey: params?.sessionKey,
-  });
+  if (params?.config?.agents?.defaults?.experimental?.localModelLean === true) {
+    const leanDeny = new Set(["browser", "cron", "message"]);
+    tools = tools.filter((tool) => !leanDeny.has(tool.name));
+  }
 
   if (
     params?.suppressManagedWebSearch !== false &&
@@ -327,7 +386,7 @@ function resolveExecConfig(params: { cfg?: OpenClawConfig; agentId?: string }) {
 
 export { resolveToolLoopDetectionConfig } from "./tool-loop-detection-config.js";
 
-export const testing = {
+export const __testing = {
   cleanToolSchemaForGemini,
   getToolParamsRecord,
   wrapToolParamValidation,
@@ -371,8 +430,6 @@ export function createOpenClawCodingTools(options?: {
   /** Relative workspace path that memory-triggered writes may append to. */
   memoryFlushWritePath?: string;
   agentDir?: string;
-  /** Task working directory for coding tools. Defaults to workspaceDir. */
-  cwd?: string;
   workspaceDir?: string;
   /**
    * Workspace directory that spawned subagents should inherit.
@@ -383,8 +440,6 @@ export function createOpenClawCodingTools(options?: {
   spawnWorkspaceDir?: string;
   config?: OpenClawConfig;
   abortSignal?: AbortSignal;
-  /** Disable hook-owned diagnostics when an outer runtime owns tool diagnostics. */
-  emitBeforeToolCallDiagnostics?: boolean;
   /**
    * Provider of the currently selected model (used for provider-specific tool quirks).
    * Example: "anthropic", "openai", "google", "openai-codex".
@@ -444,6 +499,8 @@ export function createOpenClawCodingTools(options?: {
   inboundEventKind?: InboundEventKind;
   /** If true, omit the message tool from the tool list. */
   disableMessageTool?: boolean;
+  /** Runtime-owned filesystem capabilities. Absence of workspace disables host workspace tools. */
+  agentFilesystem?: AgentFilesystem;
   /** Keep the message tool available even when the selected profile omits it. */
   forceMessageTool?: boolean;
   /** Include the heartbeat response tool for structured heartbeat outcomes. */
@@ -470,6 +527,8 @@ export function createOpenClawCodingTools(options?: {
   recordToolPrepStage?: (name: string) => void;
   /** Live observer called after wrapped tool outcomes are recorded. */
   onToolOutcome?: ToolOutcomeObserver;
+  /** Optional run-scoped store for tool-generated artifact manifests. */
+  artifactStore?: AgentToolArtifactStore;
   /** Runtime-only resolved skill paths that the read tool may load under workspaceOnly. */
   skillsSnapshot?: SkillSnapshot;
 }): AnyAgentTool[] {
@@ -631,10 +690,20 @@ export function createOpenClawCodingTools(options?: {
   const sandboxRoot = sandbox?.workspaceDir;
   const sandboxFsBridge = sandbox?.fsBridge;
   const allowWorkspaceWrites = sandbox?.workspaceAccess !== "ro";
-  const workspaceRoot = resolveWorkspaceRoot(options?.workspaceDir);
-  const runtimeRoot = resolveWorkspaceRoot(options?.cwd ?? options?.workspaceDir);
-  const codingRoot = sandboxRoot ?? runtimeRoot;
-  const memoryFlushWriteRoot = sandboxRoot ?? workspaceRoot;
+  const hasHostWorkspaceCapability = options?.agentFilesystem
+    ? Boolean(options.agentFilesystem.workspace)
+    : true;
+  const virtualScratch =
+    !hasHostWorkspaceCapability && options?.agentFilesystem?.scratch
+      ? options.agentFilesystem.scratch
+      : undefined;
+  const workspaceScratchOverlay =
+    hasHostWorkspaceCapability && options?.agentFilesystem?.scratch
+      ? options.agentFilesystem.scratch
+      : undefined;
+  const workspaceRoot = resolveWorkspaceRoot(
+    options?.agentFilesystem?.workspace?.root ?? options?.workspaceDir,
+  );
   const includeCoreTools = options?.includeCoreTools !== false;
   const toolConstructionPlan = options?.toolConstructionPlan ?? {
     includeBaseCodingTools: includeCoreTools,
@@ -643,8 +712,22 @@ export function createOpenClawCodingTools(options?: {
     includeOpenClawTools: includeCoreTools,
     includePluginTools: true,
   };
-  const includeBaseCodingTools = includeCoreTools && toolConstructionPlan.includeBaseCodingTools;
-  const includeShellTools = includeCoreTools && toolConstructionPlan.includeShellTools;
+  const includeBaseCodingTools =
+    includeCoreTools &&
+    (hasHostWorkspaceCapability || Boolean(virtualScratch)) &&
+    toolConstructionPlan.includeBaseCodingTools;
+  const includeHostShellTools =
+    includeCoreTools && hasHostWorkspaceCapability && toolConstructionPlan.includeShellTools;
+  const includeVirtualExecTool =
+    includeCoreTools &&
+    !hasHostWorkspaceCapability &&
+    Boolean(virtualScratch) &&
+    toolConstructionPlan.includeShellTools &&
+    isChildProcessPermissionAvailable();
+  const includePatchTool =
+    includeCoreTools &&
+    (hasHostWorkspaceCapability || Boolean(virtualScratch)) &&
+    toolConstructionPlan.includeShellTools;
   const includeOpenClawTools = includeCoreTools && toolConstructionPlan.includeOpenClawTools;
   const includeChannelTools = toolConstructionPlan.includeChannelTools;
   const includePluginTools = toolConstructionPlan.includePluginTools;
@@ -669,126 +752,170 @@ export function createOpenClawCodingTools(options?: {
   const imageSanitization = resolveImageSanitizationLimits(options?.config);
   options?.recordToolPrepStage?.("workspace-policy");
 
-  const base: AnyAgentTool[] = [];
-  if (includeBaseCodingTools) {
-    for (const tool of createCodingTools(codingRoot) as unknown as AnyAgentTool[]) {
-      if (tool.name === "read") {
-        if (sandboxRoot) {
-          const sandboxed = createSandboxedReadTool({
-            root: sandboxRoot,
-            bridge: sandboxFsBridge!,
+  const base = includeBaseCodingTools
+    ? (createCodingTools(workspaceRoot) as unknown as AnyAgentTool[]).flatMap((tool) => {
+        if (tool.name === "read") {
+          if (virtualScratch) {
+            return [
+              createVirtualReadTool({
+                root: workspaceRoot,
+                scratch: virtualScratch,
+                modelContextWindowTokens: options?.modelContextWindowTokens,
+                imageSanitization,
+              }),
+            ];
+          }
+          if (workspaceScratchOverlay && !sandboxRoot) {
+            return [
+              createWorkspaceScratchOverlayReadTool({
+                root: workspaceRoot,
+                scratch: workspaceScratchOverlay,
+                workspaceOnly,
+                modelContextWindowTokens: options?.modelContextWindowTokens,
+                imageSanitization,
+              }),
+            ];
+          }
+          if (sandboxRoot) {
+            const sandboxed = createSandboxedReadTool({
+              root: sandboxRoot,
+              bridge: sandboxFsBridge!,
+              modelContextWindowTokens: options?.modelContextWindowTokens,
+              imageSanitization,
+            });
+            return [
+              workspaceOnly
+                ? wrapToolWorkspaceRootGuardWithOptions(sandboxed, sandboxRoot, {
+                    additionalContainerMounts: readOnlyAgentWorkspaceMount(sandbox),
+                    containerWorkdir: sandbox.containerWorkdir,
+                  })
+                : sandboxed,
+            ];
+          }
+          const freshReadTool = createReadTool(workspaceRoot);
+          const wrapped = createOpenClawReadTool(freshReadTool, {
             modelContextWindowTokens: options?.modelContextWindowTokens,
             imageSanitization,
           });
-          base.push(
+          return [
             workspaceOnly
-              ? wrapToolWorkspaceRootGuardWithOptions(sandboxed, sandboxRoot, {
-                  additionalContainerMounts: readOnlyAgentWorkspaceMount(sandbox),
-                  containerWorkdir: sandbox.containerWorkdir,
+              ? wrapToolWorkspaceRootGuardWithOptions(wrapped, workspaceRoot, {
+                  additionalRoots: skillReadRoots,
                 })
-              : sandboxed,
-          );
-          continue;
+              : wrapped,
+          ];
         }
-        const freshReadTool = createReadTool(codingRoot);
-        const wrapped = createOpenClawReadTool(freshReadTool, {
-          modelContextWindowTokens: options?.modelContextWindowTokens,
-          imageSanitization,
-        });
-        base.push(
-          workspaceOnly
-            ? wrapToolWorkspaceRootGuardWithOptions(wrapped, codingRoot, {
-                additionalRoots: skillReadRoots,
-              })
-            : wrapped,
-        );
-        continue;
-      }
-      if (tool.name === "bash" || tool.name === execToolName) {
-        continue;
-      }
-      if (tool.name === "write") {
-        if (sandboxRoot) {
-          continue;
+        if (tool.name === "write") {
+          if (virtualScratch) {
+            return [createVirtualWriteTool({ root: workspaceRoot, scratch: virtualScratch })];
+          }
+          if (workspaceScratchOverlay && !sandboxRoot) {
+            return [
+              createWorkspaceScratchOverlayWriteTool({
+                root: workspaceRoot,
+                scratch: workspaceScratchOverlay,
+                workspaceOnly,
+              }),
+            ];
+          }
+          if (sandboxRoot) {
+            return [];
+          }
+          const wrapped = createHostWorkspaceWriteTool(workspaceRoot, { workspaceOnly });
+          return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
         }
-        const wrapped = createHostWorkspaceWriteTool(codingRoot, { workspaceOnly });
-        base.push(workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, codingRoot) : wrapped);
-        continue;
-      }
-      if (tool.name === "edit") {
-        if (sandboxRoot) {
-          continue;
+        if (tool.name === "edit") {
+          if (virtualScratch) {
+            return [createVirtualEditTool({ root: workspaceRoot, scratch: virtualScratch })];
+          }
+          if (workspaceScratchOverlay && !sandboxRoot) {
+            return [
+              createWorkspaceScratchOverlayEditTool({
+                root: workspaceRoot,
+                scratch: workspaceScratchOverlay,
+                workspaceOnly,
+              }),
+            ];
+          }
+          if (sandboxRoot) {
+            return [];
+          }
+          const wrapped = createHostWorkspaceEditTool(workspaceRoot, { workspaceOnly });
+          return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
         }
-        const wrapped = createHostWorkspaceEditTool(codingRoot, { workspaceOnly });
-        base.push(workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, codingRoot) : wrapped);
-        continue;
-      }
-      base.push(tool);
-    }
-  }
+        if (tool.name === "bash" || tool.name === execToolName) {
+          return [];
+        }
+        return [tool];
+      })
+    : [];
   options?.recordToolPrepStage?.("base-coding-tools");
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
-  const execTool = includeShellTools
-    ? createLazyExecTool({
-        ...execDefaults,
-        host: options?.exec?.host ?? execConfig.host,
-        security: options?.exec?.security ?? execConfig.security,
-        ask: options?.exec?.ask ?? execConfig.ask,
-        trigger: options?.trigger,
-        node: options?.exec?.node ?? execConfig.node,
-        pathPrepend: options?.exec?.pathPrepend ?? execConfig.pathPrepend,
-        safeBins: options?.exec?.safeBins ?? execConfig.safeBins,
-        strictInlineEval: options?.exec?.strictInlineEval ?? execConfig.strictInlineEval,
-        commandHighlighting: options?.exec?.commandHighlighting ?? execConfig.commandHighlighting,
-        safeBinTrustedDirs: options?.exec?.safeBinTrustedDirs ?? execConfig.safeBinTrustedDirs,
-        safeBinProfiles: options?.exec?.safeBinProfiles ?? execConfig.safeBinProfiles,
-        agentId,
-        cwd: codingRoot,
-        allowBackground,
-        scopeKey,
-        sessionKey: options?.sessionKey,
-        mainKey: options?.config?.session?.mainKey,
-        sessionScope: options?.config?.session?.scope,
-        eventRouting: resolveEventSessionRoutingPolicy({
-          cfg: options?.config,
-          sessionKey: options?.sessionKey,
-          channel: options?.messageProvider,
-          accountId: options?.agentAccountId,
-        }),
-        messageProvider: options?.messageProvider,
-        currentChannelId: options?.currentChannelId,
-        currentThreadTs: options?.currentThreadTs,
-        accountId: options?.agentAccountId,
-        backgroundMs: options?.exec?.backgroundMs ?? execConfig.backgroundMs,
-        timeoutSec: options?.exec?.timeoutSec ?? execConfig.timeoutSec,
-        approvalRunningNoticeMs:
-          options?.exec?.approvalRunningNoticeMs ?? execConfig.approvalRunningNoticeMs,
-        notifyOnExit: options?.exec?.notifyOnExit ?? execConfig.notifyOnExit,
-        notifyOnExitEmptySuccess:
-          options?.exec?.notifyOnExitEmptySuccess ?? execConfig.notifyOnExitEmptySuccess,
-        sandbox: sandbox
-          ? {
-              containerName: sandbox.containerName,
-              workspaceDir: sandbox.workspaceDir,
-              containerWorkdir: sandbox.containerWorkdir,
-              env: sandbox.backend?.env ?? sandbox.docker.env,
-              buildExecSpec: sandbox.backend?.buildExecSpec.bind(sandbox.backend),
-              finalizeExec: sandbox.backend?.finalizeExec?.bind(sandbox.backend),
-            }
-          : undefined,
-      })
-    : null;
-  const processTool = includeShellTools
+  const execDefaultsForTool = {
+    ...execDefaults,
+    host: options?.exec?.host ?? execConfig.host,
+    security: options?.exec?.security ?? execConfig.security,
+    ask: options?.exec?.ask ?? execConfig.ask,
+    trigger: options?.trigger,
+    node: options?.exec?.node ?? execConfig.node,
+    pathPrepend: options?.exec?.pathPrepend ?? execConfig.pathPrepend,
+    safeBins: options?.exec?.safeBins ?? execConfig.safeBins,
+    strictInlineEval: options?.exec?.strictInlineEval ?? execConfig.strictInlineEval,
+    commandHighlighting: options?.exec?.commandHighlighting ?? execConfig.commandHighlighting,
+    safeBinTrustedDirs: options?.exec?.safeBinTrustedDirs ?? execConfig.safeBinTrustedDirs,
+    safeBinProfiles: options?.exec?.safeBinProfiles ?? execConfig.safeBinProfiles,
+    agentId,
+    cwd: workspaceRoot,
+    allowBackground,
+    scopeKey,
+    sessionKey: options?.sessionKey,
+    mainKey: options?.config?.session?.mainKey,
+    sessionScope: options?.config?.session?.scope,
+    eventRouting: resolveEventSessionRoutingPolicy({
+      cfg: options?.config,
+      sessionKey: options?.sessionKey,
+      channel: options?.messageProvider,
+      accountId: options?.agentAccountId,
+    }),
+    messageProvider: options?.messageProvider,
+    currentChannelId: options?.currentChannelId,
+    currentThreadTs: options?.currentThreadTs,
+    accountId: options?.agentAccountId,
+    backgroundMs: options?.exec?.backgroundMs ?? execConfig.backgroundMs,
+    timeoutSec: options?.exec?.timeoutSec ?? execConfig.timeoutSec,
+    approvalRunningNoticeMs:
+      options?.exec?.approvalRunningNoticeMs ?? execConfig.approvalRunningNoticeMs,
+    notifyOnExit: options?.exec?.notifyOnExit ?? execConfig.notifyOnExit,
+    notifyOnExitEmptySuccess:
+      options?.exec?.notifyOnExitEmptySuccess ?? execConfig.notifyOnExitEmptySuccess,
+    sandbox: sandbox
+      ? {
+          containerName: sandbox.containerName,
+          workspaceDir: sandbox.workspaceDir,
+          containerWorkdir: sandbox.containerWorkdir,
+          env: sandbox.backend?.env ?? sandbox.docker.env,
+          buildExecSpec: sandbox.backend?.buildExecSpec.bind(sandbox.backend),
+          finalizeExec: sandbox.backend?.finalizeExec?.bind(sandbox.backend),
+        }
+      : undefined,
+  } satisfies ExecToolDefaults;
+  const execTool = includeHostShellTools
+    ? createLazyExecTool(execDefaultsForTool)
+    : includeVirtualExecTool && virtualScratch
+      ? createLazyVirtualExecTool(execDefaultsForTool, virtualScratch)
+      : null;
+  const processTool = includeHostShellTools
     ? createLazyProcessTool({
         cleanupMs: cleanupMsOverride ?? execConfig.cleanupMs,
         scopeKey,
       })
     : null;
   const applyPatchTool =
-    !includeShellTools || !applyPatchEnabled || (sandboxRoot && !allowWorkspaceWrites)
+    !includePatchTool || !applyPatchEnabled || (sandboxRoot && !allowWorkspaceWrites)
       ? null
       : createApplyPatchTool({
-          cwd: codingRoot,
+          cwd: sandboxRoot ?? workspaceRoot,
+          virtual: virtualScratch ? { root: workspaceRoot, fs: virtualScratch } : undefined,
           sandbox:
             sandboxRoot && allowWorkspaceWrites
               ? { root: sandboxRoot, bridge: sandboxFsBridge! }
@@ -872,7 +999,6 @@ export function createOpenClawCodingTools(options?: {
             disableMessageTool: options?.disableMessageTool,
             requesterAgentIdOverride: agentId,
             allowGatewaySubagentBinding: options?.allowGatewaySubagentBinding,
-            authProfileStore: options?.authProfileStore,
           },
           resolvedConfig: options?.config,
         });
@@ -915,7 +1041,7 @@ export function createOpenClawCodingTools(options?: {
           ]
         : []
       : []),
-    ...(includeShellTools && applyPatchTool ? [applyPatchTool as unknown as AnyAgentTool] : []),
+    ...(applyPatchTool ? [applyPatchTool as unknown as AnyAgentTool] : []),
     ...(execTool ? [execTool as unknown as AnyAgentTool] : []),
     ...(processTool ? [processTool as unknown as AnyAgentTool] : []),
     // Channel docking: include channel-defined agent tools (login, etc.).
@@ -988,7 +1114,7 @@ export function createOpenClawCodingTools(options?: {
       if (tool.name === "write") {
         toolsForMemoryFlush.push(
           wrapToolMemoryFlushAppendOnlyWrite(tool, {
-            root: memoryFlushWriteRoot,
+            root: sandboxRoot ?? workspaceRoot,
             relativePath: memoryFlushWritePath,
             containerWorkdir: sandbox?.containerWorkdir,
             sandbox:
@@ -1016,8 +1142,6 @@ export function createOpenClawCodingTools(options?: {
     modelProvider: options?.modelProvider,
     modelApi: options?.modelApi,
     modelId: options?.modelId,
-    agentId: options?.agentId,
-    sessionKey: options?.sessionKey,
     agentDir: options?.agentDir,
     modelCompat: options?.modelCompat,
     suppressManagedWebSearch: options?.suppressManagedWebSearch,
@@ -1075,27 +1199,18 @@ export function createOpenClawCodingTools(options?: {
   );
   options?.recordToolPrepStage?.("schema-normalization");
   const withHooks = normalized.map((tool) =>
-    wrapToolWithBeforeToolCallHook(
-      tool,
-      {
-        agentId,
-        ...(options?.config ? { config: options.config } : {}),
-        cwd: codingRoot,
-        workspaceDir: workspaceRoot,
-        ...(options?.skillsSnapshot ? { skillsSnapshot: options.skillsSnapshot } : {}),
-        ...(sandboxRoot && allowWorkspaceWrites
-          ? { sandbox: { root: sandboxRoot, bridge: sandboxFsBridge! } }
-          : {}),
-        sessionKey: options?.sessionKey,
-        sessionId: options?.sessionId,
-        runId: options?.runId,
-        channelId: options?.hookChannelId ?? options?.currentChannelId,
-        ...(options?.trace ? { trace: options.trace } : {}),
-        loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
-        onToolOutcome: options?.onToolOutcome,
-      },
-      { emitDiagnostics: options?.emitBeforeToolCallDiagnostics },
-    ),
+    wrapToolWithBeforeToolCallHook(tool, {
+      agentId,
+      ...(options?.config ? { config: options.config } : {}),
+      sessionKey: options?.sessionKey,
+      sessionId: options?.sessionId,
+      runId: options?.runId,
+      channelId: options?.hookChannelId ?? options?.currentChannelId,
+      ...(options?.trace ? { trace: options.trace } : {}),
+      loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
+      onToolOutcome: options?.onToolOutcome,
+      artifactStore: options?.artifactStore,
+    }),
   );
   options?.recordToolPrepStage?.("tool-hooks");
   const withAbort = options?.abortSignal
@@ -1112,4 +1227,3 @@ export function createOpenClawCodingTools(options?: {
   // on the wire and maps them back for tool dispatch.
   return withDeferredFollowupDescriptions;
 }
-export { testing as __testing };

@@ -1,6 +1,6 @@
-import type { AgentSession } from "openclaw/plugin-sdk/agent-sessions";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearMemoryPluginState, registerMemoryPromptSection } from "../../plugins/memory-state.js";
+import type { AgentSession } from "../agent-extension-contract.js";
 import {
   applySystemPromptOverrideToSession,
   buildEmbeddedSystemPrompt,

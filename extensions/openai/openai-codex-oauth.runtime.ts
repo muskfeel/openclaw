@@ -1,6 +1,7 @@
 import path from "node:path";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import type { ProviderAuthContext } from "openclaw/plugin-sdk/plugin-entry";
+import { loginOpenAICodex, type OAuthCredentials } from "openclaw/plugin-sdk/provider-ai-oauth";
 import { ensureGlobalUndiciEnvProxyDispatcher } from "openclaw/plugin-sdk/runtime-env";
 import { formatCliCommand } from "openclaw/plugin-sdk/setup-tools";
 import { loginOpenAICodex } from "./openai-codex-oauth-flow.runtime.js";

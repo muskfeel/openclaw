@@ -96,7 +96,6 @@ describe("broadcast dispatch", () => {
         resolveAgentRoute: (params: unknown) => mockResolveAgentRoute(params),
       },
       session: {
-        resolveStorePath: vi.fn(() => "/tmp/feishu-session-store.json"),
         recordInboundSession: vi.fn().mockResolvedValue(undefined),
       },
       reply: {
@@ -133,7 +132,6 @@ describe("broadcast dispatch", () => {
             throw new Error("feishu broadcast test runtime only supports prepared turns");
           }
           await turn.recordInboundSession({
-            storePath: turn.storePath,
             sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
             ctx: turn.ctxPayload,
             groupResolution: turn.record?.groupResolution,
@@ -149,6 +147,25 @@ describe("broadcast dispatch", () => {
             dispatchResult: await turn.runDispatch(),
           };
         }),
+        runPrepared: vi.fn(
+          async (turn: Parameters<PluginRuntime["channel"]["turn"]["runPrepared"]>[0]) => {
+            await turn.recordInboundSession({
+              sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
+              ctx: turn.ctxPayload,
+              groupResolution: turn.record?.groupResolution,
+              createIfMissing: turn.record?.createIfMissing,
+              updateLastRoute: turn.record?.updateLastRoute,
+              onRecordError: turn.record?.onRecordError ?? (() => undefined),
+            });
+            return {
+              admission: { kind: "dispatch" as const },
+              dispatched: true,
+              ctxPayload: turn.ctxPayload,
+              routeSessionKey: turn.routeSessionKey,
+              dispatchResult: await turn.runDispatch(),
+            };
+          },
+        ),
       },
       pairing: {
         readAllowFromStore: vi.fn().mockResolvedValue([]),

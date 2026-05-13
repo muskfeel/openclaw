@@ -1,7 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { MigrationProviderContext } from "openclaw/plugin-sdk/plugin-entry";
+import {
+  loadAuthProfileStoreWithoutExternalProfiles,
+  resolveAuthProfileStoreLocationForDisplay,
+} from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/provider-auth";
+import { updateAuthProfileStoreWithLock } from "openclaw/plugin-sdk/provider-auth";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   HERMES_REASON_AUTH_PROFILE_EXISTS,
@@ -15,6 +19,10 @@ import {
   makeTempRoot,
   writeFile,
 } from "./test/provider-helpers.js";
+
+function stateEnv(stateDir: string): NodeJS.ProcessEnv {
+  return { ...process.env, OPENCLAW_STATE_DIR: stateDir };
+}
 
 async function expectMissingPath(filePath: string): Promise<void> {
   try {
@@ -37,7 +45,7 @@ describe("Hermes migration secret items", () => {
     await cleanupTempRoots();
   });
 
-  it("uses configured agentDir for secret planning and imports without runtime helpers", async () => {
+  it("uses configured agentDir for secret planning and imports into SQLite", async () => {
     const root = await makeTempRoot();
     const source = path.join(root, "hermes");
     const workspaceDir = path.join(root, "workspace");
@@ -77,7 +85,10 @@ describe("Hermes migration secret items", () => {
         kind: "secret",
         action: "create",
         source: path.join(source, ".env"),
-        target: `${customAgentDir}/auth-profiles.json#openai:hermes-import`,
+        target: `${resolveAuthProfileStoreLocationForDisplay(
+          customAgentDir,
+          stateEnv(stateDir),
+        )}/openai:hermes-import`,
         status: "planned",
         sensitive: true,
         details: {
@@ -101,21 +112,15 @@ describe("Hermes migration secret items", () => {
     );
 
     expect(result.summary.errors).toBe(0);
-    const authStore = JSON.parse(
-      await fs.readFile(path.join(customAgentDir, "auth-profiles.json"), "utf8"),
-    ) as {
-      profiles?: Record<
-        string,
-        { displayName?: string; key?: string; provider?: string; type?: string }
-      >;
-    };
+    const authStore = loadAuthProfileStoreWithoutExternalProfiles(customAgentDir, {
+      env: stateEnv(stateDir),
+    });
     expect(authStore.profiles?.["openai:hermes-import"]).toEqual({
       type: "api_key",
       provider: "openai",
       key: "sk-hermes",
       displayName: "Hermes import",
     });
-    await expectMissingPath(path.join(stateDir, "agents", "custom", "agent", "auth-profiles.json"));
   });
 
   it("reports API key import when config update fails after profile write", async () => {
@@ -195,7 +200,6 @@ describe("Hermes migration secret items", () => {
     await provider.plan(makeContext({ source, stateDir, workspaceDir, includeSecrets: true }));
 
     await expect(fs.access(path.join(agentDir, "auth.json"))).resolves.toBeUndefined();
-    await expectMissingPath(path.join(agentDir, "auth-profiles.json"));
   });
 
   it("reports late-created auth profiles as conflicts without overwriting", async () => {
@@ -216,23 +220,18 @@ describe("Hermes migration secret items", () => {
       reportDir,
     });
     const plan = await provider.plan(ctx);
-    await writeFile(
-      path.join(agentDir, "auth-profiles.json"),
-      JSON.stringify(
-        {
-          version: 1,
-          profiles: {
-            "openai:hermes-import": {
-              type: "api_key",
-              provider: "openai",
-              key: "sk-late",
-            },
-          },
-        },
-        null,
-        2,
-      ),
-    );
+    await updateAuthProfileStoreWithLock({
+      agentDir,
+      env: stateEnv(stateDir),
+      updater(store) {
+        store.profiles["openai:hermes-import"] = {
+          type: "api_key",
+          provider: "openai",
+          key: "sk-late",
+        };
+        return true;
+      },
+    });
 
     const result = await provider.apply(ctx, plan);
 
@@ -242,7 +241,10 @@ describe("Hermes migration secret items", () => {
         kind: "secret",
         action: "create",
         source: path.join(source, ".env"),
-        target: `${agentDir}/auth-profiles.json#openai:hermes-import`,
+        target: `${resolveAuthProfileStoreLocationForDisplay(
+          agentDir,
+          stateEnv(stateDir),
+        )}/openai:hermes-import`,
         status: "conflict",
         sensitive: true,
         reason: HERMES_REASON_AUTH_PROFILE_EXISTS,
@@ -254,10 +256,10 @@ describe("Hermes migration secret items", () => {
       },
     ]);
     expect(result.summary.conflicts).toBe(1);
-    const authStore = JSON.parse(
-      await fs.readFile(path.join(agentDir, "auth-profiles.json"), "utf8"),
-    ) as { profiles?: Record<string, { key?: string }> };
-    expect(authStore.profiles?.["openai:hermes-import"]?.key).toBe("sk-late");
+    const authStore = loadAuthProfileStoreWithoutExternalProfiles(agentDir, {
+      env: stateEnv(stateDir),
+    });
+    expect(authStore.profiles?.["openai:hermes-import"]).toMatchObject({ key: "sk-late" });
   });
 
   it("reports API key config auth profile conflicts during planning", async () => {

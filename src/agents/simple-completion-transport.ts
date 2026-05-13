@@ -3,6 +3,7 @@ import { getApiProvider } from "../llm/api-registry.js";
 import type { Api, Model } from "../llm/types.js";
 import { createAnthropicVertexStreamFnForModel } from "./anthropic-vertex-stream.js";
 import { ensureCustomApiRegistered } from "./custom-api-registry.js";
+import { getApiProvider, type Api, type Model } from "./pi-ai-contract.js";
 import { registerProviderStreamForModel } from "./provider-stream.js";
 import {
   buildTransportAwareSimpleStreamFn,

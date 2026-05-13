@@ -365,7 +365,7 @@ describe("AcpSessionManager", () => {
       }
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: {
           ...readySessionMeta(),
           agent: "main",
@@ -448,7 +448,7 @@ describe("AcpSessionManager", () => {
         if (sessionKey === "agent:codex:acp:child-1") {
           return {
             sessionKey,
-            storeSessionKey: sessionKey,
+            rowSessionKey: sessionKey,
             entry: {
               sessionId: "child-1",
               updatedAt: Date.now(),
@@ -461,7 +461,7 @@ describe("AcpSessionManager", () => {
         if (sessionKey === "agent:quant:telegram:quant:direct:822430204") {
           return {
             sessionKey,
-            storeSessionKey: sessionKey,
+            rowSessionKey: sessionKey,
             entry: {
               sessionId: "parent-1",
               updatedAt: Date.now(),
@@ -534,7 +534,7 @@ describe("AcpSessionManager", () => {
         if (sessionKey === "agent:codex:acp:child-1") {
           return {
             sessionKey,
-            storeSessionKey: sessionKey,
+            rowSessionKey: sessionKey,
             entry: {
               sessionId: "child-1",
               updatedAt: Date.now(),
@@ -547,7 +547,7 @@ describe("AcpSessionManager", () => {
         if (sessionKey === "agent:quant:telegram:quant:direct:822430204") {
           return {
             sessionKey,
-            storeSessionKey: sessionKey,
+            rowSessionKey: sessionKey,
             entry: {
               sessionId: "parent-1",
               updatedAt: Date.now(),
@@ -588,7 +588,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -646,7 +646,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -729,7 +729,7 @@ describe("AcpSessionManager", () => {
       });
       hoisted.readAcpSessionEntryMock.mockReturnValue({
         sessionKey: "agent:codex:acp:session-1",
-        storeSessionKey: "agent:codex:acp:session-1",
+        rowSessionKey: "agent:codex:acp:session-1",
         acp: readySessionMeta(),
       });
 
@@ -820,7 +820,7 @@ describe("AcpSessionManager", () => {
         const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
         return {
           sessionKey,
-          storeSessionKey: sessionKey,
+          rowSessionKey: sessionKey,
           acp: {
             ...readySessionMeta(),
             runtimeSessionName: `runtime:${sessionKey}`,
@@ -903,7 +903,7 @@ describe("AcpSessionManager", () => {
       const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: `runtime:${sessionKey}`,
@@ -962,7 +962,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -1060,7 +1060,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -1121,7 +1121,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockImplementation(() => ({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: currentMeta,
     }));
 
@@ -1166,7 +1166,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -1201,7 +1201,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: key,
@@ -1242,7 +1242,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           agent: "gemini",
@@ -1285,7 +1285,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           cwd: "/workspace/stale",
@@ -1322,7 +1322,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           runtimeOptions: {
@@ -1358,7 +1358,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           runtimeOptions: {
@@ -1394,7 +1394,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: key,
@@ -1475,7 +1475,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: currentMeta,
       };
     });
@@ -1533,7 +1533,7 @@ describe("AcpSessionManager", () => {
       const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: `runtime:${sessionKey}`,
@@ -1580,7 +1580,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.upsertAcpSessionMetaMock.mockResolvedValue({
       sessionKey: "agent:codex:acp:session-a",
-      storeSessionKey: "agent:codex:acp:session-a",
+      rowSessionKey: "agent:codex:acp:session-a",
       acp: readySessionMeta(),
     });
     const limitedCfg = {
@@ -1911,7 +1911,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.upsertAcpSessionMetaMock.mockResolvedValue({
       sessionKey: "agent:codex:acp:session-a",
-      storeSessionKey: "agent:codex:acp:session-a",
+      rowSessionKey: "agent:codex:acp:session-a",
       acp: readySessionMeta({
         runtimeOptions: {
           model: "openai-codex/gpt-5.4",
@@ -1953,7 +1953,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.upsertAcpSessionMetaMock.mockResolvedValue({
       sessionKey: "agent:codex:acp:session-cwd-runtime-options",
-      storeSessionKey: "agent:codex:acp:session-cwd-runtime-options",
+      rowSessionKey: "agent:codex:acp:session-cwd-runtime-options",
       acp: readySessionMeta({
         runtimeOptions: {
           cwd: "/workspace/from-runtime-options",
@@ -2010,7 +2010,7 @@ describe("AcpSessionManager", () => {
         const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
         return {
           sessionKey,
-          storeSessionKey: sessionKey,
+          rowSessionKey: sessionKey,
           acp: {
             ...readySessionMeta(),
             runtimeSessionName: `runtime:${sessionKey}`,
@@ -2067,7 +2067,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:claude:acp:session-1",
-      storeSessionKey: "agent:claude:acp:session-1",
+      rowSessionKey: "agent:claude:acp:session-1",
       acp: readySessionMeta({
         agent: "claude",
       }),
@@ -2103,7 +2103,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:openclaw:acp:session-1",
-      storeSessionKey: "agent:openclaw:acp:session-1",
+      rowSessionKey: "agent:openclaw:acp:session-1",
       acp: readySessionMeta({
         agent: "openclaw",
       }),
@@ -2132,7 +2132,7 @@ describe("AcpSessionManager", () => {
     const sessionKey = "agent:claude:acp:binding:discord:default:9373ab192b2317f4";
     const entry = {
       sessionKey,
-      storeSessionKey: sessionKey,
+      rowSessionKey: sessionKey,
       acp: readySessionMeta({
         agent: "claude",
         state: "running",
@@ -2219,7 +2219,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: currentMeta,
       };
     });
@@ -2273,7 +2273,7 @@ describe("AcpSessionManager", () => {
 
     const entry = {
       sessionKey,
-      storeSessionKey: sessionKey,
+      rowSessionKey: sessionKey,
       acp: readySessionMeta({
         agent: "claude",
         identity: {
@@ -2340,7 +2340,7 @@ describe("AcpSessionManager", () => {
         const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
         return {
           sessionKey,
-          storeSessionKey: sessionKey,
+          rowSessionKey: sessionKey,
           acp: {
             ...readySessionMeta(),
             runtimeSessionName: `runtime:${sessionKey}`,
@@ -2404,7 +2404,7 @@ describe("AcpSessionManager", () => {
       const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: `runtime:${sessionKey}`,
@@ -2473,7 +2473,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -2532,7 +2532,7 @@ describe("AcpSessionManager", () => {
       const sessionKey = (paramsUnknown as { sessionKey?: string }).sessionKey ?? "";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: {
           ...readySessionMeta(),
           runtimeSessionName: `runtime:${sessionKey}`,
@@ -2573,7 +2573,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
     runtimeState.runTurn.mockImplementation(async function* () {
@@ -3421,7 +3421,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
     runtimeState.runTurn.mockImplementation(async function* () {
@@ -3457,7 +3457,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: {
         ...readySessionMeta(),
         state: "running",
@@ -3494,7 +3494,7 @@ describe("AcpSessionManager", () => {
       });
       hoisted.readAcpSessionEntryMock.mockReturnValue({
         sessionKey: "agent:codex:acp:session-1",
-        storeSessionKey: "agent:codex:acp:session-1",
+        rowSessionKey: "agent:codex:acp:session-1",
         acp: readySessionMeta(),
       });
       runtimeState.runTurn
@@ -3553,7 +3553,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: currentMeta,
       };
     });
@@ -3642,7 +3642,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -3681,7 +3681,7 @@ describe("AcpSessionManager", () => {
         (paramsUnknown as { sessionKey?: string }).sessionKey ?? "agent:codex:acp:session-1";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: currentMeta,
       };
     });
@@ -3760,7 +3760,7 @@ describe("AcpSessionManager", () => {
         (paramsUnknown as { sessionKey?: string }).sessionKey ?? "agent:codex:acp:session-1";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: currentMeta,
       };
     });
@@ -3821,7 +3821,7 @@ describe("AcpSessionManager", () => {
         (paramsUnknown as { sessionKey?: string }).sessionKey ?? "agent:codex:acp:session-1";
       return {
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         acp: currentMeta,
       };
     });
@@ -3909,9 +3909,9 @@ describe("AcpSessionManager", () => {
     hoisted.listAcpSessionEntriesMock.mockResolvedValue([
       {
         cfg: baseCfg,
-        storePath: "/tmp/sessions-acp.json",
+        agentId: "codex",
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         entry: {
           sessionId: "session-1",
           updatedAt: Date.now(),
@@ -3924,7 +3924,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: currentMeta,
       };
     });
@@ -3967,9 +3967,9 @@ describe("AcpSessionManager", () => {
     hoisted.listAcpSessionEntriesMock.mockResolvedValue([
       {
         cfg: baseCfg,
-        storePath: "/tmp/sessions-acp.json",
+        agentId: "claude",
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         entry: {
           sessionId: "session-1",
           updatedAt: Date.now(),
@@ -4048,7 +4048,7 @@ describe("AcpSessionManager", () => {
       const key = (paramsUnknown as { sessionKey?: string }).sessionKey ?? sessionKey;
       return {
         sessionKey: key,
-        storeSessionKey: key,
+        rowSessionKey: key,
         acp: currentMeta,
       };
     });
@@ -4104,9 +4104,9 @@ describe("AcpSessionManager", () => {
     hoisted.listAcpSessionEntriesMock.mockResolvedValue([
       {
         cfg: baseCfg,
-        storePath: "/tmp/sessions-acp.json",
+        agentId: "codex",
         sessionKey,
-        storeSessionKey: sessionKey,
+        rowSessionKey: sessionKey,
         entry: {
           sessionId: "session-1",
           updatedAt: Date.now(),
@@ -4141,7 +4141,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: {
         ...readySessionMeta(),
         identity: {
@@ -4172,7 +4172,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: {
         ...readySessionMeta(),
         runtimeOptions: {
@@ -4445,7 +4445,7 @@ describe("AcpSessionManager", () => {
     const sessionKey = "agent:codex:acp:session-cwd-update";
     let currentEntry = {
       sessionKey,
-      storeSessionKey: sessionKey,
+      rowSessionKey: sessionKey,
       acp: readySessionMeta(),
     };
     hoisted.readAcpSessionEntryMock.mockImplementation(() => currentEntry);
@@ -4521,7 +4521,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -4675,7 +4675,7 @@ describe("AcpSessionManager", () => {
     });
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
 
@@ -4704,7 +4704,7 @@ describe("AcpSessionManager", () => {
   it("can close and clear metadata when backend is unavailable", async () => {
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
     hoisted.requireAcpRuntimeBackendMock.mockImplementation(() => {
@@ -4732,7 +4732,7 @@ describe("AcpSessionManager", () => {
   it("does not fail reset close recovery when backend lookup also throws", async () => {
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
     hoisted.requireAcpRuntimeBackendMock.mockImplementation(() => {
@@ -4761,7 +4761,7 @@ describe("AcpSessionManager", () => {
     const runtimeState = createRuntime();
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:claude:acp:session-1",
-      storeSessionKey: "agent:claude:acp:session-1",
+      rowSessionKey: "agent:claude:acp:session-1",
       acp: readySessionMeta({
         agent: "claude",
       }),
@@ -4797,7 +4797,7 @@ describe("AcpSessionManager", () => {
   it("surfaces metadata clear errors during closeSession", async () => {
     hoisted.readAcpSessionEntryMock.mockReturnValue({
       sessionKey: "agent:codex:acp:session-1",
-      storeSessionKey: "agent:codex:acp:session-1",
+      rowSessionKey: "agent:codex:acp:session-1",
       acp: readySessionMeta(),
     });
     hoisted.requireAcpRuntimeBackendMock.mockImplementation(() => {

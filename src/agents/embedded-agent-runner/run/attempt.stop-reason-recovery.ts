@@ -1,7 +1,6 @@
 import { formatErrorMessage } from "../../../infra/errors.js";
-import { createAssistantMessageEventStream } from "../../../llm/utils/event-stream.js";
-import type { StreamFn } from "../../runtime/index.js";
-import type { MutableAssistantMessageEventStream } from "../../stream-compat.js";
+import type { StreamFn } from "../../agent-core-contract.js";
+import { createAssistantMessageEventStream, streamSimple } from "../../pi-ai-contract.js";
 import { createStreamIteratorWrapper } from "../../stream-iterator-wrapper.js";
 import { buildStreamErrorAssistantMessage } from "../../stream-message-shared.js";
 

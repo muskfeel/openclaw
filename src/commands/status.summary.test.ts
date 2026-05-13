@@ -5,47 +5,9 @@ import type { TaskRegistrySummary } from "../tasks/task-registry.types.js";
 const statusSummaryMocks = vi.hoisted(() => ({
   hasConfiguredChannelsForReadOnlyScope: vi.fn(() => true),
   buildChannelSummary: vi.fn(async () => ["ok"]),
-  readSessionStoreReadOnly: vi.fn(() => ({})),
-  taskRegistrySummary: {
-    total: 0,
-    active: 0,
-    terminal: 0,
-    failures: 0,
-    byStatus: {
-      queued: 0,
-      running: 0,
-      succeeded: 0,
-      failed: 0,
-      timed_out: 0,
-      cancelled: 0,
-      lost: 0,
-    },
-    byRuntime: {
-      subagent: 0,
-      acp: 0,
-      cli: 0,
-      cron: 0,
-    },
-  } as TaskRegistrySummary,
-  taskAuditFindings: [
-    {
-      severity: "warn",
-      code: "delivery_failed",
-      detail: "terminal update delivery failed",
-      task: {
-        taskId: "task-delivery",
-        runtime: "subagent",
-        ownerKey: "agent:main:main",
-        requesterSessionKey: "agent:main:main",
-        scopeKind: "session",
-        task: "Deliver update",
-        status: "failed",
-        deliveryStatus: "failed",
-        notifyPolicy: "done_only",
-        createdAt: 1,
-      },
-    },
-  ] as TaskAuditFinding[],
+  listSessionEntries: vi.fn(
+    () => [] as Array<{ sessionKey: string; entry: Record<string, unknown> }>,
+  ),
 }));
 
 vi.mock("../plugins/channel-plugin-ids.js", () => ({
@@ -82,12 +44,8 @@ vi.mock("../config/config.js", () => ({
   getRuntimeConfig: vi.fn(() => ({})),
 }));
 
-vi.mock("../config/sessions/paths.js", () => ({
-  resolveStorePath: vi.fn(() => "/tmp/sessions.json"),
-}));
-
-vi.mock("../config/sessions/store-read.js", () => ({
-  readSessionStoreReadOnly: statusSummaryMocks.readSessionStoreReadOnly,
+vi.mock("../config/sessions/store.js", () => ({
+  listSessionEntries: statusSummaryMocks.listSessionEntries,
 }));
 
 vi.mock("../gateway/agent-list.js", () => ({
@@ -133,6 +91,7 @@ vi.mock("../tasks/task-registry.maintenance.js", () => ({
 }));
 
 vi.mock("../routing/session-key.js", () => ({
+  DEFAULT_AGENT_ID: "main",
   normalizeAgentId: vi.fn((value: string) => value),
   normalizeMainKey: vi.fn((value?: string) => value ?? "main"),
   parseAgentSessionKey: vi.fn(() => null),
@@ -205,7 +164,7 @@ describe("getStatusSummary", () => {
     ];
     statusSummaryMocks.hasConfiguredChannelsForReadOnlyScope.mockReturnValue(true);
     statusSummaryMocks.buildChannelSummary.mockResolvedValue(["ok"]);
-    statusSummaryMocks.readSessionStoreReadOnly.mockReturnValue({});
+    statusSummaryMocks.listSessionEntries.mockReturnValue([]);
   });
 
   it("includes runtimeVersion in the status payload", async () => {
@@ -309,12 +268,15 @@ describe("getStatusSummary", () => {
 
   it("includes the selected agent runtime on recent sessions", async () => {
     vi.mocked(statusSummaryRuntime.resolveSessionRuntimeLabel).mockReturnValue("OpenAI Codex");
-    statusSummaryMocks.readSessionStoreReadOnly.mockReturnValue({
-      "agent:main:main": {
-        sessionId: "session-1",
-        updatedAt: Date.now(),
+    statusSummaryMocks.listSessionEntries.mockReturnValue([
+      {
+        sessionKey: "agent:main:main",
+        entry: {
+          sessionId: "session-1",
+          updatedAt: Date.now(),
+        },
       },
-    });
+    ]);
 
     const summary = await getStatusSummary();
 

@@ -390,8 +390,7 @@ export default definePluginEntry({
         if (apiKey) {
           return { token: apiKey };
         }
-        const legacyToken = resolveDeprecatedPiAgentAccessToken(ctx.env, ["z-ai", PROVIDER_ID]);
-        return legacyToken ? { token: legacyToken } : null;
+        return null;
       },
       fetchUsageSnapshot: async (ctx) => await fetchZaiUsage(ctx.token, ctx.timeoutMs, ctx.fetchFn),
       isCacheTtlEligible: () => true,

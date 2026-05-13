@@ -1288,7 +1288,6 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
       accountId: route.accountId,
       agentId: route.agentId,
       routeSessionKey: route.sessionKey,
-      storePath: prepared.turn.storePath,
       ctxPayload: prepared.ctxPayload,
       recordInboundSession,
       dispatchReplyWithBufferedBlockDispatcher,

@@ -1,4 +1,4 @@
-import type { MutableAssistantMessageEventStream } from "../../stream-compat.js";
+import { streamSimple } from "../../pi-ai-contract.js";
 import { createStreamIteratorWrapper } from "../../stream-iterator-wrapper.js";
 
 export function wrapStreamObjectEvents(

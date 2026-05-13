@@ -1,15 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CURRENT_SESSION_VERSION } from "openclaw/plugin-sdk/agent-sessions";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import { registerLegacyContextEngine } from "../../context-engine/legacy.registration.js";
 import {
-  registerContextEngine,
-  registerContextEngineForOwner,
-} from "../../context-engine/registry.js";
-import type { ContextEngine } from "../../context-engine/types.js";
+  loadSqliteSessionTranscriptEvents,
+  replaceSqliteSessionTranscriptEvents,
+} from "../../config/sessions/transcript-store.sqlite.js";
+import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { clearMemoryPluginState, registerMemoryPromptSection } from "../../plugins/memory-state.js";
 import { testing as cliBackendsTesting } from "../cli-backends.js";
@@ -17,18 +14,13 @@ import { hashCliSessionText } from "../cli-session.js";
 import { resetContextWindowCacheForTest } from "../context.js";
 import { buildActiveImageGenerationTaskPromptContextForSession } from "../image-generation-task-status.js";
 import { buildActiveMusicGenerationTaskPromptContextForSession } from "../music-generation-task-status.js";
+import { CURRENT_SESSION_VERSION } from "../transcript/session-transcript-contract.js";
 import { buildActiveVideoGenerationTaskPromptContextForSession } from "../video-generation-task-status.js";
 import {
   prepareCliRunContext,
   setCliRunnerPrepareTestDeps,
   shouldSkipLocalCliCredentialEpoch,
 } from "./prepare.js";
-
-const getRuntimeConfigMock = vi.hoisted(() => vi.fn(() => ({})));
-
-vi.mock("../../config/config.js", () => ({
-  getRuntimeConfig: getRuntimeConfigMock,
-}));
 
 vi.mock("../../plugins/hook-runner-global.js", () => ({
   getGlobalHookRunner: vi.fn(() => null),
@@ -114,11 +106,7 @@ async function createTestMcpLoopbackServer(port = 0) {
 }
 
 function createCliBackendConfig(
-  params: {
-    systemPromptOverride?: string | null;
-    bundleMcp?: boolean;
-    reseedFromRawTranscriptWhenUncompacted?: boolean;
-  } = {},
+  params: { systemPromptOverride?: string | null; bundleMcp?: boolean } = {},
 ): OpenClawConfig {
   return {
     agents: {
@@ -135,9 +123,6 @@ function createCliBackendConfig(
             sessionMode: "existing",
             output: "text",
             input: "arg",
-            ...(params.reseedFromRawTranscriptWhenUncompacted
-              ? { reseedFromRawTranscriptWhenUncompacted: true }
-              : {}),
             ...(params.bundleMcp
               ? { bundleMcp: true, bundleMcpMode: "claude-config-file" as const }
               : {}),
@@ -148,45 +133,49 @@ function createCliBackendConfig(
   } satisfies OpenClawConfig;
 }
 
-function createSessionFile() {
+function createTranscriptStateFixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-cli-prepare-"));
   vi.stubEnv("OPENCLAW_STATE_DIR", dir);
-  const sessionFile = path.join(dir, "agents", "main", "sessions", "session-test.jsonl");
-  fs.mkdirSync(path.dirname(sessionFile), { recursive: true });
-  fs.writeFileSync(
-    sessionFile,
-    `${JSON.stringify({
-      type: "session",
-      version: CURRENT_SESSION_VERSION,
-      id: "session-test",
-      timestamp: new Date(0).toISOString(),
-      cwd: dir,
-    })}\n`,
-    "utf-8",
-  );
-  return { dir, sessionFile };
+  replaceSqliteSessionTranscriptEvents({
+    agentId: "main",
+    sessionId: "session-test",
+    events: [
+      {
+        type: "session",
+        version: CURRENT_SESSION_VERSION,
+        id: "session-test",
+        timestamp: new Date(0).toISOString(),
+        cwd: dir,
+      },
+    ],
+  });
+  return { dir };
 }
 
-function appendTranscriptEntry(
-  sessionFile: string,
-  entry: {
-    id: string;
-    parentId: string | null;
-    timestamp: string;
-    message: unknown;
-  },
-): void {
-  fs.appendFileSync(
-    sessionFile,
-    `${JSON.stringify({
-      type: "message",
-      id: entry.id,
-      parentId: entry.parentId,
-      timestamp: entry.timestamp,
-      message: entry.message,
-    })}\n`,
-    "utf-8",
-  );
+function appendTranscriptEntry(entry: {
+  id: string;
+  parentId: string | null;
+  timestamp: string;
+  message: unknown;
+}): void {
+  const events = loadSqliteSessionTranscriptEvents({
+    agentId: "main",
+    sessionId: "session-test",
+  }).map((row) => row.event);
+  replaceSqliteSessionTranscriptEvents({
+    agentId: "main",
+    sessionId: "session-test",
+    events: [
+      ...events,
+      {
+        type: "message",
+        id: entry.id,
+        parentId: entry.parentId,
+        timestamp: entry.timestamp,
+        message: entry.message,
+      },
+    ],
+  });
 }
 
 describe("shouldSkipLocalCliCredentialEpoch", () => {
@@ -215,7 +204,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       })),
     });
     mockGetGlobalHookRunner.mockReturnValue(null);
-    getRuntimeConfigMock.mockReturnValue({});
     mockBuildActiveImageGenerationTaskPromptContextForSession.mockReturnValue(undefined);
     mockBuildActiveVideoGenerationTaskPromptContextForSession.mockReturnValue(undefined);
     mockBuildActiveMusicGenerationTaskPromptContextForSession.mockReturnValue(undefined);
@@ -223,7 +211,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
   afterEach(() => {
     cliBackendsTesting.resetDepsForTest();
-    getRuntimeConfigMock.mockReset();
     mockGetGlobalHookRunner.mockReset();
     mockBuildActiveImageGenerationTaskPromptContextForSession.mockReset();
     mockBuildActiveVideoGenerationTaskPromptContextForSession.mockReset();
@@ -266,15 +253,15 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("applies prompt-build hook context to Claude-style CLI preparation", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
-      appendTranscriptEntry(sessionFile, {
+      appendTranscriptEntry({
         id: "msg-1",
         parentId: null,
         timestamp: new Date(1).toISOString(),
         message: { role: "user", content: "earlier context", timestamp: 1 },
       });
-      appendTranscriptEntry(sessionFile, {
+      appendTranscriptEntry({
         id: "msg-2",
         parentId: "msg-1",
         timestamp: new Date(2).toISOString(),
@@ -313,7 +300,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         sessionKey: "agent:main:test",
         agentId: "main",
         trigger: "user",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -328,68 +314,51 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       });
 
       expect(context.params.prompt).toBe("history:2\n\nlatest ask");
-      expect(context.contextEngineTurnPrompt).toBe("latest ask");
-      expect(context.systemPrompt).toBe(
-        `${wrappedPluginSystemContext("prepend system")}\n\nhook system\n\n${wrappedPluginSystemContext("append system")}\n\nCurrent model identity: test-cli/test-model. If asked what model you are, answer with this value for the current run.`,
-      );
-      expect(hookRunner.runBeforePromptBuild).toHaveBeenCalledTimes(1);
-      const beforePromptBuildCalls = hookRunner.runBeforePromptBuild.mock.calls as unknown as Array<
-        [unknown, unknown]
-      >;
-      expect(beforePromptBuildCalls[0]?.[0]).toEqual({
-        prompt: "latest ask",
-        messages: [
-          { role: "user", content: "earlier context", timestamp: 1 },
-          {
-            role: "assistant",
-            content: [{ type: "text", text: "earlier reply" }],
-            api: "responses",
-            provider: "test-cli",
-            model: "test-model",
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      expect(context.systemPrompt).toBe("prepend system\n\nhook system\n\nappend system");
+      expect(hookRunner.runBeforePromptBuild).toHaveBeenCalledWith(
+        {
+          prompt: "latest ask",
+          messages: [
+            { role: "user", content: "earlier context", timestamp: 1 },
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "earlier reply" }],
+              api: "responses",
+              provider: "test-cli",
+              model: "test-model",
+              usage: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: 0,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              },
+              stopReason: "stop",
+              timestamp: 2,
             },
-            stopReason: "stop",
-            timestamp: 2,
-          },
-        ],
-      });
-      const hookContext = beforePromptBuildCalls[0]?.[1] as
-        | {
-            runId?: string;
-            agentId?: string;
-            sessionKey?: string;
-            sessionId?: string;
-            workspaceDir?: string;
-            modelProviderId?: string;
-            modelId?: string;
-            messageProvider?: string;
-            trigger?: string;
-            channelId?: string;
-          }
-        | undefined;
-      expect(hookContext?.runId).toBe("run-test");
-      expect(hookContext?.agentId).toBe("main");
-      expect(hookContext?.sessionKey).toBe("agent:main:test");
-      expect(hookContext?.sessionId).toBe("session-test");
-      expect(hookContext?.workspaceDir).toBe(dir);
-      expect(hookContext?.modelProviderId).toBe("test-cli");
-      expect(hookContext?.modelId).toBe("test-model");
-      expect(hookContext?.messageProvider).toBe("acp");
-      expect(hookContext?.trigger).toBe("user");
-      expect(hookContext?.channelId).toBe("telegram");
+          ],
+        },
+        expect.objectContaining({
+          runId: "run-test",
+          agentId: "main",
+          sessionKey: "agent:main:test",
+          sessionId: "session-test",
+          workspaceDir: dir,
+          modelProviderId: "test-cli",
+          modelId: "test-model",
+          messageProvider: "acp",
+          trigger: "user",
+          channelId: "telegram",
+        }),
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
   it("prepends current-turn context after prompt-build hooks without changing hook or transcript prompt", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const hookRunner = {
         hasHooks: vi.fn((hookName: string) => hookName === "before_prompt_build"),
@@ -406,7 +375,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         sessionKey: "agent:main:test",
         agentId: "main",
         trigger: "user",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         transcriptPrompt: "latest ask",
@@ -425,7 +393,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         "Sender (untrusted metadata):\nsender_id=U123 trusted hook context\n\nlatest ask\n\ntrusted hook tail",
       );
       expect(context.params.transcriptPrompt).toBe("latest ask");
-      expect(context.contextEngineTurnPrompt).toBe("latest ask");
       expect(hookRunner.runBeforePromptBuild).toHaveBeenCalledTimes(1);
       const beforePromptBuildCalls = hookRunner.runBeforePromptBuild.mock.calls as unknown as Array<
         [unknown, unknown]
@@ -438,7 +405,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("marks inter-session prompts after CLI prompt-build hook context is applied", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const hookRunner = {
         hasHooks: vi.fn((hookName: string) => hookName === "before_prompt_build"),
@@ -454,7 +421,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         sessionKey: "agent:main:test",
         agentId: "main",
         trigger: "user",
-        sessionFile,
         workspaceDir: dir,
         prompt: "foreign reply text",
         inputProvenance: {
@@ -481,7 +447,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("applies agent_turn_prepare-only context on the CLI path", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const hookRunner = {
         hasHooks: vi.fn((hookName: string) => hookName === "agent_turn_prepare"),
@@ -499,7 +465,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         sessionKey: "agent:main:test",
         agentId: "main",
         trigger: "user",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -510,20 +475,17 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       });
 
       expect(context.params.prompt).toBe("turn prepend\n\nlatest ask\n\nturn append");
-      expect(hookRunner.runAgentTurnPrepare).toHaveBeenCalledTimes(1);
-      const agentTurnPrepareCalls = hookRunner.runAgentTurnPrepare.mock.calls as unknown as Array<
-        [unknown, unknown]
-      >;
-      expect(agentTurnPrepareCalls[0]?.[0]).toEqual({
-        prompt: "latest ask",
-        messages: [],
-        queuedInjections: [],
-      });
-      const turnPrepareContext = agentTurnPrepareCalls[0]?.[1] as
-        | { runId?: string; sessionKey?: string }
-        | undefined;
-      expect(turnPrepareContext?.runId).toBe("run-test-turn-prepare");
-      expect(turnPrepareContext?.sessionKey).toBe("agent:main:test");
+      expect(hookRunner.runAgentTurnPrepare).toHaveBeenCalledWith(
+        {
+          prompt: "latest ask",
+          messages: [],
+          queuedInjections: [],
+        },
+        expect.objectContaining({
+          runId: "run-test-turn-prepare",
+          sessionKey: "agent:main:test",
+        }),
+      );
       expect(hookRunner.runBeforePromptBuild).not.toHaveBeenCalled();
       expect(hookRunner.runBeforeAgentStart).not.toHaveBeenCalled();
     } finally {
@@ -532,7 +494,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("merges before_prompt_build and legacy before_agent_start hook context for CLI preparation", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const hookRunner = {
         hasHooks: vi.fn((_hookName: string) => true),
@@ -553,7 +515,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -565,7 +526,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
       expect(context.params.prompt).toBe("prompt prepend\n\nlegacy prepend\n\nlatest ask");
       expect(context.systemPrompt).toBe(
-        `${wrappedPluginSystemContext("prompt prepend system")}\n\n${wrappedPluginSystemContext("legacy prepend system")}\n\nprompt system\n\n${wrappedPluginSystemContext("prompt append system")}\n\n${wrappedPluginSystemContext("legacy append system")}\n\nCurrent model identity: test-cli/test-model. If asked what model you are, answer with this value for the current run.`,
+        "prompt prepend system\n\nlegacy prepend system\n\nprompt system\n\nprompt append system\n\nlegacy append system",
       );
       expect(hookRunner.runBeforePromptBuild).toHaveBeenCalledOnce();
       expect(hookRunner.runBeforeAgentStart).toHaveBeenCalledOnce();
@@ -575,7 +536,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("preserves the base prompt when prompt-build hooks fail", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const hookRunner = {
         hasHooks: vi.fn((hookName: string) => hookName === "before_prompt_build"),
@@ -588,7 +549,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -599,9 +559,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       });
 
       expect(context.params.prompt).toBe("latest ask");
-      expect(context.systemPrompt).toBe(
-        "base extra system\n\nCurrent model identity: test-cli/test-model. If asked what model you are, answer with this value for the current run.",
-      );
+      expect(context.systemPrompt).toBe("base extra system");
       expect(context.systemPrompt).not.toContain("hook exploded");
       expect(hookRunner.runBeforePromptBuild).toHaveBeenCalledOnce();
     } finally {
@@ -823,11 +781,10 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("uses explicit static prompt text for CLI session reuse hashing", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -838,7 +795,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         extraSystemPromptStatic: "",
         cliSessionBinding: {
           sessionId: "cli-session",
-          cwdHash: hashCliSessionText(dir),
         },
         config: createCliBackendConfig({ systemPromptOverride: null }),
       });
@@ -851,39 +807,12 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
     }
   });
 
-  it("uses cwd for CLI system prompt workspace guidance", async () => {
-    const { dir, sessionFile } = createSessionFile();
-    const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-cli-task-"));
-    try {
-      const context = await prepareCliRunContext({
-        sessionId: "session-test",
-        sessionFile,
-        workspaceDir: dir,
-        cwd: taskDir,
-        prompt: "latest ask",
-        provider: "test-cli",
-        model: "test-model",
-        timeoutMs: 1_000,
-        runId: "run-test-cwd-prompt",
-        config: createCliBackendConfig({ systemPromptOverride: null }),
-      });
-
-      expect(context.cwd).toBe(taskDir);
-      expect(context.systemPrompt).toContain(`Your working directory is: ${taskDir}`);
-      expect(context.systemPrompt).not.toContain(`Your working directory is: ${dir}`);
-    } finally {
-      fs.rmSync(taskDir, { recursive: true, force: true });
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
   it("ignores volatile prompt text when static prompt text matches", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const staticPrompt = "## Direct Context\nYou are in a Telegram direct conversation.";
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -895,7 +824,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         cliSessionBinding: {
           sessionId: "cli-session",
           extraSystemPromptHash: hashCliSessionText(staticPrompt),
-          cwdHash: hashCliSessionText(dir),
         },
         config: createCliBackendConfig(),
       });
@@ -907,92 +835,8 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
     }
   });
 
-  it("prepares raw-tail history for safe invalidations only when the backend opts in", async () => {
-    const { dir, sessionFile } = createSessionFile();
-    appendTranscriptEntry(sessionFile, {
-      id: "msg-1",
-      parentId: null,
-      timestamp: new Date(1).toISOString(),
-      message: {
-        role: "user",
-        content: "prior no-compaction ask",
-        timestamp: 1,
-      },
-    });
-
-    try {
-      const context = await prepareCliRunContext({
-        sessionId: "session-test",
-        sessionFile,
-        workspaceDir: dir,
-        prompt: "latest ask",
-        provider: "test-cli",
-        model: "test-model",
-        timeoutMs: 1_000,
-        runId: "run-test-raw-reseed-opt-in",
-        extraSystemPrompt: "changed stable prompt",
-        extraSystemPromptStatic: "changed stable prompt",
-        cliSessionBinding: {
-          sessionId: "cli-session",
-          extraSystemPromptHash: hashCliSessionText("old stable prompt"),
-        },
-        config: createCliBackendConfig({
-          systemPromptOverride: null,
-          reseedFromRawTranscriptWhenUncompacted: true,
-        }),
-      });
-
-      expect(context.reusableCliSession).toEqual({ invalidatedReason: "system-prompt" });
-      expect(context.openClawHistoryPrompt).toContain("prior no-compaction ask");
-      expect(context.openClawHistoryPrompt).toContain("latest ask");
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("prepares opted-in raw-tail history for session-expired retry without disabling native resume", async () => {
-    const { dir, sessionFile } = createSessionFile();
-    appendTranscriptEntry(sessionFile, {
-      id: "msg-1",
-      parentId: null,
-      timestamp: new Date(1).toISOString(),
-      message: {
-        role: "user",
-        content: "prior resumable ask",
-        timestamp: 1,
-      },
-    });
-
-    try {
-      const context = await prepareCliRunContext({
-        sessionId: "session-test",
-        sessionFile,
-        workspaceDir: dir,
-        prompt: "latest ask",
-        provider: "test-cli",
-        model: "test-model",
-        timeoutMs: 1_000,
-        runId: "run-test-session-expired-reseed-opt-in",
-        cliSessionBinding: {
-          sessionId: "cli-session",
-          cwdHash: hashCliSessionText(dir),
-        },
-        config: createCliBackendConfig({
-          systemPromptOverride: null,
-          reseedFromRawTranscriptWhenUncompacted: true,
-        }),
-      });
-
-      expect(context.reusableCliSession).toEqual({ sessionId: "cli-session" });
-      expect(context.openClawHistoryPrompt).toContain("prior resumable ask");
-      expect(context.openClawHistoryPrompt).toContain("latest ask");
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
   it("applies direct-run prepend system context helpers on the CLI path", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       mockBuildActiveImageGenerationTaskPromptContextForSession.mockReturnValue(
         "active image task",
@@ -1014,7 +858,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         sessionId: "session-test",
         sessionKey: "agent:main:test",
         trigger: "user",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -1039,7 +882,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("skips bundle MCP preparation when tools are disabled", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const getActiveMcpLoopbackRuntime = vi.fn(() => ({
         port: 31783,
@@ -1056,7 +899,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
@@ -1308,7 +1150,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("fails closed when a runtime toolsAllow is requested for CLI backends", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const getActiveMcpLoopbackRuntime = vi.fn(() => ({
         port: 31783,
@@ -1322,7 +1164,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       await expect(
         prepareCliRunContext({
           sessionId: "session-test",
-          sessionFile,
           workspaceDir: dir,
           prompt: "latest ask",
           provider: "test-cli",
@@ -1343,7 +1184,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("fails closed for native tool-capable CLI backends when tools are disabled", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const getActiveMcpLoopbackRuntime = vi.fn(() => ({
         port: 31783,
@@ -1377,7 +1218,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       await expect(
         prepareCliRunContext({
           sessionId: "session-test",
-          sessionFile,
           workspaceDir: dir,
           prompt: "latest ask",
           provider: "native-cli",
@@ -1398,7 +1238,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("drops the claude-cli sessionId when the on-disk transcript is missing (#77011)", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       cliBackendsTesting.setDepsForTest({
         resolvePluginSetupCliBackend: () => undefined,
@@ -1426,7 +1266,6 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       const context = await prepareCliRunContext({
         sessionId: "session-test",
         sessionKey: "agent:main:telegram:direct:peer",
-        sessionFile,
         workspaceDir: dir,
         prompt: "follow-up",
         provider: "claude-cli",
@@ -1446,7 +1285,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("keeps the claude-cli sessionId when the on-disk transcript is present", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       cliBackendsTesting.setDepsForTest({
         resolvePluginSetupCliBackend: () => undefined,
@@ -1474,14 +1313,13 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
       const context = await prepareCliRunContext({
         sessionId: "session-test",
         sessionKey: "agent:main:telegram:direct:peer",
-        sessionFile,
         workspaceDir: dir,
         prompt: "follow-up",
         provider: "claude-cli",
         model: "opus",
         timeoutMs: 1_000,
         runId: "run-77011-present",
-        cliSessionBinding: { sessionId: "live-claude-sid", cwdHash: hashCliSessionText(dir) },
+        cliSessionBinding: { sessionId: "live-claude-sid" },
         cliSessionId: "live-claude-sid",
         config: createCliBackendConfig({ systemPromptOverride: null }),
       });
@@ -1758,7 +1596,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
   });
 
   it("does not probe the transcript for non-claude-cli providers", async () => {
-    const { dir, sessionFile } = createSessionFile();
+    const { dir } = createTranscriptStateFixture();
     try {
       const transcriptCheck = vi.fn(async () => false);
       setCliRunnerPrepareTestDeps({
@@ -1767,14 +1605,13 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
 
       const context = await prepareCliRunContext({
         sessionId: "session-test",
-        sessionFile,
         workspaceDir: dir,
         prompt: "latest ask",
         provider: "test-cli",
         model: "test-model",
         timeoutMs: 1_000,
         runId: "run-77011-other-provider",
-        cliSessionBinding: { sessionId: "test-cli-sid", cwdHash: hashCliSessionText(dir) },
+        cliSessionBinding: { sessionId: "test-cli-sid" },
         config: createCliBackendConfig({ systemPromptOverride: null }),
       });
 
@@ -1989,7 +1826,7 @@ describe("shouldSkipLocalCliCredentialEpoch", () => {
         model: "claude-haiku-3-5",
         timeoutMs: 1_000,
         runId: "run-raw-reseed-cap-override",
-        cliSessionBinding: { sessionId: "cli-session", cwdHash: hashCliSessionText(dir) },
+        cliSessionBinding: { sessionId: "cli-session" },
         config: createCliBackendConfig({ systemPromptOverride: null }),
       });
 

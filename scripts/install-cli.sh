@@ -52,13 +52,8 @@ resolve_openclaw_effective_home() {
 OPENCLAW_EFFECTIVE_HOME="$(resolve_openclaw_effective_home)"
 PREFIX="${OPENCLAW_PREFIX:-${HOME}/.openclaw}"
 OPENCLAW_VERSION="${OPENCLAW_VERSION:-latest}"
-NODE_VERSION="${OPENCLAW_NODE_VERSION:-22.22.0}"
-NODE_VERSION_REQUESTED=0
-if [[ -n "${OPENCLAW_NODE_VERSION:-}" ]]; then
-  NODE_VERSION_REQUESTED=1
-fi
-MIN_NODE_VERSION="22.19.0"
-APK_NODE_BIN_DIR="/usr/bin"
+NODE_VERSION="${OPENCLAW_NODE_VERSION:-24.12.0}"
+SHARP_IGNORE_GLOBAL_LIBVIPS="${SHARP_IGNORE_GLOBAL_LIBVIPS:-1}"
 NPM_LOGLEVEL="${OPENCLAW_NPM_LOGLEVEL:-error}"
 INSTALL_METHOD="${OPENCLAW_INSTALL_METHOD:-npm}"
 GIT_DIR="${OPENCLAW_GIT_DIR:-${OPENCLAW_EFFECTIVE_HOME}/openclaw}"
@@ -78,7 +73,7 @@ Usage: install-cli.sh [options]
   --git, --github                     Shortcut for --install-method git
   --git-dir, --dir <path>             Checkout directory (default: ~/openclaw, or \$OPENCLAW_HOME/openclaw)
   --version <ver>                     OpenClaw version (default: latest)
-  --node-version <ver>                Node version (default: 22.22.0)
+  --node-version <ver>                Node version (default: 24.12.0)
   --onboard                           Run "openclaw onboard" after install
   --no-onboard                        Skip onboarding (default)
   --set-npm-prefix                    Force npm prefix to ~/.npm-global if current prefix is not writable (Linux)
@@ -799,12 +794,8 @@ install_node() {
 
   ln -sfn "$dir" "${PREFIX}/tools/node"
 
-  if ! linked_node_is_usable; then
-    local installed_version
-    local required_version
-    installed_version="$("$(node_bin)" -v 2>/dev/null || echo unknown)"
-    required_version="$(required_node_version)"
-    fail "Installed Node ${NODE_VERSION} must provide Node >= ${required_version} with node:sqlite; found ${installed_version}. Re-run with --node-version 22.22.0 (or newer)"
+  if ! "$(node_bin)" -e "require('node:sqlite')" >/dev/null 2>&1; then
+    fail "Installed Node ${NODE_VERSION} is missing node:sqlite; re-run with --node-version 24.0.0 (or newer)"
   fi
   emit_json "{\"event\":\"step\",\"name\":\"node\",\"status\":\"ok\",\"version\":\"${NODE_VERSION}\"}"
 }

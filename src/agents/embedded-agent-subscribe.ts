@@ -10,7 +10,9 @@ import { buildCodeSpanIndex, createInlineCodeState } from "../markdown/code-span
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { findFinalTagMatches } from "../shared/text/final-tags.js";
 import { hasOrphanReasoningCloseBoundary } from "../shared/text/reasoning-tags.js";
-import { EmbeddedBlockChunker } from "./embedded-agent-block-chunker.js";
+import { mediaUrlsFromGeneratedAttachments } from "./generated-attachments.js";
+import type { AgentMessage } from "./agent-core-contract.js";
+import { EmbeddedBlockChunker } from "./pi-embedded-block-chunker.js";
 import {
   isMessagingToolDuplicateNormalized,
   normalizeTextForComparison,

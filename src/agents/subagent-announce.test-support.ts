@@ -7,12 +7,11 @@ import type { EmbeddedAgentQueueMessageOutcome } from "./embedded-agent-runner/r
 type DeliveryRuntimeMockOptions = {
   callGateway: (request: unknown) => Promise<unknown>;
   getRuntimeConfig: () => OpenClawConfig;
-  loadSessionStore: (storePath: string) => unknown;
+  getSessionEntry: (params: { agentId: string; sessionKey: string }) => unknown;
   resolveAgentIdFromSessionKey: (sessionKey: string) => string;
   resolveMainSessionKey: (cfg: unknown) => string;
-  resolveStorePath: (store: unknown, options: unknown) => string;
-  isEmbeddedAgentRunActive: (sessionId: string) => boolean;
-  queueEmbeddedAgentMessageWithOutcome: (
+  isEmbeddedPiRunActive: (sessionId: string) => boolean;
+  queueEmbeddedPiMessageWithOutcome: (
     sessionId: string,
     text: string,
     options?: EmbeddedAgentQueueMessageOptions,
@@ -67,13 +66,12 @@ export function createSubagentAnnounceDeliveryRuntimeMock(options: DeliveryRunti
         timeoutMs: callOptions?.timeoutMs,
       })) as T) as typeof dispatchGatewayMethodInProcess,
     getRuntimeConfig: options.getRuntimeConfig,
-    loadSessionStore: options.loadSessionStore,
+    getSessionEntry: options.getSessionEntry,
     resolveAgentIdFromSessionKey: options.resolveAgentIdFromSessionKey,
     resolveMainSessionKey: options.resolveMainSessionKey,
-    resolveStorePath: options.resolveStorePath,
-    isEmbeddedAgentRunActive: options.isEmbeddedAgentRunActive,
-    queueEmbeddedAgentMessageWithOutcome: options.queueEmbeddedAgentMessageWithOutcome,
-    formatEmbeddedAgentQueueFailureSummary: (outcome: { reason?: string; sessionId?: string }) =>
+    isEmbeddedPiRunActive: options.isEmbeddedPiRunActive,
+    queueEmbeddedPiMessageWithOutcome: options.queueEmbeddedPiMessageWithOutcome,
+    formatEmbeddedPiQueueFailureSummary: (outcome: { reason?: string; sessionId?: string }) =>
       outcome.reason && outcome.sessionId
         ? `queue_message_failed reason=${outcome.reason} sessionId=${outcome.sessionId} gatewayHealth=live`
         : undefined,

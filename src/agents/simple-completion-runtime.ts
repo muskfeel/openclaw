@@ -20,7 +20,13 @@ import {
   resolveDefaultModelForAgent,
   resolveModelRefFromString,
 } from "./model-selection.js";
-import { OPENAI_CODEX_PROVIDER_ID, isOpenAIProvider } from "./openai-codex-routing.js";
+import {
+  completeSimple,
+  type Api,
+  type Model,
+  type ThinkingLevel as SimpleCompletionThinkingLevel,
+} from "./pi-ai-contract.js";
+import { resolveModel, resolveModelAsync } from "./pi-embedded-runner/model.js";
 import { prepareModelForSimpleCompletion } from "./simple-completion-transport.js";
 
 type SimpleCompletionAuthStorage = {

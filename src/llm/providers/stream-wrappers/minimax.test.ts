@@ -1,7 +1,10 @@
 import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
-import type { Context, Model } from "openclaw/plugin-sdk/llm";
 import { describe, expect, it } from "vitest";
-import { createMinimaxFastModeWrapper, createMinimaxThinkingDisabledWrapper } from "./minimax.js";
+import type { Context, Model } from "../pi-ai-contract.js";
+import {
+  createMinimaxFastModeWrapper,
+  createMinimaxThinkingDisabledWrapper,
+} from "./minimax-stream-wrappers.js";
 
 function captureThinkingPayload(params: {
   provider: string;

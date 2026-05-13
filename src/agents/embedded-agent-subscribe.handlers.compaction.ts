@@ -4,26 +4,20 @@ import type { EmbeddedAgentSubscribeContext } from "./embedded-agent-subscribe.h
 import type { AgentSessionEvent } from "./sessions/index.js";
 import { makeZeroUsageSnapshot } from "./usage.js";
 
-type SessionCompactionStartEvent = Extract<AgentSessionEvent, { type: "compaction_start" }>;
-type SessionCompactionEndEvent = Extract<AgentSessionEvent, { type: "compaction_end" }>;
-type CompactionReason = SessionCompactionStartEvent["reason"];
+type CompactionReason = "manual" | "threshold" | "overflow";
 
-type CompactionStartEvent =
-  | SessionCompactionStartEvent
-  | {
-      type: "compaction_start";
-      reason?: unknown;
-    };
+type CompactionStartEvent = {
+  type: "compaction_start";
+  reason?: unknown;
+};
 
-type CompactionEndEvent =
-  | SessionCompactionEndEvent
-  | {
-      type: "compaction_end";
-      reason?: unknown;
-      willRetry?: unknown;
-      result?: unknown;
-      aborted?: unknown;
-    };
+type CompactionEndEvent = {
+  type: "compaction_end";
+  reason?: unknown;
+  willRetry?: unknown;
+  result?: unknown;
+  aborted?: unknown;
+};
 
 function normalizeCompactionReason(reason: unknown): CompactionReason {
   return reason === "manual" || reason === "threshold" || reason === "overflow"
@@ -68,7 +62,6 @@ export function handleCompactionStart(
         {
           messageCount: ctx.params.session.messages?.length ?? 0,
           messages: ctx.params.session.messages,
-          sessionFile: ctx.params.session.sessionFile,
         },
         {
           sessionKey: ctx.params.sessionKey,
@@ -108,10 +101,9 @@ export function handleCompactionEnd(ctx: EmbeddedAgentSubscribeContext, evt: Com
       compactionCount: observedCompactionCount,
       consoleMessage: `embedded run ${kind} complete: runId=${ctx.params.runId} reason=${reason} compactionCount=${observedCompactionCount} willRetry=${willRetry}`,
     });
-    void reconcileSessionStoreCompactionCountAfterSuccess({
+    void reconcileSessionRowCompactionCountAfterSuccess({
       sessionKey: ctx.params.sessionKey,
       agentId: ctx.params.agentId,
-      configStore: ctx.params.config?.session?.store,
       observedCompactionCount,
     }).catch((err) => {
       ctx.log.warn(`late compaction count reconcile failed: ${String(err)}`);
@@ -158,7 +150,6 @@ export function handleCompactionEnd(ctx: EmbeddedAgentSubscribeContext, evt: Com
           {
             messageCount: ctx.params.session.messages?.length ?? 0,
             compactedCount: ctx.getCompactionCount(),
-            sessionFile: ctx.params.session.sessionFile,
           },
           { sessionKey: ctx.params.sessionKey },
         )
@@ -169,15 +160,14 @@ export function handleCompactionEnd(ctx: EmbeddedAgentSubscribeContext, evt: Com
   }
 }
 
-export async function reconcileSessionStoreCompactionCountAfterSuccess(params: {
+export async function reconcileSessionRowCompactionCountAfterSuccess(params: {
   sessionKey?: string;
   agentId?: string;
-  configStore?: string;
   observedCompactionCount: number;
   now?: number;
 }): Promise<number | undefined> {
-  const { reconcileSessionStoreCompactionCountAfterSuccess: reconcile } =
-    await import("./embedded-agent-subscribe.handlers.compaction.runtime.js");
+  const { reconcileSessionRowCompactionCountAfterSuccess: reconcile } =
+    await import("./pi-embedded-subscribe.handlers.compaction.runtime.js");
   return reconcile(params);
 }
 

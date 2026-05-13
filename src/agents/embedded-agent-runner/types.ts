@@ -15,7 +15,6 @@ import type { AgentRunTimeoutPhase } from "../run-timeout-attribution.js";
 
 export type EmbeddedAgentMeta = {
   sessionId: string;
-  sessionFile?: string;
   provider: string;
   model: string;
   contextTokens?: number;
@@ -46,7 +45,7 @@ export type EmbeddedAgentMeta = {
   /**
    * Usage from the last individual API call (not accumulated across tool-use
    * loops or compaction retries). Used for context-window utilization display
-   * (`totalTokens` in sessions.json) because the accumulated `usage.input`
+   * (`totalTokens` in the SQLite session row) because the accumulated `usage.input`
    * sums input tokens from every API call in the run, which overstates the
    * actual context size.
    */
@@ -228,7 +227,6 @@ export type EmbeddedAgentCompactResult = {
     tokensAfter?: number;
     details?: unknown;
     sessionId?: string;
-    sessionFile?: string;
   };
 };
 

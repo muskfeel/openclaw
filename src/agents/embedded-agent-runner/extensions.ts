@@ -1,23 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { ProviderRuntimeModel } from "../../plugins/provider-runtime-model.types.js";
-import { normalizeOptionalLowercaseString } from "../../shared/string-coerce.js";
-import { setCompactionSafeguardRuntime } from "../agent-hooks/compaction-safeguard-runtime.js";
-import compactionSafeguardExtension from "../agent-hooks/compaction-safeguard.js";
-import contextPruningExtension from "../agent-hooks/context-pruning.js";
-import { setContextPruningRuntime } from "../agent-hooks/context-pruning/runtime.js";
-import { computeEffectiveSettings } from "../agent-hooks/context-pruning/settings.js";
-import { makeToolPrunablePredicate } from "../agent-hooks/context-pruning/tools.js";
-import {
-  ensureAgentCompactionReserveTokens,
-  resolveEffectiveCompactionMode,
-} from "../agent-settings.js";
+import type { AgentToolResult } from "../agent-core-contract.js";
+import type { ExtensionFactory } from "../agent-extension-contract.js";
 import { resolveContextWindowInfo } from "../context-window-guard.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";
 import { createAgentToolResultMiddlewareRunner } from "../harness/tool-result-middleware.js";
 import type { AgentToolResult } from "../runtime/index.js";
 import type { ExtensionFactory, SessionManager } from "../sessions/index.js";
 import { resolveTranscriptPolicy } from "../transcript-policy.js";
+import type { SessionManager } from "../transcript/session-transcript-contract.js";
 import { isCacheTtlEligibleProvider, readLastCacheTtlTimestamp } from "./cache-ttl.js";
 
 type AgentToolResultEvent = {
@@ -26,7 +18,7 @@ type AgentToolResultEvent = {
   toolCallId?: string;
   toolName?: string;
   input?: unknown;
-  content?: AgentToolResult<unknown>["content"];
+  content?: AgentToolResult["content"];
   details?: unknown;
   isError?: boolean;
 };
@@ -35,16 +27,6 @@ function recordFromUnknown(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-// Only checks "error" and "timeout" — the status values emitted by the
-// adapter's buildToolExecutionErrorResult. The subscribe-side classifier
-// (isErrorLikeStatus) uses a broader regex because it handles arbitrary
-// external tool results; this bridge only elevates adapter-produced statuses.
-function hasErrorToolResultStatus(result: AgentToolResult<unknown>): boolean {
-  const details = recordFromUnknown(result.details);
-  const status = normalizeOptionalLowercaseString(details.status);
-  return status === "error" || status === "timeout";
 }
 
 function buildAgentToolResultMiddlewareFactory(): ExtensionFactory {
@@ -63,8 +45,7 @@ function buildAgentToolResultMiddlewareFactory(): ExtensionFactory {
       const current = {
         content,
         details: event.details,
-      } satisfies AgentToolResult<unknown>;
-      const inputHadErrorStatus = hasErrorToolResultStatus(current);
+      } satisfies AgentToolResult;
       const result = await runner.applyToolResultMiddleware({
         threadId: event.threadId,
         turnId: event.turnId,
@@ -75,12 +56,9 @@ function buildAgentToolResultMiddlewareFactory(): ExtensionFactory {
         isError: event.isError,
         result: current,
       });
-      const isError =
-        event.isError === true || inputHadErrorStatus || hasErrorToolResultStatus(result);
       return {
         content: result.content,
         details: result.details,
-        ...(isError ? { isError: true } : {}),
       };
     });
   };

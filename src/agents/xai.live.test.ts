@@ -1,4 +1,3 @@
-import { completeSimple, type Model, streamSimple } from "openclaw/plugin-sdk/llm";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 import {
@@ -11,6 +10,12 @@ import {
   extractNonEmptyAssistantText,
   isLiveTestEnabled,
 } from "./live-test-helpers.js";
+import { completeSimple, getModel, streamSimple } from "./pi-ai-contract.js";
+import {
+  isBillingErrorMessage,
+  isOverloadedErrorMessage,
+} from "./pi-embedded-helpers/failover-matches.js";
+import { applyExtraParamsToAgent } from "./pi-embedded-runner.js";
 import { createWebSearchTool } from "./tools/web-search.js";
 
 const XAI_KEY = process.env.XAI_API_KEY ?? "";

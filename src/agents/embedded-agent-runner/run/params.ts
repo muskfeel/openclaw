@@ -11,17 +11,19 @@ import type { ImageContent } from "../../../llm/types.js";
 import type { PromptImageOrderEntry } from "../../../media/prompt-image-order.js";
 import type { CommandQueueEnqueueFn } from "../../../process/command-queue.types.js";
 import type { InputProvenance } from "../../../sessions/input-provenance.js";
-import type { UserTurnTranscriptRecorder } from "../../../sessions/user-turn-transcript.js";
+import type { AgentMessage } from "../../agent-core-contract.js";
 import type { ExecElevatedDefaults, ExecToolDefaults } from "../../bash-tools.exec-types.js";
 import type { AgentStreamParams, ClientToolDefinition } from "../../command/shared-types.js";
-import type { BlockReplyPayload } from "../../embedded-agent-payloads.js";
+import type { AgentFilesystem } from "../../filesystem/agent-filesystem.js";
+import type { AgentInternalEvent } from "../../internal-events.js";
+import type { ImageContent } from "../../pi-ai-contract.js";
+import type { BlockReplyPayload } from "../../pi-embedded-payloads.js";
 import type {
   BlockReplyChunking,
   ToolProgressDetailMode,
   ToolResultFormat,
-} from "../../embedded-agent-subscribe.shared-types.js";
-import type { AgentInternalEvent } from "../../internal-events.js";
-import type { AgentMessage } from "../../runtime/index.js";
+} from "../../pi-embedded-subscribe.shared-types.js";
+import type { PreparedAgentRunInitialVfsEntry } from "../../runtime-backend.js";
 import type { SkillSnapshot } from "../../skills.js";
 import type { SilentReplyPromptMode } from "../../system-prompt.types.js";
 import type { PromptMode } from "../../system-prompt.types.js";
@@ -99,7 +101,6 @@ export type RunEmbeddedAgentParams = {
   forceHeartbeatTool?: boolean;
   /** Allow runtime plugins for this run to late-bind the gateway subagent. */
   allowGatewaySubagentBinding?: boolean;
-  sessionFile: string;
   workspaceDir: string;
   /** Task working directory for tool/runtime execution. Defaults to workspaceDir. */
   cwd?: string;
@@ -117,6 +118,14 @@ export type RunEmbeddedAgentParams = {
   clientTools?: ClientToolDefinition[];
   /** Disable built-in tools for this run (LLM-only mode). */
   disableTools?: boolean;
+  /**
+   * OpenClaw-owned filesystem capabilities for this run. Worker-backed runs
+   * inject this from the runtime context; inline runs can omit it and use the
+   * legacy disk-backed compatibility paths.
+   */
+  agentFilesystem?: AgentFilesystem;
+  /** Files to seed into the worker SQLite VFS before tools start. */
+  initialVfsEntries?: PreparedAgentRunInitialVfsEntry[];
   provider?: string;
   model?: string;
   /** Effective model fallback chain for this session attempt. Undefined uses config defaults. */

@@ -14,8 +14,8 @@ import {
   loadPluginMetadataSnapshot,
   type PluginMetadataSnapshot,
 } from "../plugins/plugin-metadata-snapshot.js";
-import { loadEmbeddedAgentMcpConfig } from "./embedded-agent-mcp.js";
-import type { SettingsManager } from "./sessions/index.js";
+import { loadEmbeddedPiMcpConfig } from "./embedded-pi-mcp.js";
+import type { SettingsManager } from "./pi-coding-agent-contract.js";
 
 const log = createSubsystemLogger("embedded-agent-settings");
 

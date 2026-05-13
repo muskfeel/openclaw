@@ -19,6 +19,7 @@ import {
 import { uniqueStrings } from "../../shared/string-normalization.js";
 import type { AuthProfileStore } from "../auth-profiles/types.js";
 import { normalizeModelRef } from "../model-selection.js";
+import { type Api, type Model } from "../pi-ai-contract.js";
 import { normalizeProviderId } from "../provider-id.js";
 import {
   ToolInputError,

@@ -1,5 +1,5 @@
-import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
 import { describe, expect, it } from "vitest";
+import type { StreamFn } from "../agents/agent-core-contract.js";
 import {
   createDeepSeekV4OpenAICompatibleThinkingWrapper,
   createAnthropicThinkingPrefillPayloadWrapper,

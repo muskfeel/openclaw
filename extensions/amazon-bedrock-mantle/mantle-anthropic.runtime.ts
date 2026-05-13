@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
-import { stream, type Model, type SimpleStreamOptions } from "openclaw/plugin-sdk/llm";
+import type { Api, Model, SimpleStreamOptions } from "openclaw/plugin-sdk/provider-ai";
+import { streamAnthropic } from "openclaw/plugin-sdk/provider-ai";
 
 const MANTLE_ANTHROPIC_BETA = "fine-grained-tool-streaming-2025-05-14";
 type AnthropicOptions = ConstructorParameters<typeof Anthropic>[0];

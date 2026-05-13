@@ -9,7 +9,8 @@ import {
 import { setPluginToolMeta } from "../plugins/tools.js";
 import { killProcessTree } from "../process/kill-tree.js";
 import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
-import { loadEmbeddedAgentLspConfig } from "./embedded-agent-lsp.js";
+import type { AgentToolResult } from "./agent-core-contract.js";
+import { loadEmbeddedPiLspConfig } from "./embedded-pi-lsp.js";
 import {
   resolveStdioMcpServerLaunchConfig,
   describeStdioMcpServerLaunchConfig,
@@ -375,11 +376,7 @@ function buildLspTools(session: LspSession): AnyAgentTool[] {
   return tools;
 }
 
-function formatLspResult(
-  serverName: string,
-  method: string,
-  result: unknown,
-): AgentToolResult<unknown> {
+function formatLspResult(serverName: string, method: string, result: unknown): AgentToolResult {
   const text =
     result !== null && result !== undefined
       ? JSON.stringify(result, null, 2)

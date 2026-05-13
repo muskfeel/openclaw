@@ -1889,11 +1889,90 @@ export async function runAgentTurnWithFallback(params: {
           resolveAgentHarnessRuntimeOverride: (provider) =>
             resolveSessionRuntimeOverrideForProvider({
               provider,
-              entry: params.getActiveSessionEntry(),
-            }),
-          prepareAgentHarnessRuntime: async ({ provider, model, agentHarnessRuntimeOverride }) => {
-            await agentTurnTiming.measure("fallback_prepare_harness", () =>
-              ensureSelectedAgentHarnessPlugin({
+              model,
+              candidateRun,
+            );
+            if (rollbackFallbackCandidateSelection) {
+              pendingFallbackCandidateRollback = {
+                provider,
+                model,
+                rollback: rollbackFallbackCandidateSelection,
+              };
+            }
+          } catch (error) {
+            logVerbose(
+              `failed to persist fallback candidate selection (non-fatal): ${String(error)}`,
+            );
+          }
+
+          const sessionRuntimeOverride = resolveSessionRuntimeOverrideForProvider({
+            provider,
+            entry: params.getActiveSessionEntry(),
+          });
+          const selectedAuthProfile = resolveRunAuthProfile(candidateRun, provider, {
+            config: runtimeConfig,
+          });
+          const cliExecutionProvider =
+            sessionRuntimeOverride === "pi"
+              ? provider
+              : ((sessionRuntimeOverride && isCliProvider(sessionRuntimeOverride, runtimeConfig)
+                  ? sessionRuntimeOverride
+                  : undefined) ??
+                resolveCliRuntimeExecutionProvider({
+                  provider,
+                  cfg: runtimeConfig,
+                  agentId: params.followupRun.run.agentId,
+                  modelId: model,
+                  authProfileId: selectedAuthProfile.authProfileId,
+                }) ??
+                provider);
+
+          if (isCliProvider(cliExecutionProvider, runtimeConfig)) {
+            const isRoomEventCliRun = params.followupRun.currentInboundEventKind === "room_event";
+            const cliSessionBinding = isRoomEventCliRun
+              ? undefined
+              : getCliSessionBinding(params.getActiveSessionEntry(), cliExecutionProvider);
+            const authProfile = resolveRunAuthProfile(candidateRun, cliExecutionProvider, {
+              config: runtimeConfig,
+            });
+            const hookMessageProvider = resolveOriginMessageProvider({
+              originatingChannel: params.followupRun.originatingChannel,
+              provider: params.sessionCtx.Provider,
+            });
+            const result = await runCliAgentWithLifecycle({
+              runId,
+              provider: cliExecutionProvider,
+              onAgentRunStart: notifyAgentRunStart,
+              suppressAssistantBridge: params.followupRun.run.silentExpected,
+              onAssistantText: async (text) => {
+                const textForTyping = await handlePartialForTyping({ text } as ReplyPayload);
+                if (textForTyping === undefined || !params.opts?.onPartialReply) {
+                  return;
+                }
+                await params.opts.onPartialReply({ text: textForTyping });
+              },
+              onReasoningText: async (text) => {
+                await params.opts?.onReasoningStream?.({ text });
+              },
+              onErrorBeforeLifecycle: async () => {
+                if (!rollbackFallbackCandidateSelection) {
+                  return;
+                }
+                try {
+                  await rollbackFallbackCandidateSelection();
+                  clearPendingFallbackRollback(rollbackFallbackCandidateSelection);
+                } catch (rollbackError) {
+                  logVerbose(
+                    `failed to roll back fallback candidate selection (non-fatal): ${String(rollbackError)}`,
+                  );
+                }
+              },
+              runParams: {
+                sessionId: params.followupRun.run.sessionId,
+                sessionKey: params.sessionKey,
+                agentId: params.followupRun.run.agentId,
+                trigger: params.isHeartbeat ? "heartbeat" : "user",
+                workspaceDir: params.followupRun.run.workspaceDir,
                 config: runtimeConfig,
                 provider,
                 modelId: model,

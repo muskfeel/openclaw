@@ -1,14 +1,12 @@
-import type {
-  PartialReplyPayload,
-  SourceReplyDeliveryMode,
-} from "../auto-reply/get-reply-options.types.js";
-import type { HeartbeatToolResponse } from "../auto-reply/heartbeat-tool-response.js";
+import type { PartialReplyPayload } from "../auto-reply/get-reply-options.types.js";
 import type { ReplyPayload } from "../auto-reply/reply-payload.js";
 import type { ReasoningLevel, ThinkLevel, VerboseLevel } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { HookRunner } from "../plugins/hooks.js";
-import type { BlockReplyPayload } from "./embedded-agent-payloads.js";
-import type { EmbeddedRunReplayState } from "./embedded-agent-runner/replay-state.js";
+import type { AgentSession } from "./agent-extension-contract.js";
+import type { AgentInternalEvent } from "./internal-events.js";
+import type { BlockReplyPayload } from "./pi-embedded-payloads.js";
+import type { EmbeddedRunReplayState } from "./pi-embedded-runner/replay-state.js";
 import type {
   BlockReplyChunking,
   ToolProgressDetailMode,
@@ -34,7 +32,6 @@ export type SubscribeEmbeddedAgentSessionParams = {
   toolProgressDetail?: ToolProgressDetailMode;
   shouldEmitToolResult?: () => boolean;
   shouldEmitToolOutput?: () => boolean;
-  sourceReplyDeliveryMode?: SourceReplyDeliveryMode;
   onToolResult?: (payload: ReplyPayload) => void | Promise<void>;
   onReasoningStream?: (payload: { text?: string; mediaUrls?: string[] }) => void | Promise<void>;
   /** Called when a thinking/reasoning block ends (</think> tag processed). */

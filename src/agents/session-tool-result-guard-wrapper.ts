@@ -4,15 +4,12 @@ import {
   applyInputProvenanceToUserMessage,
   type InputProvenance,
 } from "../sessions/input-provenance.js";
-import {
-  mergePreparedUserTurnMessageForRuntime,
-  type PersistedUserTurnMessage,
-} from "../sessions/user-turn-transcript.js";
-import { resolveLiveToolResultMaxChars } from "./embedded-agent-runner/tool-result-truncation.js";
-import type { AgentMessage } from "./runtime/index.js";
+import type { AgentMessage } from "./agent-core-contract.js";
+import { resolveLiveToolResultMaxChars } from "./pi-embedded-runner/tool-result-truncation.js";
 import { installSessionToolResultGuard } from "./session-tool-result-guard.js";
 import type { SessionManager } from "./sessions/index.js";
 import { redactTranscriptMessage } from "./transcript-redact.js";
+import type { SessionManager } from "./transcript/session-transcript-contract.js";
 
 type GuardedSessionManager = SessionManager & {
   /** Flush any synthetic tool results for pending tool calls. Idempotent. */
@@ -29,6 +26,7 @@ export function guardSessionManager(
   sessionManager: SessionManager,
   opts?: {
     agentId?: string;
+    sessionId?: string;
     sessionKey?: string;
     config?: OpenClawConfig;
     contextWindowTokens?: number;
@@ -55,7 +53,9 @@ export function guardSessionManager(
 
   const hookRunner = getGlobalHookRunner();
   let pendingPreparedUserTurnMessage = opts?.preparedUserTurnMessage;
-  const beforeMessageWrite = (event: { message: AgentMessage }) => {
+  const beforeMessageWrite = (event: {
+    message: import("./agent-core-contract.js").AgentMessage;
+  }) => {
     let message = event.message;
     let changed = false;
     if (hookRunner?.hasHooks("before_message_write")) {
@@ -103,6 +103,8 @@ export function guardSessionManager(
     : undefined;
 
   const guard = installSessionToolResultGuard(sessionManager, {
+    agentId: opts?.agentId,
+    sessionId: opts?.sessionId,
     sessionKey: opts?.sessionKey,
     transformMessageForPersistence: (message) => {
       const withProvenance = applyInputProvenanceToUserMessage(message, opts?.inputProvenance);

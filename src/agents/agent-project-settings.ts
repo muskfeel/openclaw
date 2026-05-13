@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
+import { SettingsManager } from "./pi-coding-agent-contract.js";
 import {
   buildEmbeddedAgentSettingsSnapshot,
   loadEnabledBundleAgentSettingsSnapshot,

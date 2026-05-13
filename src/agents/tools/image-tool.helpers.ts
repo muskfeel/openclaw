@@ -5,6 +5,8 @@ import { normalizeLowercaseStringOrEmpty } from "../../shared/string-coerce.js";
 import { extractAssistantText } from "../embedded-agent-utils.js";
 import { isMinimaxVlmProvider } from "../minimax-vlm.js";
 import { findNormalizedProviderValue, normalizeProviderId } from "../model-selection.js";
+import type { AssistantMessage } from "../pi-ai-contract.js";
+import { extractAssistantText } from "../pi-embedded-utils.js";
 import { coerceToolModelConfig, type ToolModelConfig } from "./model-config.helpers.js";
 
 export type ImageModelConfig = ToolModelConfig;

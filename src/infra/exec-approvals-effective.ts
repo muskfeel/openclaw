@@ -7,7 +7,7 @@ import {
   type ExecApprovalDecision,
   maxAsk,
   minSecurity,
-  resolveExecApprovalsFromFile,
+  resolveExecApprovalsDocument,
   type ExecApprovalsFile,
   type ExecAsk,
   type ExecSecurity,
@@ -16,7 +16,7 @@ import {
 
 const DEFAULT_REQUESTED_SECURITY: ExecSecurity = "full";
 const DEFAULT_REQUESTED_ASK: ExecAsk = "off";
-const DEFAULT_HOST_PATH = "~/.openclaw/exec-approvals.json";
+const DEFAULT_HOST_PATH = "SQLite exec approvals state";
 const REQUESTED_DEFAULT_LABEL = {
   security: DEFAULT_REQUESTED_SECURITY,
   ask: DEFAULT_REQUESTED_ASK,
@@ -227,8 +227,8 @@ export function resolveExecPolicyScopeSnapshot(params: {
     scopeExecConfig: params.scopeExecConfig,
     globalExecConfig: params.globalExecConfig,
   });
-  const resolved = resolveExecApprovalsFromFile({
-    file: params.approvals,
+  const resolved = resolveExecApprovalsDocument({
+    document: params.approvals,
     agentId: params.agentId,
     overrides: {
       security: requestedSecurity.value,

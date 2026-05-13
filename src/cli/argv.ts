@@ -449,7 +449,7 @@ export function buildParseArgv(params: {
   return ["node", programName || "openclaw", ...normalizedArgv];
 }
 
-export function shouldMigrateStateFromPath(path: string[]): boolean {
+export function shouldRunConfigPreflightFromPath(path: string[]): boolean {
   if (path.length === 0) {
     return true;
   }
@@ -472,6 +472,6 @@ export function shouldMigrateStateFromPath(path: string[]): boolean {
   return true;
 }
 
-export function shouldMigrateState(argv: string[]): boolean {
-  return shouldMigrateStateFromPath(getCommandPathWithRootOptions(argv, 2));
+export function shouldRunConfigPreflight(argv: string[]): boolean {
+  return shouldRunConfigPreflightFromPath(getCommandPath(argv, 2));
 }

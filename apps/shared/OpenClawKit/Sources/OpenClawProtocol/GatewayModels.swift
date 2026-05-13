@@ -758,7 +758,7 @@ public struct AgentParams: Codable, Sendable {
     public let suppresspromptpersistence: Bool?
     public let sessioneffects: AnyCodable?
     public let sourcereplydeliverymode: AnyCodable?
-    public let disablemessagetool: Bool?
+    public let initialvfsentries: [[String: AnyCodable]]?
     public let voicewaketrigger: String?
     public let idempotencykey: String
     public let label: String?
@@ -799,7 +799,7 @@ public struct AgentParams: Codable, Sendable {
         suppresspromptpersistence: Bool?,
         sessioneffects: AnyCodable?,
         sourcereplydeliverymode: AnyCodable?,
-        disablemessagetool: Bool?,
+        initialvfsentries: [[String: AnyCodable]]?,
         voicewaketrigger: String?,
         idempotencykey: String,
         label: String?)
@@ -839,7 +839,7 @@ public struct AgentParams: Codable, Sendable {
         self.suppresspromptpersistence = suppresspromptpersistence
         self.sessioneffects = sessioneffects
         self.sourcereplydeliverymode = sourcereplydeliverymode
-        self.disablemessagetool = disablemessagetool
+        self.initialvfsentries = initialvfsentries
         self.voicewaketrigger = voicewaketrigger
         self.idempotencykey = idempotencykey
         self.label = label
@@ -881,7 +881,7 @@ public struct AgentParams: Codable, Sendable {
         case suppresspromptpersistence = "suppressPromptPersistence"
         case sessioneffects = "sessionEffects"
         case sourcereplydeliverymode = "sourceReplyDeliveryMode"
-        case disablemessagetool = "disableMessageTool"
+        case initialvfsentries = "initialVfsEntries"
         case voicewaketrigger = "voiceWakeTrigger"
         case idempotencykey = "idempotencyKey"
         case label
@@ -1598,12 +1598,12 @@ public struct SessionsListParams: Codable, Sendable {
     public let activeminutes: Int?
     public let includeglobal: Bool?
     public let includeunknown: Bool?
-    public let configuredagentsonly: Bool?
     public let includederivedtitles: Bool?
     public let includelastmessage: Bool?
     public let label: String?
     public let spawnedby: String?
     public let agentid: String?
+    public let configuredagentsonly: Bool?
     public let search: String?
 
     public init(
@@ -1612,12 +1612,12 @@ public struct SessionsListParams: Codable, Sendable {
         activeminutes: Int?,
         includeglobal: Bool?,
         includeunknown: Bool?,
-        configuredagentsonly: Bool?,
         includederivedtitles: Bool?,
         includelastmessage: Bool?,
         label: String?,
         spawnedby: String?,
         agentid: String?,
+        configuredagentsonly: Bool?,
         search: String?)
     {
         self.limit = limit
@@ -1625,12 +1625,12 @@ public struct SessionsListParams: Codable, Sendable {
         self.activeminutes = activeminutes
         self.includeglobal = includeglobal
         self.includeunknown = includeunknown
-        self.configuredagentsonly = configuredagentsonly
         self.includederivedtitles = includederivedtitles
         self.includelastmessage = includelastmessage
         self.label = label
         self.spawnedby = spawnedby
         self.agentid = agentid
+        self.configuredagentsonly = configuredagentsonly
         self.search = search
     }
 
@@ -1640,47 +1640,13 @@ public struct SessionsListParams: Codable, Sendable {
         case activeminutes = "activeMinutes"
         case includeglobal = "includeGlobal"
         case includeunknown = "includeUnknown"
-        case configuredagentsonly = "configuredAgentsOnly"
         case includederivedtitles = "includeDerivedTitles"
         case includelastmessage = "includeLastMessage"
         case label
         case spawnedby = "spawnedBy"
         case agentid = "agentId"
+        case configuredagentsonly = "configuredAgentsOnly"
         case search
-    }
-}
-
-public struct SessionsCleanupParams: Codable, Sendable {
-    public let agent: String?
-    public let allagents: Bool?
-    public let enforce: Bool?
-    public let activekey: String?
-    public let fixmissing: Bool?
-    public let fixdmscope: Bool?
-
-    public init(
-        agent: String?,
-        allagents: Bool?,
-        enforce: Bool?,
-        activekey: String?,
-        fixmissing: Bool?,
-        fixdmscope: Bool?)
-    {
-        self.agent = agent
-        self.allagents = allagents
-        self.enforce = enforce
-        self.activekey = activekey
-        self.fixmissing = fixmissing
-        self.fixdmscope = fixdmscope
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case agent
-        case allagents = "allAgents"
-        case enforce
-        case activekey = "activeKey"
-        case fixmissing = "fixMissing"
-        case fixdmscope = "fixDmScope"
     }
 }
 
@@ -2338,22 +2304,18 @@ public struct SessionsResetParams: Codable, Sendable {
 
 public struct SessionsDeleteParams: Codable, Sendable {
     public let key: String
-    public let deletetranscript: Bool?
     public let emitlifecyclehooks: Bool?
 
     public init(
         key: String,
-        deletetranscript: Bool?,
         emitlifecyclehooks: Bool?)
     {
         self.key = key
-        self.deletetranscript = deletetranscript
         self.emitlifecyclehooks = emitlifecyclehooks
     }
 
     private enum CodingKeys: String, CodingKey {
         case key
-        case deletetranscript = "deleteTranscript"
         case emitlifecyclehooks = "emitLifecycleHooks"
     }
 }

@@ -22,30 +22,31 @@ type MSTeamsTestRuntimeOptions = {
   createInboundDebouncer?: PluginRuntime["channel"]["debounce"]["createInboundDebouncer"];
   resolveInboundDebounceMs?: PluginRuntime["channel"]["debounce"]["resolveInboundDebounceMs"];
   resolveTextChunkLimit?: () => number;
-  resolveStorePath?: () => string;
 };
 
 export function installMSTeamsTestRuntime(options: MSTeamsTestRuntimeOptions = {}): void {
-  const runPrepared = vi.fn(async (turn: PreparedInboundReply<unknown>) => {
-    await turn.recordInboundSession({
-      storePath: turn.storePath,
-      sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
-      ctx: turn.ctxPayload,
-      groupResolution: turn.record?.groupResolution,
-      createIfMissing: turn.record?.createIfMissing,
-      updateLastRoute: turn.record?.updateLastRoute,
-      onRecordError: turn.record?.onRecordError ?? (() => undefined),
-    });
-    const dispatchResult = await turn.runDispatch();
-    return {
-      admission: { kind: "dispatch" as const },
-      dispatched: true,
-      ctxPayload: turn.ctxPayload,
-      routeSessionKey: turn.routeSessionKey,
-      dispatchResult,
-    };
-  });
-  const run = vi.fn(async (params: Parameters<PluginRuntime["channel"]["inbound"]["run"]>[0]) => {
+  const runPrepared = vi.fn(
+    async (turn: Parameters<PluginRuntime["channel"]["turn"]["runPrepared"]>[0]) => {
+      await turn.recordInboundSession({
+        agentId: turn.agentId,
+        sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
+        ctx: turn.ctxPayload,
+        groupResolution: turn.record?.groupResolution,
+        createIfMissing: turn.record?.createIfMissing,
+        updateLastRoute: turn.record?.updateLastRoute,
+        onRecordError: turn.record?.onRecordError ?? (() => undefined),
+      });
+      const dispatchResult = await turn.runDispatch();
+      return {
+        admission: { kind: "dispatch" as const },
+        dispatched: true,
+        ctxPayload: turn.ctxPayload,
+        routeSessionKey: turn.routeSessionKey,
+        dispatchResult,
+      };
+    },
+  );
+  const run = vi.fn(async (params: Parameters<PluginRuntime["channel"]["turn"]["run"]>[0]) => {
     const input = await params.adapter.ingest(params.raw);
     if (!input) {
       return { admission: { kind: "drop" as const, reason: "ingest-null" }, dispatched: false };
@@ -123,7 +124,6 @@ export function installMSTeamsTestRuntime(options: MSTeamsTestRuntimeOptions = {
       },
       session: {
         recordInboundSession: options.recordInboundSession ?? vi.fn(async () => undefined),
-        ...(options.resolveStorePath ? { resolveStorePath: options.resolveStorePath } : {}),
       },
       inbound: {
         run: run as unknown as PluginRuntime["channel"]["inbound"]["run"],

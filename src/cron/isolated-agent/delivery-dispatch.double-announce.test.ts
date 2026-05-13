@@ -1109,7 +1109,6 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       method: "sessions.delete",
       params: {
         key: "agent:main:cron:test-job",
-        deleteTranscript: true,
         emitLifecycleHooks: false,
       },
       timeoutMs: 10_000,
@@ -1130,7 +1129,6 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       method: "sessions.delete",
       params: {
         key: "agent:main:cron:test-job",
-        deleteTranscript: true,
         emitLifecycleHooks: false,
       },
       timeoutMs: 10_000,
@@ -1658,7 +1656,6 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       method: "sessions.delete",
       params: {
         key: "agent:main:cron:test-job",
-        deleteTranscript: true,
         emitLifecycleHooks: false,
       },
       timeoutMs: 10_000,
@@ -1715,7 +1712,6 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       method: "sessions.delete",
       params: {
         key: "agent:main:cron:test-job",
-        deleteTranscript: true,
         emitLifecycleHooks: false,
       },
       timeoutMs: 10_000,
@@ -1785,7 +1781,6 @@ describe("dispatchCronDelivery — double-announce guard", () => {
       method: "sessions.delete",
       params: {
         key: "agent:main:cron:test-job",
-        deleteTranscript: true,
         emitLifecycleHooks: false,
       },
       timeoutMs: 10_000,

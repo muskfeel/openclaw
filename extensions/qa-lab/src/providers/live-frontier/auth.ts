@@ -206,6 +206,7 @@ export async function stageQaLiveAnthropicSetupToken(params: {
   }
   await writeQaAuthProfiles({
     agentDir: resolveQaAgentAuthDir({ stateDir: params.stateDir, agentId: "main" }),
+    stateDir: params.stateDir,
     profiles: {
       [resolved.profileId]: {
         type: "token",
@@ -269,6 +270,7 @@ export async function stageQaLiveApiKeyProfiles(params: {
     agentIds.map((agentId) =>
       writeQaAuthProfiles({
         agentDir: resolveQaAgentAuthDir({ stateDir: params.stateDir, agentId }),
+        stateDir: params.stateDir,
         profiles,
       }),
     ),

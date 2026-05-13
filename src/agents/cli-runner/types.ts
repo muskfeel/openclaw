@@ -16,8 +16,7 @@ import type {
 } from "../../sessions/user-turn-transcript.js";
 import type { BootstrapContextMode } from "../bootstrap-files.js";
 import type { ResolvedCliBackend } from "../cli-backends.js";
-import type { ContextWindowInfo } from "../context-window-guard.js";
-import type { EmbeddedAgentExecutionPhase } from "../embedded-agent-runner/execution-phase.js";
+import type { ImageContent } from "../pi-ai-contract.js";
 import type {
   CurrentInboundPromptContext,
   EmbeddedRunTrigger,
@@ -31,7 +30,6 @@ export type RunCliAgentParams = {
   sessionEntry?: SessionEntry;
   agentId?: string;
   trigger?: EmbeddedRunTrigger;
-  sessionFile: string;
   workspaceDir: string;
   /** Task working directory for CLI execution. Defaults to workspaceDir. */
   cwd?: string;
@@ -79,7 +77,7 @@ export type RunCliAgentParams = {
   abortSignal?: AbortSignal;
   onExecutionStarted?: () => void;
   onExecutionPhase?: (info: {
-    phase: EmbeddedAgentExecutionPhase;
+    phase: "process_spawned" | "model_call_started";
     provider?: string;
     model?: string;
     backend?: string;

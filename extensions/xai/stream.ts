@@ -1,10 +1,6 @@
 import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
-import {
-  streamSimple,
-  type AssistantMessage,
-  type AssistantMessageEvent,
-} from "openclaw/plugin-sdk/llm";
 import type { ProviderWrapStreamFnContext } from "openclaw/plugin-sdk/plugin-entry";
+import { streamSimple } from "openclaw/plugin-sdk/provider-ai";
 import {
   composeProviderStreamWrappers,
   createPlainTextToolCallCompatWrapper,

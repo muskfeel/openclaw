@@ -9,6 +9,12 @@ import {
   getCompactionProvider,
   type CompactionProvider,
 } from "../../plugins/compaction-provider.js";
+import type { AgentMessage } from "../agent-core-contract.js";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  FileOperations,
+} from "../agent-extension-contract.js";
 import {
   hasMeaningfulConversationContent,
   isRealConversationMessage,

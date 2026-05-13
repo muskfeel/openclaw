@@ -6,6 +6,8 @@ import {
 } from "../../llm/providers/stream-wrappers/proxy.js";
 import type { Context, Model, SimpleStreamOptions } from "../../llm/types.js";
 import { captureEnv } from "../../test-utils/env.js";
+import type { Context, Model, SimpleStreamOptions } from "../pi-ai-contract.js";
+import { createKilocodeWrapper, isProxyReasoningUnsupported } from "./proxy-stream-wrappers.js";
 
 type ExtraParamsCapture<TPayload extends Record<string, unknown>> = {
   headers?: Record<string, string>;

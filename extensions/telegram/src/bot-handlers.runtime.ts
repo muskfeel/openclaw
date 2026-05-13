@@ -34,9 +34,10 @@ import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
 import { danger, logVerbose, warn } from "openclaw/plugin-sdk/runtime-env";
 import {
-  loadSessionStore,
-  resolveSessionStoreEntry,
-  updateSessionStore,
+  getSessionEntry,
+  listSessionEntries,
+  patchSessionEntry,
+  type SessionEntry,
 } from "openclaw/plugin-sdk/session-store-runtime";
 import { normalizeStringEntries } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { expandTelegramAllowFromWithAccessGroups } from "./access-groups.js";
@@ -122,7 +123,7 @@ import {
   buildTelegramConversationContext,
   buildTelegramReplyChain,
   createTelegramMessageCache,
-  resolveTelegramMessageCachePath,
+  resolveTelegramMessageCacheScopeKey,
   type TelegramCachedMessageNode,
   type TelegramReplyChainEntry,
 } from "./message-cache.js";
@@ -205,9 +206,7 @@ export const registerTelegramHandlers = ({
   const mediaGroupBuffer = new Map<string, BufferedMediaGroupEntry>();
   const mediaGroupProcessingByKey = new Map<string, Promise<void>>();
   const messageCache = createTelegramMessageCache({
-    persistedPath: resolveTelegramMessageCachePath(
-      telegramDeps.resolveStorePath(cfg.session?.store),
-    ),
+    persistedScopeKey: resolveTelegramMessageCacheScopeKey(accountId),
   });
   const messageDispatchReplayGuard = createTelegramMessageDispatchReplayGuard({
     storePath: telegramDeps.resolveStorePath(cfg.session?.store),
@@ -591,7 +590,7 @@ export const registerTelegramHandlers = ({
     runtimeCfg?: OpenClawConfig;
   }): {
     agentId: string;
-    sessionEntry: ReturnType<typeof resolveSessionStoreEntry>["existing"];
+    sessionEntry?: SessionEntry;
     sessionKey: string;
     model?: string;
   } => {
@@ -630,11 +629,16 @@ export const registerTelegramHandlers = ({
         ? resolveThreadSessionKeys({ baseSessionKey, threadId: `${params.chatId}:${dmThreadId}` })
         : null;
     const sessionKey = threadKeys?.sessionKey ?? baseSessionKey;
-    const storePath = telegramDeps.resolveStorePath(runtimeCfg.session?.store, {
+    const storeEntries = (telegramDeps.listSessionEntries ?? listSessionEntries)({
       agentId: route.agentId,
     });
-    const store = (telegramDeps.loadSessionStore ?? loadSessionStore)(storePath);
-    const entry = resolveSessionStoreEntry({ store, sessionKey }).existing;
+    const store = Object.fromEntries(
+      storeEntries.map(({ sessionKey, entry }) => [sessionKey, entry]),
+    );
+    const entry = (telegramDeps.getSessionEntry ?? getSessionEntry)({
+      agentId: route.agentId,
+      sessionKey,
+    });
     const storedOverride = resolveStoredModelOverride({
       sessionEntry: entry,
       sessionStore: store,
@@ -1529,7 +1533,7 @@ export const registerTelegramHandlers = ({
       if (user?.is_bot) {
         return;
       }
-      if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId, cfg)) {
+      if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId, { accountId })) {
         logVerbose(
           `telegram: skipped reaction on msg ${messageId} in chat ${chatId} (own mode, not sent by bot)`,
         );
@@ -2557,16 +2561,10 @@ export const registerTelegramHandlers = ({
 
           // Directly set model override in session
           try {
-            // Use the fresh runtimeCfg (loaded at callback entry) so store path
-            // and default-model resolution stay consistent with the next
-            // inbound message.  The outer `cfg` is a snapshot captured at
-            // handler-registration time and becomes stale after config reloads,
-            // which can cause the override to be written to the wrong store or
-            // incorrectly treated as the default model (clearing the override).
-            const storePath = telegramDeps.resolveStorePath(runtimeCfg.session?.store, {
-              agentId: sessionState.agentId,
-            });
-
+            // Use the fresh runtimeCfg loaded at callback entry so default-model
+            // resolution stays consistent with the next inbound message. The
+            // outer `cfg` is a snapshot captured at handler registration time
+            // and becomes stale after config reloads.
             const resolvedDefault = resolveDefaultModelForAgent({
               cfg: runtimeCfg,
               agentId: sessionState.agentId,
@@ -2576,18 +2574,24 @@ export const registerTelegramHandlers = ({
               selection.model === resolvedDefault.model;
 
             try {
-              await updateSessionStore(storePath, (store) => {
-                const sessionKey = sessionState.sessionKey;
-                const entry = store[sessionKey] ?? {};
-                store[sessionKey] = entry;
-                applyModelOverrideToSessionEntry({
-                  entry,
-                  selection: {
-                    provider: selection.provider,
-                    model: selection.model,
-                    isDefault: isDefaultSelection,
-                  },
-                });
+              await (telegramDeps.patchSessionEntry ?? patchSessionEntry)({
+                agentId: sessionState.agentId,
+                sessionKey: sessionState.sessionKey,
+                fallbackEntry: sessionState.sessionEntry ?? {
+                  sessionId: sessionState.sessionKey,
+                  updatedAt: Date.now(),
+                },
+                update: (entry) => {
+                  applyModelOverrideToSessionEntry({
+                    entry,
+                    selection: {
+                      provider: selection.provider,
+                      model: selection.model,
+                      isDefault: isDefaultSelection,
+                    },
+                  });
+                  return entry;
+                },
               });
             } catch (err) {
               throw new TelegramRetryableCallbackError(err);

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
-import type { Model } from "openclaw/plugin-sdk/llm";
 import { describe, expect, it, vi } from "vitest";
+import type { Model } from "../pi-ai-contract.js";
 import { prepareGooglePromptCacheStreamFn } from "./google-prompt-cache.js";
 import { EmbeddedAttemptSessionTakeoverError } from "./run/attempt.session-lock.js";
 

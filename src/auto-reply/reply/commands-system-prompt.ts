@@ -1,4 +1,5 @@
 import { isAcpRuntimeSpawnAvailable } from "../../acp/runtime/availability.js";
+import type { AgentTool } from "../../agents/agent-core-contract.js";
 import { resolveSessionAgentIds } from "../../agents/agent-scope.js";
 import { createOpenClawCodingTools } from "../../agents/agent-tools.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";

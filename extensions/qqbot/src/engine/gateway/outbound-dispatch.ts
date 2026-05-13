@@ -231,12 +231,8 @@ export async function dispatchOutbound(
     });
   }
 
-  const cfgWithSession = cfg as { session?: { store?: unknown } };
   const agentId = inbound.route.agentId ?? "default";
-  const storePath = runtime.channel.session.resolveStorePath(cfgWithSession.session?.store, {
-    agentId,
-  });
-  const dispatchPromise = runtime.channel.inbound.run({
+  const dispatchPromise = runtime.channel.turn.run({
     channel: "qqbot",
     accountId: inbound.route.accountId,
     raw: inbound,
@@ -251,8 +247,8 @@ export async function dispatchOutbound(
       resolveTurn: () => ({
         channel: "qqbot",
         accountId: inbound.route.accountId,
+        agentId,
         routeSessionKey: inbound.route.sessionKey,
-        storePath,
         ctxPayload,
         recordInboundSession: runtime.channel.session.recordInboundSession,
         record: {

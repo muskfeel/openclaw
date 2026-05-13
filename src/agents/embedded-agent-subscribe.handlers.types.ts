@@ -1,10 +1,11 @@
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { HeartbeatToolResponse } from "../auto-reply/heartbeat-tool-response.js";
 import type { ReplyDirectiveParseResult } from "../auto-reply/reply/reply-directives.js";
 import type { ReasoningLevel } from "../auto-reply/thinking.js";
 import type { InlineCodeState } from "../markdown/code-spans.js";
 import type { HookRunner } from "../plugins/hooks.js";
-import type { AcceptedSessionSpawn } from "./accepted-session-spawn.js";
-import type { EmbeddedBlockChunker } from "./embedded-agent-block-chunker.js";
+import type { AgentMessage } from "./agent-core-contract.js";
+import type { EmbeddedBlockChunker } from "./pi-embedded-block-chunker.js";
 import type {
   MessagingToolSend,
   MessagingToolSourceReplyPayload,
@@ -42,8 +43,7 @@ export type ToolCallSummary = {
 
 export type EmbeddedAgentSubscribeState = {
   assistantTexts: string[];
-  toolMetas: Array<{ toolName?: string; meta?: string; asyncStarted?: boolean }>;
-  acceptedSessionSpawns: AcceptedSessionSpawn[];
+  toolMetas: Array<{ toolName?: string; meta?: string }>;
   toolMetaById: Map<string, ToolCallSummary>;
   toolSummaryById: Set<string>;
   execLiveUpdateStateById?: Map<string, { lastEmittedAtMs: number }>;
@@ -217,7 +217,6 @@ type ToolHandlerState = Pick<
   EmbeddedAgentSubscribeState,
   | "toolMetaById"
   | "toolMetas"
-  | "acceptedSessionSpawns"
   | "toolSummaryById"
   | "execLiveUpdateStateById"
   | "itemActiveIds"

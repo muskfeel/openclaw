@@ -1,7 +1,6 @@
-import type { AssistantMessage } from "openclaw/plugin-sdk/llm";
 import { describe, expect, it } from "vitest";
-import { getReplyPayloadMetadata } from "../../../auto-reply/reply-payload.js";
-import { formatBillingErrorMessage } from "../../embedded-agent-helpers.js";
+import type { AssistantMessage } from "../../pi-ai-contract.js";
+import { formatBillingErrorMessage } from "../../pi-embedded-helpers.js";
 import { makeAssistantMessageFixture } from "../../test-helpers/assistant-message-fixtures.js";
 import {
   buildPayloads,
@@ -345,7 +344,7 @@ describe("buildEmbeddedRunPayloads", () => {
     });
   });
 
-  it("adds compact tool error fallback when the assistant only invoked tools and verbose mode is on", () => {
+  it("adds tool error fallback when the assistant only invoked tools and verbose mode is on", () => {
     const payloads = buildPayloads({
       lastAssistant: makeAssistant({
         stopReason: "toolUse",
@@ -365,7 +364,7 @@ describe("buildEmbeddedRunPayloads", () => {
 
     expectSingleToolErrorPayload(payloads, {
       title: "Exec",
-      absentDetail: "code 1",
+      detail: "code 1",
     });
   });
 
@@ -463,9 +462,6 @@ describe("buildEmbeddedRunPayloads", () => {
     expect(payloads[1]?.isError).toBe(true);
     expect(payloads[1]?.text).toContain("Write");
     expect(payloads[1]?.text).not.toContain("missing");
-    expect(getReplyPayloadMetadata(payloads[1] as object)?.nonTerminalToolErrorWarning).toBe(
-      undefined,
-    );
   });
 
   it("still shows write tool errors when timedOut is true but no fileTarget was recorded", () => {
@@ -541,9 +537,6 @@ describe("buildEmbeddedRunPayloads", () => {
     expect(payloads[1]?.isError).toBe(true);
     expect(payloads[1]?.text).toContain("Exec");
     expect(payloads[1]?.text).not.toContain("python: command not found");
-    expect(getReplyPayloadMetadata(payloads[1] as object)?.nonTerminalToolErrorWarning).toBe(
-      undefined,
-    );
   });
 
   it("shows mutating tool errors when assistant output does not acknowledge the failure", () => {
@@ -652,39 +645,10 @@ describe("buildEmbeddedRunPayloads", () => {
     expectSinglePayloadSummary(payloads, { text: warningText ?? "" });
   });
 
-  it("wraps markdown-capable mutating tool warnings so mention-looking names stay inert", () => {
-    const payloads = buildPayloads({
-      lastToolError: {
-        toolName: "bash",
-        meta: "show matrix-progress-@room-@alice:matrix-qa.test-!room:matrix-qa.test.txt (workspace)",
-        error: "file missing",
-        mutatingAction: true,
-      },
-      toolResultFormat: "markdown",
-    });
-
-    expectSinglePayloadSummary(payloads, {
-      text: "⚠️ 🛠️ `show matrix-progress-@room-@alice:matrix-qa.test-!room:matrix-qa.test.txt (workspace)` failed",
-      isError: true,
-    });
-  });
-
-  it("keeps non-recoverable tool errors compact when verbose mode is on", () => {
+  it("includes non-recoverable tool error details when verbose mode is on", () => {
     const payloads = buildPayloads({
       lastToolError: { toolName: "browser", error: "connection timeout" },
       verboseLevel: "on",
-    });
-
-    expectSingleToolErrorPayload(payloads, {
-      title: "Browser",
-      absentDetail: "connection timeout",
-    });
-  });
-
-  it("includes non-recoverable tool error details when verbose mode is full", () => {
-    const payloads = buildPayloads({
-      lastToolError: { toolName: "browser", error: "connection timeout" },
-      verboseLevel: "full",
     });
 
     expectSingleToolErrorPayload(payloads, {

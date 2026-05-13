@@ -25,7 +25,7 @@ import {
 } from "../shared/record-coerce.js";
 import { normalizeOptionalLowercaseString, readStringValue } from "../shared/string-coerce.js";
 import { truncateUtf16Safe } from "../utils.js";
-import { normalizeAcceptedSessionSpawnResult } from "./accepted-session-spawn.js";
+import type { AgentEvent } from "./agent-core-contract.js";
 import type { ApplyPatchSummary } from "./apply-patch.js";
 import type { ExecToolDetails } from "./bash-tools.exec-types.js";
 import { sanitizeForConsole } from "./console-sanitize.js";
@@ -1158,19 +1158,7 @@ export async function handleToolExecutionEnd(
   const callSummary = ctx.state.toolMetaById.get(toolCallId);
   const completedMutatingAction = !isToolError && Boolean(callSummary?.mutatingAction);
   const meta = callSummary?.meta;
-  const asyncStarted = !isToolError && isAsyncStartedToolResult(sanitizedResult);
-  ctx.state.toolMetas.push({
-    toolName,
-    meta,
-    ...(asyncStarted ? { asyncStarted: true } : {}),
-  });
-  const acceptedSessionSpawn =
-    toolName === "sessions_spawn" && !isToolError
-      ? normalizeAcceptedSessionSpawnResult(sanitizedResult)
-      : null;
-  if (acceptedSessionSpawn) {
-    ctx.state.acceptedSessionSpawns.push(acceptedSessionSpawn);
-  }
+  ctx.state.toolMetas.push({ toolName, meta });
   ctx.state.toolMetaById.delete(toolCallId);
   ctx.state.toolSummaryById.delete(toolCallId);
   if (isToolError) {
@@ -1204,10 +1192,7 @@ export async function handleToolExecutionEnd(
       ctx.state.lastToolError = undefined;
     }
   }
-  if (asyncStarted) {
-    ctx.state.hadDeterministicSideEffect = true;
-  }
-  if (completedMutatingAction || acceptedSessionSpawn || asyncStarted) {
+  if (completedMutatingAction) {
     ctx.state.replayState = mergeEmbeddedRunReplayState(ctx.state.replayState, {
       replayInvalid: true,
       hadPotentialSideEffects: true,

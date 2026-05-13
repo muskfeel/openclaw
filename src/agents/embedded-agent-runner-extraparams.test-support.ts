@@ -1,6 +1,6 @@
-import type { Context, Model } from "../llm/types.js";
-import { applyExtraParamsToAgent } from "./embedded-agent-runner/extra-params.js";
-import type { StreamFn } from "./runtime/index.js";
+import type { StreamFn } from "./agent-core-contract.js";
+import type { Context, Model } from "./pi-ai-contract.js";
+import { applyExtraParamsToAgent } from "./pi-embedded-runner/extra-params.js";
 
 export function runExtraParamsPayloadCase(params: {
   provider: string;

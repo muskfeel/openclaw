@@ -1,4 +1,4 @@
-import type { StreamFn } from "../../../agents/runtime/index.js";
+import type { StreamFn } from "../agent-core-contract.js";
 
 export function streamWithPayloadPatch(
   underlying: StreamFn,

@@ -1,5 +1,3 @@
-import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
-import type { Context, Model } from "openclaw/plugin-sdk/llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GPT_PARALLEL_TOOL_CALLS_PAYLOAD_APIS,
@@ -8,7 +6,8 @@ import {
   OPENAI_GPT5_TRANSPORT_DEFAULTS,
   UNRELATED_TOOL_CALLS_PAYLOAD_APIS,
 } from "../../test/helpers/agents/transport-params-runtime-contract.js";
-import { createOpenAIThinkingLevelWrapper } from "../llm/providers/stream-wrappers/openai.js";
+import type { StreamFn } from "./agent-core-contract.js";
+import type { Context, Model } from "./pi-ai-contract.js";
 import {
   testing as extraParamsTesting,
   applyExtraParamsToAgent,

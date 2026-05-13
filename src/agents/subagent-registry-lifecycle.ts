@@ -50,7 +50,6 @@ import {
   MIN_ANNOUNCE_RETRY_DELAY_MS,
   persistSubagentSessionTiming,
   resolveAnnounceRetryDelayMs,
-  safeRemoveAttachmentsDir,
 } from "./subagent-registry-helpers.js";
 import type { PendingFinalDeliveryPayload, SubagentRunRecord } from "./subagent-registry.types.js";
 import { deleteSubagentSessionForCleanup } from "./subagent-session-cleanup.js";
@@ -586,14 +585,8 @@ export function createSubagentRegistryLifecycleController(params: {
       reason: deliveryError,
     });
     giveUpParams.entry.wakeOnDescendantSettle = undefined;
-    const completion = ensureCompletionState(giveUpParams.entry);
-    completion.fallbackResultText = undefined;
-    completion.fallbackCapturedAt = undefined;
-    const shouldDeleteAttachments =
-      giveUpParams.entry.cleanup === "delete" || !giveUpParams.entry.retainAttachmentsOnKeep;
-    if (shouldDeleteAttachments) {
-      await safeRemoveAttachmentsDir(giveUpParams.entry);
-    }
+    giveUpParams.entry.fallbackFrozenResultText = undefined;
+    giveUpParams.entry.fallbackFrozenResultCapturedAt = undefined;
     const completionReason = resolveCleanupCompletionReason(giveUpParams.entry);
     logAnnounceGiveUp(giveUpParams.entry, giveUpParams.reason);
     // Retry-limit / expiry give-up should not leave cleanup stuck behind the
@@ -774,10 +767,6 @@ export function createSubagentRegistryLifecycleController(params: {
       completion.fallbackCapturedAt = undefined;
       const completionReason = resolveCleanupCompletionReason(entry);
       await emitCompletionEndedHookIfNeeded(entry, completionReason);
-      const shouldDeleteAttachments = cleanup === "delete" || !entry.retainAttachmentsOnKeep;
-      if (shouldDeleteAttachments) {
-        await safeRemoveAttachmentsDir(entry);
-      }
       if (cleanup === "delete") {
         completion.resultText = undefined;
         completion.capturedAt = undefined;
@@ -843,13 +832,8 @@ export function createSubagentRegistryLifecycleController(params: {
         reason: deliveryError,
       });
       entry.wakeOnDescendantSettle = undefined;
-      const completion = ensureCompletionState(entry);
-      completion.fallbackResultText = undefined;
-      completion.fallbackCapturedAt = undefined;
-      const shouldDeleteAttachments = cleanup === "delete" || !entry.retainAttachmentsOnKeep;
-      if (shouldDeleteAttachments) {
-        await safeRemoveAttachmentsDir(entry);
-      }
+      entry.fallbackFrozenResultText = undefined;
+      entry.fallbackFrozenResultCapturedAt = undefined;
       const completionReason = resolveCleanupCompletionReason(entry);
       logAnnounceGiveUp(entry, deferredDecision.reason);
       // Giving up on announce delivery is terminal for cleanup even if the

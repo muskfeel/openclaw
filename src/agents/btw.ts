@@ -18,24 +18,30 @@ import { discoverAuthStorage, discoverModels } from "./agent-model-discovery.js"
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "./agent-scope.js";
 import { resolveExternalCliAuthOverlayScopeFromSelection } from "./auth-profiles/external-cli-auth-selection.js";
 import { resolveSessionAuthProfileOverride } from "./auth-profiles/session-override.js";
-import { readBtwTranscriptMessages, resolveBtwSessionTranscriptPath } from "./btw-transcript.js";
-import { EmbeddedBlockChunker, type BlockReplyChunking } from "./embedded-agent-block-chunker.js";
-import { resolveModelWithRegistry } from "./embedded-agent-runner/model.js";
-import { getActiveEmbeddedRunSnapshot } from "./embedded-agent-runner/runs.js";
-import { resolveEmbeddedAgentStreamFn } from "./embedded-agent-runner/stream-resolution.js";
-import { resolveAvailableAgentHarnessPolicy, selectAgentHarness } from "./harness/selection.js";
+import { readBtwTranscriptMessages } from "./btw-transcript.js";
+import { resolveAgentHarnessPolicy, selectAgentHarness } from "./harness/selection.js";
 import {
   resolveImageSanitizationLimits,
   type ImageSanitizationLimits,
 } from "./image-sanitization.js";
-import {
-  ensureAuthProfileStore,
-  ensureAuthProfileStoreWithoutExternalProfiles,
-  getApiKeyForModel,
-  requireApiKey,
-} from "./model-auth.js";
-import { ensureOpenClawModelsJson } from "./models-config.js";
+import { getApiKeyForModel, requireApiKey } from "./model-auth.js";
+import { ensureOpenClawModelCatalog } from "./models-config.js";
 import { listOpenAIAuthProfileProvidersForAgentRuntime } from "./openai-codex-routing.js";
+import {
+  streamSimple,
+  type Api,
+  type AssistantMessageEvent,
+  type ImageContent,
+  type Message,
+  type Model,
+  type TextContent,
+} from "./pi-ai-contract.js";
+import { EmbeddedBlockChunker, type BlockReplyChunking } from "./pi-embedded-block-chunker.js";
+import { resolveModelWithRegistry } from "./pi-embedded-runner/model.js";
+import { getActiveEmbeddedRunSnapshot } from "./pi-embedded-runner/runs.js";
+import { streamWithPayloadPatch } from "./pi-embedded-runner/stream-payload-utils.js";
+import { resolveEmbeddedAgentStreamFn } from "./pi-embedded-runner/stream-resolution.js";
+import { discoverAuthStorage, discoverModels } from "./pi-model-discovery.js";
 import { registerProviderStreamForModel } from "./provider-stream.js";
 import { stripToolResultDetails } from "./session-transcript-repair.js";
 import { sanitizeImageBlocks } from "./tool-images.js";
@@ -242,7 +248,6 @@ async function resolveRuntimeModel(params: {
   sessionEntry?: StoredSessionEntry;
   sessionStore?: Record<string, StoredSessionEntry>;
   sessionKey?: string;
-  storePath?: string;
   isNewSession: boolean;
 }): Promise<{
   model: Model;
@@ -250,7 +255,7 @@ async function resolveRuntimeModel(params: {
   authProfileIdSource?: "auto" | "user";
 }> {
   const modelsOptions = params.workspaceDir ? { workspaceDir: params.workspaceDir } : undefined;
-  await ensureOpenClawModelsJson(params.cfg, params.agentDir, modelsOptions);
+  await ensureOpenClawModelCatalog(params.cfg, params.agentDir, modelsOptions);
   const authStorage = discoverAuthStorage(params.agentDir);
   const modelRegistry = discoverModels(authStorage, params.agentDir);
   const model = resolveModelWithRegistry({
@@ -268,7 +273,7 @@ async function resolveRuntimeModel(params: {
     provider: params.provider,
     acceptedProviderIds: listOpenAIAuthProfileProvidersForAgentRuntime({
       provider: params.provider,
-      harnessRuntime: resolveAvailableAgentHarnessPolicy({
+      harnessRuntime: resolveAgentHarnessPolicy({
         provider: params.provider,
         modelId: params.model,
         config: params.cfg,
@@ -281,7 +286,6 @@ async function resolveRuntimeModel(params: {
     sessionEntry: params.sessionEntry,
     sessionStore: params.sessionStore,
     sessionKey: params.sessionKey,
-    storePath: params.storePath,
     isNewSession: params.isNewSession,
   });
   return {
@@ -300,7 +304,6 @@ type RunBtwSideQuestionParams = {
   sessionEntry: StoredSessionEntry;
   sessionStore?: Record<string, StoredSessionEntry>;
   sessionKey?: string;
-  storePath?: string;
   resolvedThinkLevel?: ThinkLevel;
   resolvedReasoningLevel: ReasoningLevel;
   blockReplyChunking?: BlockReplyChunking;
@@ -320,20 +323,11 @@ export async function runBtwSideQuestion(
     throw new Error("No active session context.");
   }
 
-  const sessionFile = resolveBtwSessionTranscriptPath({
-    sessionId,
-    sessionEntry: params.sessionEntry,
-    sessionKey: params.sessionKey,
-    storePath: params.storePath,
-  });
-  if (!sessionFile) {
-    throw new Error("No active session transcript.");
-  }
-
   const sessionAgentId = resolveSessionAgentId({
     sessionKey: params.sessionKey,
     config: params.cfg,
   });
+
   const workspaceDir = resolveAgentWorkspaceDir(params.cfg, sessionAgentId);
   const harness = selectAgentHarness({
     provider: params.provider,
@@ -353,7 +347,6 @@ export async function runBtwSideQuestion(
       sessionEntry: params.sessionEntry,
       sessionStore: params.sessionStore,
       sessionKey: params.sessionKey,
-      storePath: params.storePath,
       isNewSession: params.isNewSession,
     });
     const result = await harness.runSideQuestion({
@@ -362,7 +355,6 @@ export async function runBtwSideQuestion(
       model: model.id,
       runtimeModel: model,
       sessionId,
-      sessionFile,
       agentId: sessionAgentId,
       workspaceDir,
       authProfileId,
@@ -370,7 +362,7 @@ export async function runBtwSideQuestion(
     });
     return { text: result.text };
   }
-  if (harness.id === "codex") {
+  if (harness.id !== "pi") {
     throw new Error(`Selected agent harness "${harness.id}" does not support /btw side questions.`);
   }
 
@@ -390,7 +382,7 @@ export async function runBtwSideQuestion(
   if (messages.length === 0) {
     messages = await toSimpleContextMessages({
       messages: await readBtwTranscriptMessages({
-        sessionFile,
+        agentId: sessionAgentId,
         sessionId,
         snapshotLeafId: activeRunSnapshot?.transcriptLeafId,
       }),
@@ -411,7 +403,6 @@ export async function runBtwSideQuestion(
     sessionEntry: params.sessionEntry,
     sessionStore: params.sessionStore,
     sessionKey: params.sessionKey,
-    storePath: params.storePath,
     isNewSession: params.isNewSession,
   });
   let externalCliAuthScope = resolveExternalCliAuthOverlayScopeFromSelection({
@@ -536,8 +527,9 @@ export async function runBtwSideQuestion(
     await blockEmitChain;
   };
 
+  const btwStream = providerStreamFn ?? streamSimple;
   const stream = await streamWithPayloadPatch(
-    streamFn,
+    btwStream,
     runtimeModel,
     {
       systemPrompt: buildBtwSystemPrompt(),

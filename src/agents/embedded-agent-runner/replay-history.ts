@@ -15,6 +15,8 @@ import {
   hasInterSessionUserProvenance,
   normalizeInputProvenance,
 } from "../../sessions/input-provenance.js";
+import type { AgentMessage } from "../agent-core-contract.js";
+import { resolveImageSanitizationLimits } from "../image-sanitization.js";
 import {
   downgradeOpenAIFunctionCallReasoningPairs,
   downgradeOpenAIReasoningBlocks,
@@ -40,6 +42,7 @@ import {
   resolveTranscriptPolicy,
   shouldAllowProviderOwnedThinkingReplay,
 } from "../transcript-policy.js";
+import type { SessionManager } from "../transcript/session-transcript-contract.js";
 import {
   makeZeroUsageSnapshot,
   normalizeUsage,
@@ -354,7 +357,7 @@ export function normalizeAssistantReplayContent(messages: AgentMessage[]): Agent
       continue;
     }
     if (isTranscriptOnlyOpenclawAssistant(message)) {
-      // Drop from the in-memory replay copy; the persisted JSONL keeps the
+      // Drop from the in-memory replay copy; the persisted transcript keeps the
       // entry so user-facing transcript surfaces are unchanged.
       touched = true;
       continue;
@@ -424,7 +427,7 @@ export function normalizeAssistantReplayContent(messages: AgentMessage[]): Agent
   // conversation must end with a user message.`. The original turn carried
   // `content: []` and zero usage — there is no information to lose by
   // dropping it. This trim runs after the main loop so it also catches a
-  // sentinel that was *persisted* to disk by an earlier session-file repair
+  // sentinel that was *persisted* to disk by an earlier transcript-state repair
   // pass (matching the same content shape the loop above produces).
   while (out.length > 0) {
     const last = out[out.length - 1];
@@ -450,7 +453,7 @@ function isReplayDroppableTrailingAssistant(message: AgentMessage | undefined): 
     return stopReason === "error" || isZeroUsageEmptyStopAssistantTurn(message);
   }
   // Sentinel-text content is the post-rewrite shape produced by either
-  // session-file-repair.rewriteAssistantEntryWithEmptyContent (always
+  // transcript-state-repair.rewriteAssistantEntryWithEmptyContent (always
   // stopReason="error") or the in-memory rewrite earlier in this same
   // normalizeAssistantReplayContent loop (preserves the original
   // stopReason — "error" or zero-usage "stop"). Drop only when the trailing

@@ -8,7 +8,9 @@ import { collectProviderApiKeys } from "./live-auth-keys.js";
 import { isLiveTestEnabled } from "./live-test-helpers.js";
 import { getApiKeyForModel, requireApiKey } from "./model-auth.js";
 import { normalizeProviderId, parseModelRef } from "./model-selection.js";
-import { ensureOpenClawModelsJson } from "./models-config.js";
+import { ensureOpenClawModelCatalog } from "./models-config.js";
+import { completeSimple, type Api, type AssistantMessage, type Model } from "./pi-ai-contract.js";
+import { discoverAuthStorage, discoverModels } from "./pi-model-discovery.js";
 import { buildAssistantMessageWithZeroUsage } from "./stream-message-shared.js";
 
 export const LIVE_CACHE_TEST_ENABLED =
@@ -214,7 +216,30 @@ export async function resolveLiveDirectModelPool(params: {
   }
 
   logLiveCache(`resolving ${params.provider} model from configured auth storage`);
-  const resolvedModel = selectModel();
+  const cfg = getRuntimeConfig();
+  await ensureOpenClawModelCatalog(cfg);
+  const agentDir = resolveDefaultAgentDir(cfg);
+  const authStorage = discoverAuthStorage(agentDir);
+  const models = discoverModels(authStorage, agentDir).getAll();
+
+  const rawModel = process.env[params.envVar]?.trim();
+  const parsed = rawModel ? parseModelRef(rawModel, params.provider) : null;
+  const candidates = models.filter(
+    (model) => normalizeProviderId(model.provider) === params.provider && model.api === params.api,
+  );
+
+  let resolvedModel: Model<Api> | undefined;
+  if (parsed) {
+    resolvedModel = candidates.find(
+      (model) =>
+        normalizeProviderId(model.provider) === parsed.provider && model.id === parsed.model,
+    );
+  }
+  if (!resolvedModel) {
+    resolvedModel = params.preferredModelIds
+      .map((id) => candidates.find((model) => model.id === id))
+      .find(Boolean);
+  }
   if (!resolvedModel) {
     throw new Error(
       rawModel
@@ -223,17 +248,17 @@ export async function resolveLiveDirectModelPool(params: {
     );
   }
 
-  const apiKey = requireApiKey(
-    await getApiKeyForModel({
-      model: resolvedModel,
-      cfg,
-      agentDir,
-    }),
-    resolvedModel.provider,
-  );
-  logLiveCache(
-    `resolved ${params.provider} model ${resolvedModel.id} from configured auth storage`,
-  );
+  const liveKeys = collectProviderApiKeys(params.provider);
+  const apiKey =
+    liveKeys[0] ??
+    requireApiKey(
+      await getApiKeyForModel({
+        model: resolvedModel,
+        cfg,
+        agentDir,
+      }),
+      resolvedModel.provider,
+    );
   return {
     apiKeys: [apiKey],
     fixture: {

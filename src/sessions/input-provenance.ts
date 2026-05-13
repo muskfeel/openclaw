@@ -1,4 +1,4 @@
-import type { AgentMessage } from "../agents/runtime/index.js";
+import type { AgentMessage } from "../agents/agent-core-contract.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 
 export const INPUT_PROVENANCE_KIND_VALUES = [

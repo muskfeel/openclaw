@@ -1,4 +1,5 @@
 import { detectOpenAICompletionsCompat } from "../agents/openai-completions-compat.js";
+import type { Api, Model } from "../agents/pi-ai-contract.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import type { Model } from "../llm/types.js";
 import { normalizeStringEntries } from "../shared/string-normalization.js";

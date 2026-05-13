@@ -7,6 +7,7 @@ import {
   generateChutesPkce,
   parseOAuthCallbackInput,
 } from "../agents/chutes-oauth.js";
+import type { OAuthCredentials } from "../agents/pi-ai-contract.js";
 import { isLoopbackHost } from "../gateway/net.js";
 import type { OAuthCredentials } from "../llm/oauth.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";

@@ -7,6 +7,7 @@ import { loadPluginManifestRegistry } from "../../plugins/manifest-registry.js";
 import type { PluginManifestRecord } from "../../plugins/manifest-registry.js";
 import { loadPluginManifest } from "../../plugins/manifest.js";
 import { normalizeStaticProviderModelId } from "../model-ref-shared.js";
+import type { Api, Model } from "../pi-ai-contract.js";
 import { normalizeProviderId } from "../provider-id.js";
 
 function rowMatchesModel(params: {

@@ -6,8 +6,7 @@ import {
   sortSubagentRuns,
   type SubagentTargetResolution,
 } from "../auto-reply/reply/subagents-utils.js";
-import { resolveStorePath } from "../config/sessions/paths.js";
-import { loadSessionStore, updateSessionStore } from "../config/sessions/store.js";
+import { getSessionEntry, upsertSessionEntry } from "../config/sessions/store.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { callGateway } from "../gateway/call.js";
@@ -45,23 +44,21 @@ export const MAX_STEER_MESSAGE_CHARS = 4_000;
 const STEER_RATE_LIMIT_MS = 2_000;
 const STEER_ABORT_SETTLE_TIMEOUT_MS = 5_000;
 const SUBAGENT_REPLY_HISTORY_LIMIT = 50;
+type SessionEntryCache = Map<string, SessionEntry | undefined>;
 
 const steerRateLimit = new Map<string, number>();
 
 type GatewayCaller = typeof callGateway;
-type UpdateSessionStore = typeof updateSessionStore;
-type AbortEmbeddedAgentRun = (sessionId: string) => boolean;
+type AbortEmbeddedPiRun = (sessionId: string) => boolean;
 type ClearSessionQueues = (keys: Array<string | undefined>) => ClearSessionQueueResult;
 
 const defaultSubagentControlDeps = {
   callGateway,
-  updateSessionStore,
 };
 
 let subagentControlDeps: {
   callGateway: GatewayCaller;
-  updateSessionStore: UpdateSessionStore;
-  abortEmbeddedAgentRun?: AbortEmbeddedAgentRun;
+  abortEmbeddedPiRun?: AbortEmbeddedPiRun;
   clearSessionQueues?: ClearSessionQueues;
 } = defaultSubagentControlDeps;
 
@@ -157,14 +154,13 @@ function ensureControllerOwnsRun(params: {
 async function killSubagentRun(params: {
   cfg: OpenClawConfig;
   entry: SubagentRunRecord;
-  cache: Map<string, Record<string, SessionEntry>>;
+  cache: SessionEntryCache;
 }): Promise<{ killed: boolean; sessionId?: string }> {
   if (params.entry.endedAt) {
     return { killed: false };
   }
   const childSessionKey = params.entry.childSessionKey;
   const resolved = resolveSessionEntryForKey({
-    cfg: params.cfg,
     key: childSessionKey,
     cache: params.cache,
   });
@@ -179,15 +175,18 @@ async function killSubagentRun(params: {
   }
   if (resolved.entry) {
     try {
-      await subagentControlDeps.updateSessionStore(resolved.storePath, (store) => {
-        const current = store[childSessionKey];
-        if (!current) {
-          return;
-        }
-        current.abortedLastRun = true;
-        current.updatedAt = Date.now();
-        store[childSessionKey] = current;
-      });
+      const parsed = parseAgentSessionKey(childSessionKey);
+      if (parsed?.agentId) {
+        upsertSessionEntry({
+          agentId: parsed.agentId,
+          sessionKey: childSessionKey,
+          entry: {
+            ...resolved.entry,
+            abortedLastRun: true,
+            updatedAt: Date.now(),
+          },
+        });
+      }
     } catch (error) {
       logVerbose(
         `subagents control kill: failed to persist abortedLastRun for ${childSessionKey}: ${formatErrorMessage(error)}`,
@@ -206,7 +205,7 @@ async function killSubagentRun(params: {
 async function cascadeKillChildren(params: {
   cfg: OpenClawConfig;
   parentChildSessionKey: string;
-  cache: Map<string, Record<string, SessionEntry>>;
+  cache: SessionEntryCache;
   seenChildSessionKeys?: Set<string>;
 }): Promise<{ killed: number; labels: string[] }> {
   const childRunsBySessionKey = new Map<string, SubagentRunRecord>();
@@ -280,7 +279,7 @@ export async function killAllControlledSubagentRuns(params: {
       labels: [],
     };
   }
-  const cache = new Map<string, Record<string, SessionEntry>>();
+  const cache = new Map<string, SessionEntry | undefined>();
   const seenChildSessionKeys = new Set<string>();
   const killedLabels: string[] = [];
   let killed = 0;
@@ -350,7 +349,7 @@ export async function killControlledSubagentRun(params: {
       text: `${resolveSubagentLabel(params.entry)} is already finished.`,
     };
   }
-  const killCache = new Map<string, Record<string, SessionEntry>>();
+  const killCache = new Map<string, SessionEntry | undefined>();
   const stopResult = await killSubagentRun({
     cfg: params.cfg,
     entry: currentEntry,
@@ -401,7 +400,7 @@ export async function killSubagentRunAdmin(params: { cfg: OpenClawConfig; sessio
     return { found: false as const, killed: false };
   }
 
-  const killCache = new Map<string, Record<string, SessionEntry>>();
+  const killCache = new Map<string, SessionEntry | undefined>();
   const stopResult = await killSubagentRun({
     cfg: params.cfg,
     entry,
@@ -520,9 +519,8 @@ export async function steerControlledSubagentRun(params: {
   markSubagentRunForSteerRestart(params.entry.runId);
 
   const targetSession = resolveSessionEntryForKey({
-    cfg: params.cfg,
     key: params.entry.childSessionKey,
-    cache: new Map<string, Record<string, SessionEntry>>(),
+    cache: new Map<string, SessionEntry | undefined>(),
   });
   const sessionId =
     typeof targetSession.entry?.sessionId === "string" && targetSession.entry.sessionId.trim()
@@ -644,9 +642,12 @@ export async function sendControlledSubagentMessage(params: {
 
   const targetSessionKey = params.entry.childSessionKey;
   const parsed = parseAgentSessionKey(targetSessionKey);
-  const storePath = resolveStorePath(params.cfg.session?.store, { agentId: parsed?.agentId });
-  const store = loadSessionStore(storePath);
-  const targetSessionEntry = store[targetSessionKey];
+  const targetSessionEntry = parsed?.agentId
+    ? getSessionEntry({
+        agentId: parsed.agentId,
+        sessionKey: targetSessionKey,
+      })
+    : undefined;
   const targetSessionId =
     typeof targetSessionEntry?.sessionId === "string" && targetSessionEntry.sessionId.trim()
       ? targetSessionEntry.sessionId.trim()
@@ -733,8 +734,7 @@ export const testing = {
   setDepsForTest(
     overrides?: Partial<{
       callGateway: GatewayCaller;
-      updateSessionStore: UpdateSessionStore;
-      abortEmbeddedAgentRun: AbortEmbeddedAgentRun;
+      abortEmbeddedPiRun: AbortEmbeddedPiRun;
       clearSessionQueues: ClearSessionQueues;
     }>,
   ) {

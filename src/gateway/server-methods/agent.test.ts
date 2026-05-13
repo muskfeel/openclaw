@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   loadSessionEntry: vi.fn(),
   loadGatewaySessionRow: vi.fn(),
   updateSessionStore: vi.fn(),
+  applySessionEntryWrite: vi.fn(),
   agentCommand: vi.fn(),
   registerAgentRunContext: vi.fn(),
   emitAgentEvent: vi.fn(),
@@ -68,6 +69,18 @@ vi.mock("../../config/sessions.js", async () => {
     ...actual,
     updateSessionStore: mocks.updateSessionStore,
     resolveSessionLifecycleTimestamps: mocks.resolveSessionLifecycleTimestamps,
+    upsertSessionEntry: (opts: {
+      agentId?: string;
+      sessionKey: string;
+      entry: Record<string, unknown>;
+    }) =>
+      mocks.applySessionEntryWrite(
+        { agentId: opts.agentId ?? "main", sessionKey: opts.sessionKey },
+        (store: Record<string, unknown>) => {
+          store[opts.sessionKey] = opts.entry;
+          return opts.entry;
+        },
+      ),
     resolveAgentIdFromSessionKey: (sessionKey: string) => {
       const m = /^agent:([^:]+):/.exec(sessionKey.trim());
       return m?.[1] ?? "main";
@@ -300,7 +313,6 @@ async function waitForAcceptedRunDispatch(respond: ReturnType<typeof vi.fn>) {
 function mockMainSessionEntry(entry: Record<string, unknown>, cfg: Record<string, unknown> = {}) {
   mocks.loadSessionEntry.mockReturnValue({
     cfg,
-    storePath: "/tmp/sessions.json",
     entry: {
       sessionId: "existing-session-id",
       updatedAt: Date.now(),
@@ -350,7 +362,7 @@ function primeMainAgentRun(params?: { sessionId?: string; cfg?: Record<string, u
     { sessionId: params?.sessionId ?? "existing-session-id" },
     params?.cfg ?? {},
   );
-  mocks.updateSessionStore.mockResolvedValue(undefined);
+  mocks.applySessionEntryWrite.mockResolvedValue(undefined);
   mocks.agentCommand.mockResolvedValue({
     payloads: [{ text: "ok" }],
     meta: { durationMs: 100 },
@@ -376,7 +388,7 @@ async function runMainAgentAndCaptureEntry(idempotencyKey: string) {
   const canonicalKey = loaded?.canonicalKey ?? "agent:main:main";
   const existingEntry = structuredClone(loaded?.entry ?? buildExistingMainStoreEntry());
   let capturedEntry: Record<string, unknown> | undefined;
-  mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+  mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
     const store: Record<string, unknown> = {
       [canonicalKey]: existingEntry,
     };
@@ -540,7 +552,7 @@ describe("gateway agent handler", () => {
     });
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:main": buildExistingMainStoreEntry({ acp: existingAcpMeta }),
       };
@@ -556,31 +568,29 @@ describe("gateway agent handler", () => {
 
     await runMainAgent("test", "test-idem-acp-meta");
 
-    expect(mocks.updateSessionStore).toHaveBeenCalled();
-    expect(requireValue(capturedEntry, "updated session entry missing").acp).toEqual(
-      existingAcpMeta,
-    );
+    expect(mocks.applySessionEntryWrite).toHaveBeenCalled();
+    expect(capturedEntry).toBeDefined();
+    expect(capturedEntry?.acp).toEqual(existingAcpMeta);
   });
 
-  it("drops a stale transcript path when a stale session rotates ids", async () => {
+  it("rotates a stale session id", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     dateOnlyFakeClockActive = true;
     vi.setSystemTime(new Date("2026-05-07T12:00:00.000Z"));
     const staleEntry = {
       sessionId: "old-session-id",
-      sessionFile: "/tmp/openclaw/agents/main/sessions/old-session-id.jsonl",
       updatedAt: 0,
       sessionStartedAt: 0,
     };
     mockMainSessionEntry(staleEntry);
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:main": { ...staleEntry },
       };
       const result = await updater(store);
-      capturedEntry = result as Record<string, unknown>;
+      capturedEntry = store["agent:main:main"] as Record<string, unknown>;
       return result;
     });
     mocks.agentCommand.mockResolvedValue({
@@ -591,7 +601,6 @@ describe("gateway agent handler", () => {
     await runMainAgent("test", "test-idem-stale-transcript");
 
     expect(capturedEntry?.sessionId).not.toBe("old-session-id");
-    expect(capturedEntry?.sessionFile).toBeUndefined();
   });
 
   it("rotates a failed session instead of resuming when its transcript is missing", async () => {
@@ -734,13 +743,12 @@ describe("gateway agent handler", () => {
     });
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: existingEntry,
       canonicalKey: sessionKey,
     });
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         [sessionKey]: { ...existingEntry },
       };
@@ -768,7 +776,7 @@ describe("gateway agent handler", () => {
       { reqId: "trusted-group-forged-selectors" },
     );
 
-    expect(mocks.updateSessionStore).toHaveBeenCalled();
+    expect(mocks.applySessionEntryWrite).toHaveBeenCalled();
     expect(capturedEntry?.groupId).toBe("C123");
     expect(capturedEntry?.groupChannel).toBe("#trusted");
     expect(capturedEntry?.space).toBe("TTRUSTED");
@@ -787,13 +795,12 @@ describe("gateway agent handler", () => {
     const sessionKey = "agent:main:slack:group:C123";
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: undefined,
       canonicalKey: sessionKey,
     });
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {};
       const result = await updater(store);
       capturedEntry = result as Record<string, unknown>;
@@ -819,7 +826,7 @@ describe("gateway agent handler", () => {
       { reqId: "trusted-group-first-turn-selectors" },
     );
 
-    expect(mocks.updateSessionStore).toHaveBeenCalled();
+    expect(mocks.applySessionEntryWrite).toHaveBeenCalled();
     expect(capturedEntry?.groupId).toBe("C123");
     expect(capturedEntry?.groupChannel).toBe("#general");
     expect(capturedEntry?.space).toBe("TWORKSPACE");
@@ -838,13 +845,12 @@ describe("gateway agent handler", () => {
     const sessionKey = "agent:main:dreaming-narrative-light-workspace-1";
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: undefined,
       canonicalKey: sessionKey,
     });
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {};
       const result = await updater(store);
       capturedEntry = store[sessionKey] as Record<string, unknown>;
@@ -871,7 +877,7 @@ describe("gateway agent handler", () => {
       },
     );
 
-    expect(mocks.updateSessionStore).toHaveBeenCalled();
+    expect(mocks.applySessionEntryWrite).toHaveBeenCalled();
     expect(capturedEntry?.pluginOwnerId).toBe("memory-core");
   });
 
@@ -884,13 +890,12 @@ describe("gateway agent handler", () => {
     };
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: existingEntry,
       canonicalKey: sessionKey,
     });
 
     let capturedEntry: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         [sessionKey]: { ...existingEntry },
       };
@@ -1031,18 +1036,15 @@ describe("gateway agent handler", () => {
     });
   });
 
-  it("preserves cliSessionIds from existing session entry", async () => {
-    const existingCliSessionIds = { "claude-cli": "abc-123-def" };
-    const existingClaudeCliSessionId = "abc-123-def";
+  it("preserves CLI session bindings from existing session entry", async () => {
+    const existingCliSessionBindings = { "claude-cli": { sessionId: "abc-123-def" } };
 
     mockMainSessionEntry({
-      cliSessionIds: existingCliSessionIds,
-      claudeCliSessionId: existingClaudeCliSessionId,
+      cliSessionBindings: existingCliSessionBindings,
     });
 
     const capturedEntry = await runMainAgentAndCaptureEntry("test-idem");
-    expect(capturedEntry.cliSessionIds).toEqual(existingCliSessionIds);
-    expect(capturedEntry.claudeCliSessionId).toBe(existingClaudeCliSessionId);
+    expect(capturedEntry.cliSessionBindings).toEqual(existingCliSessionBindings);
   });
   // #5369: sessions.patch can write modelOverride to the session store between
   // when the agent handler reads its cached entry and when updateSessionStore
@@ -1401,14 +1403,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "sess-followup",
         updatedAt: Date.now(),
       },
       canonicalKey: childSessionKey,
     });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         [childSessionKey]: {
           sessionId: "sess-followup",
@@ -1473,20 +1474,26 @@ describe("gateway agent handler", () => {
       updatedAt: Date.now(),
       fastMode: true,
       sendPolicy: "deny",
-      lastChannel: "telegram",
-      lastTo: "-100123",
-      lastAccountId: "acct-1",
-      lastThreadId: 42,
+      channel: "telegram",
+      deliveryContext: {
+        channel: "telegram",
+        to: "-100123",
+        accountId: "acct-1",
+        threadId: 42,
+      },
     });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:main": buildExistingMainStoreEntry({
           fastMode: true,
           sendPolicy: "deny",
-          lastChannel: "telegram",
-          lastTo: "-100123",
-          lastAccountId: "acct-1",
-          lastThreadId: 42,
+          channel: "telegram",
+          deliveryContext: {
+            channel: "telegram",
+            to: "-100123",
+            accountId: "acct-1",
+            threadId: 42,
+          },
         }),
       };
       return await updater(store);
@@ -2139,7 +2146,7 @@ describe("gateway agent handler", () => {
       spawnedBy: "agent:main:subagent:parent",
       spawnedWorkspaceDir: "/tmp/inherited",
     });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:main": buildExistingMainStoreEntry({
           spawnedBy: "agent:main:subagent:parent",
@@ -2162,49 +2169,21 @@ describe("gateway agent handler", () => {
     expect(spawnedCall.workspaceDir).toBe("/tmp/inherited");
   });
 
-  it("forwards spawnedCwd as runtime cwd for spawned sessions", async () => {
-    primeMainAgentRun();
-    mockMainSessionEntry({
-      spawnedBy: "agent:main:subagent:parent",
-      spawnedWorkspaceDir: "/tmp/inherited",
-      spawnedCwd: "/tmp/task-repo",
-    });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
-      const store: Record<string, unknown> = {
-        "agent:main:main": buildExistingMainStoreEntry({
-          spawnedBy: "agent:main:subagent:parent",
-          spawnedWorkspaceDir: "/tmp/inherited",
-          spawnedCwd: "/tmp/task-repo",
-        }),
-      };
-      return await updater(store);
-    });
-    mocks.agentCommand.mockClear();
-
-    await invokeAgent(
-      {
-        message: "spawned run",
-        sessionKey: "agent:main:main",
-        idempotencyKey: "cwd-forwarded",
-      },
-      { reqId: "cwd-forwarded-1" },
-    );
-    const spawnedCall = await waitForAgentCommandCall<{ cwd?: string; workspaceDir?: string }>();
-    expect(spawnedCall.workspaceDir).toBe("/tmp/inherited");
-    expect(spawnedCall.cwd).toBe("/tmp/task-repo");
-  });
-
-  it("keeps origin messageChannel as webchat while delivery channel uses last session channel", async () => {
+  it("keeps origin messageChannel as webchat while delivery uses typed session context", async () => {
     mockMainSessionEntry({
       sessionId: "existing-session-id",
-      lastChannel: "telegram",
-      lastTo: "12345",
+      deliveryContext: {
+        channel: "telegram",
+        to: "12345",
+      },
     });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:main": buildExistingMainStoreEntry({
-          lastChannel: "telegram",
-          lastTo: "12345",
+          deliveryContext: {
+            channel: "telegram",
+            to: "12345",
+          },
         }),
       };
       return await updater(store);
@@ -2258,8 +2237,11 @@ describe("gateway agent handler", () => {
     }
     mockMainSessionEntry({
       sessionId: "existing-session-id",
-      lastChannel: "telegram",
-      lastTo: "123",
+      channel: "telegram",
+      deliveryContext: {
+        channel: "telegram",
+        to: "123",
+      },
     });
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
@@ -2536,8 +2518,11 @@ describe("gateway agent handler", () => {
     }
     mockMainSessionEntry({
       sessionId: "existing-session-id",
-      lastChannel: "telegram",
-      lastTo: "123",
+      channel: "telegram",
+      deliveryContext: {
+        channel: "telegram",
+        to: "123",
+      },
     });
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
@@ -2565,8 +2550,11 @@ describe("gateway agent handler", () => {
   it("does not honor caller-supplied exec approval runtime handoff ids without registry state", async () => {
     mockMainSessionEntry({
       sessionId: "existing-session-id",
-      lastChannel: "telegram",
-      lastTo: "123",
+      channel: "telegram",
+      deliveryContext: {
+        channel: "telegram",
+        to: "123",
+      },
     });
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
@@ -2604,8 +2592,11 @@ describe("gateway agent handler", () => {
     }
     mockMainSessionEntry({
       sessionId: "existing-session-id",
-      lastChannel: "telegram",
-      lastTo: "123",
+      channel: "telegram",
+      deliveryContext: {
+        channel: "telegram",
+        to: "123",
+      },
     });
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
@@ -3026,7 +3017,7 @@ describe("gateway agent handler", () => {
       );
       const loaded = mocks.loadSessionEntry();
       let capturedEntry: Record<string, unknown> | undefined;
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [loaded.canonicalKey]: structuredClone(loaded.entry),
         };
@@ -3351,7 +3342,7 @@ describe("gateway agent handler", () => {
       );
       const loaded = mocks.loadSessionEntry();
       let capturedEntry: Record<string, unknown> | undefined;
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [loaded.canonicalKey]: structuredClone(loaded.entry),
         };
@@ -3393,14 +3384,13 @@ describe("gateway agent handler", () => {
     mocks.resolveExplicitAgentSessionKey.mockReturnValue("agent:ops:main");
     mocks.loadSessionEntry.mockReturnValue({
       cfg: { session: { scope: "global" } },
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "global-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: "global",
     });
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         global: { sessionId: "global-session-id", updatedAt: Date.now() },
       };
@@ -3498,14 +3488,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: "agent:main:voice",
     });
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3540,14 +3529,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "main-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: "agent:main:main",
     });
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3583,14 +3571,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockImplementation((sessionKey: string) => ({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: sessionKey === "main" ? "agent:main:main" : sessionKey,
     }));
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3633,14 +3620,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockImplementation((sessionKey: string) => ({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: sessionKey === "main" ? "agent:main:main" : sessionKey,
     }));
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3685,14 +3671,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockImplementation((sessionKey: string) => ({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: sessionKey,
     }));
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3732,14 +3717,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockImplementation((sessionKey: string) => ({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: sessionKey,
     }));
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3779,14 +3763,13 @@ describe("gateway agent handler", () => {
 
     mocks.loadSessionEntry.mockImplementation((sessionKey: string) => ({
       cfg: {},
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: sessionKey === "main" ? "main-session-id" : "voice-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: sessionKey === "main" ? "agent:main:main" : sessionKey,
     }));
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
     mocks.agentCommand.mockResolvedValue({
       payloads: [{ text: "ok" }],
       meta: { durationMs: 100 },
@@ -3816,30 +3799,29 @@ describe("gateway agent handler", () => {
     expect(mocks.resolveVoiceWakeRouteByTrigger).not.toHaveBeenCalled();
   });
 
-  it("handles missing cliSessionIds gracefully", async () => {
+  it("handles missing CLI session bindings gracefully", async () => {
     mockMainSessionEntry({});
 
     const capturedEntry = await runMainAgentAndCaptureEntry("test-idem-2");
     // Should be undefined, not cause an error
-    expect(capturedEntry.cliSessionIds).toBeUndefined();
-    expect(capturedEntry.claudeCliSessionId).toBeUndefined();
+    expect(capturedEntry.cliSessionBindings).toBeUndefined();
   });
-  it("prunes legacy main alias keys when writing a canonical session entry", async () => {
+  it("leaves noncanonical main row cleanup to doctor when writing a canonical session entry", async () => {
     mocks.loadSessionEntry.mockReturnValue({
       cfg: {
         session: { mainKey: "work" },
         agents: { list: [{ id: "main", default: true }] },
       },
-      storePath: "/tmp/sessions.json",
       entry: {
         sessionId: "existing-session-id",
         updatedAt: Date.now(),
       },
       canonicalKey: "agent:main:work",
+      agentId: "main",
     });
 
     let capturedStore: Record<string, unknown> | undefined;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+    mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
       const store: Record<string, unknown> = {
         "agent:main:work": { sessionId: "existing-session-id", updatedAt: 10 },
         "agent:main:MAIN": { sessionId: "legacy-session-id", updatedAt: 5 },
@@ -3863,10 +3845,10 @@ describe("gateway agent handler", () => {
       { reqId: "3" },
     );
 
-    expect(mocks.updateSessionStore).toHaveBeenCalled();
-    const sessionStore = requireValue(capturedStore, "updated session store missing");
-    expect(sessionStore).toHaveProperty("agent:main:work");
-    expect(sessionStore["agent:main:MAIN"]).toBeUndefined();
+    expect(mocks.applySessionEntryWrite).toHaveBeenCalled();
+    expect(capturedStore).toBeDefined();
+    expect(capturedStore?.["agent:main:work"]).toBeDefined();
+    expect(capturedStore?.["agent:main:MAIN"]).toBeDefined();
   });
 
   it("handles bare /new by resetting the same session and sending reset greeting prompt", async () => {
@@ -3984,7 +3966,6 @@ describe("gateway agent handler", () => {
             mockSessionResetSuccess({ reason: "new" });
             mocks.loadSessionEntry.mockReturnValue({
               cfg: mocks.loadConfigReturn,
-              storePath: "/tmp/sessions.json",
               entry: {
                 sessionId: "reset-session-id",
                 updatedAt: Date.now(),
@@ -3993,7 +3974,7 @@ describe("gateway agent handler", () => {
               },
               canonicalKey: "agent:main:main",
             });
-            mocks.updateSessionStore.mockResolvedValue(undefined);
+            mocks.applySessionEntryWrite.mockResolvedValue(undefined);
             mocks.agentCommand.mockResolvedValue({
               payloads: [{ text: "ok" }],
               meta: { durationMs: 100 },
@@ -4039,14 +4020,13 @@ describe("gateway agent handler", () => {
       });
       mocks.loadSessionEntry.mockReturnValue({
         cfg: mocks.loadConfigReturn,
-        storePath: "/tmp/sessions.json",
         entry: {
           sessionId: "reset-session-id",
           updatedAt: Date.now(),
         },
         canonicalKey: "agent:main:subagent:worker",
       });
-      mocks.updateSessionStore.mockResolvedValue(undefined);
+      mocks.applySessionEntryWrite.mockResolvedValue(undefined);
       mocks.agentCommand.mockResolvedValue({
         payloads: [{ text: "ok" }],
         meta: { durationMs: 100 },
@@ -4113,7 +4093,6 @@ describe("gateway agent handler", () => {
                 });
                 mocks.loadSessionEntry.mockReturnValue({
                   cfg: mocks.loadConfigReturn,
-                  storePath: "/tmp/sessions.json",
                   entry: {
                     sessionId: "existing-child-session",
                     updatedAt: Date.now(),
@@ -4122,7 +4101,7 @@ describe("gateway agent handler", () => {
                   },
                   canonicalKey: "agent:main:subagent:sandbox-child",
                 });
-                mocks.updateSessionStore.mockResolvedValue(undefined);
+                mocks.applySessionEntryWrite.mockResolvedValue(undefined);
                 mocks.agentCommand.mockResolvedValue({
                   payloads: [{ text: "ok" }],
                   meta: { durationMs: 100 },
@@ -4353,12 +4332,11 @@ describe("gateway agent handler", () => {
     ) {
       mocks.loadSessionEntry.mockReturnValue({
         cfg: {},
-        storePath: "/tmp/sessions.json",
         entry: { sessionId: "existing-session-id", updatedAt: Date.now(), ...entry },
         canonicalKey: sessionKey,
       });
       let capturedEntry: Record<string, unknown> | undefined;
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [sessionKey]: { sessionId: "existing-session-id", ...entry },
         };
@@ -4450,7 +4428,7 @@ describe("gateway agent handler chat.abort integration", () => {
 
   function prime(sessionId = "existing-session-id", cfg: Record<string, unknown> = {}) {
     mockMainSessionEntry({ sessionId }, cfg);
-    mocks.updateSessionStore.mockResolvedValue(undefined);
+    mocks.applySessionEntryWrite.mockResolvedValue(undefined);
   }
 
   it("registers an abort controller into chatAbortControllers for an agent run", async () => {

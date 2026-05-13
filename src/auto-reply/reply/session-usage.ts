@@ -5,14 +5,11 @@ import {
   type NormalizedUsage,
 } from "../../agents/usage.js";
 import { getRuntimeConfig } from "../../config/config.js";
-import {
-  type SessionSystemPromptReport,
-  type SessionEntry,
-  updateSessionStoreEntry,
-} from "../../config/sessions.js";
+import { type SessionSystemPromptReport, type SessionEntry } from "../../config/sessions.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { logVerbose } from "../../globals.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
+import { writeSessionEntryRow } from "./session-row-patch.js";
 
 function applyCliSessionIdToSessionPatch(
   params: {
@@ -29,9 +26,7 @@ function applyCliSessionIdToSessionPatch(
     setCliSessionBinding(nextEntry, cliProvider, params.cliSessionBinding);
     return {
       ...patch,
-      cliSessionIds: nextEntry.cliSessionIds,
       cliSessionBindings: nextEntry.cliSessionBindings,
-      claudeCliSessionId: nextEntry.claudeCliSessionId,
     };
   }
   if (params.cliSessionId && cliProvider) {
@@ -39,9 +34,7 @@ function applyCliSessionIdToSessionPatch(
     setCliSessionId(nextEntry, cliProvider, params.cliSessionId);
     return {
       ...patch,
-      cliSessionIds: nextEntry.cliSessionIds,
       cliSessionBindings: nextEntry.cliSessionBindings,
-      claudeCliSessionId: nextEntry.claudeCliSessionId,
     };
   }
   return patch;
@@ -69,7 +62,6 @@ function estimateSessionRunCostUsd(params: {
 }
 
 export async function persistSessionUsageUpdate(params: {
-  storePath?: string;
   sessionKey?: string;
   cfg?: OpenClawConfig;
   usage?: NormalizedUsage;
@@ -93,8 +85,8 @@ export async function persistSessionUsageUpdate(params: {
   preserveUserFacingSessionModelState?: boolean;
   logLabel?: string;
 }): Promise<void> {
-  const { storePath, sessionKey } = params;
-  if (!storePath || !sessionKey) {
+  const { sessionKey } = params;
+  if (!sessionKey) {
     return;
   }
 
@@ -110,8 +102,7 @@ export async function persistSessionUsageUpdate(params: {
 
   if (hasUsage || hasFreshContextSnapshot) {
     try {
-      await updateSessionStoreEntry({
-        storePath,
+      await writeSessionEntryRow({
         sessionKey,
         skipMaintenance: true,
         takeCacheOwnership: true,
@@ -196,8 +187,7 @@ export async function persistSessionUsageUpdate(params: {
 
   if (params.modelUsed || params.contextTokensUsed) {
     try {
-      await updateSessionStoreEntry({
-        storePath,
+      await writeSessionEntryRow({
         sessionKey,
         skipMaintenance: true,
         takeCacheOwnership: true,

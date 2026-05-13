@@ -3,8 +3,7 @@ import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
 import {
   stream as streamDefault,
   type Model,
-  type ProviderStreamOptions,
-} from "openclaw/plugin-sdk/llm";
+} from "openclaw/plugin-sdk/provider-ai";
 import {
   applyAnthropicPayloadPolicyToParams,
   resolveAnthropicPayloadPolicy,

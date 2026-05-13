@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 const command = process.argv[2];
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
@@ -28,122 +29,34 @@ function configPath() {
   return process.env.OPENCLAW_CONFIG_PATH || path.join(stateDir(), "openclaw.json");
 }
 
-function agentOutputPath() {
-  return process.env.OPENCLAW_LIVE_PLUGIN_TOOL_AGENT_OUTPUT_PATH || "/tmp/openclaw-agent.json";
+function agentDatabasePath(agentId = "main") {
+  return path.join(stateDir(), "agents", agentId, "agent", "openclaw-agent.sqlite");
 }
 
-function agentErrorPath() {
-  return process.env.OPENCLAW_LIVE_PLUGIN_TOOL_AGENT_ERROR_PATH || "/tmp/openclaw-agent.err";
+function stateDatabasePath() {
+  return path.join(stateDir(), "state", "openclaw.sqlite");
 }
 
-function tailText(text, maxBytes = ERROR_DETAIL_TAIL_BYTES) {
-  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
-    return text;
+function withSqliteDatabase(dbPath, callback) {
+  if (!fs.existsSync(dbPath)) {
+    throw new Error(`missing SQLite database: ${dbPath}`);
   }
-  return Buffer.from(text, "utf8").subarray(-maxBytes).toString("utf8");
-}
-
-function readTextFileTail(file, maxBytes = ERROR_DETAIL_TAIL_BYTES) {
-  let stat;
+  const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    stat = fs.statSync(file);
-  } catch {
-    return "";
-  }
-  if (!stat.isFile() || stat.size <= 0) {
-    return "";
-  }
-
-  const length = Math.min(maxBytes, stat.size);
-  const start = stat.size - length;
-  const fd = fs.openSync(file, "r");
-  try {
-    const buffer = Buffer.alloc(length);
-    const bytesRead = fs.readSync(fd, buffer, 0, length, start);
-    return buffer.subarray(0, bytesRead).toString("utf8");
+    return callback(db);
   } finally {
-    fs.closeSync(fd);
+    db.close();
   }
 }
 
-function scanFileForNeedles(file, pendingNeedles) {
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return;
-  }
-  if (!stat.isFile() || stat.size <= 0 || pendingNeedles.size === 0) {
-    return;
-  }
-
-  const maxNeedleLength = Math.max(...Array.from(pendingNeedles, (needle) => needle.length));
-  const carryChars = Math.max(SCAN_CARRY_CHARS, maxNeedleLength - 1);
-  const fd = fs.openSync(file, "r");
-  try {
-    const buffer = Buffer.alloc(Math.min(SCAN_CHUNK_BYTES, stat.size));
-    let carry = "";
-    let offset = 0;
-    while (offset < stat.size && pendingNeedles.size > 0) {
-      const bytesToRead = Math.min(buffer.length, stat.size - offset);
-      const bytesRead = fs.readSync(fd, buffer, 0, bytesToRead, offset);
-      if (bytesRead <= 0) {
-        break;
-      }
-      offset += bytesRead;
-      const text = carry + buffer.subarray(0, bytesRead).toString("utf8");
-      for (const needle of Array.from(pendingNeedles)) {
-        if (text.includes(needle)) {
-          pendingNeedles.delete(needle);
-        }
-      }
-      carry = text.slice(-carryChars);
-    }
-  } finally {
-    fs.closeSync(fd);
-  }
-}
-
-function scanSessionTranscripts(sessionsDir, needles) {
-  const pendingNeedles = new Set(needles);
-  const checkedFiles = [];
-  let filesChecked = 0;
-  let stat;
-  try {
-    stat = fs.statSync(sessionsDir);
-  } catch {
-    return { checkedFiles, filesChecked, missingDir: true, pendingNeedles };
-  }
-  if (!stat.isDirectory()) {
-    return { checkedFiles, filesChecked, missingDir: true, pendingNeedles };
-  }
-
-  const pendingDirs = [sessionsDir];
-  while (pendingDirs.length > 0 && pendingNeedles.size > 0) {
-    const dir = pendingDirs.pop();
-    const entries = fs
-      .readdirSync(dir, { withFileTypes: true })
-      .toSorted((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      const entryPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        pendingDirs.push(entryPath);
-        continue;
-      }
-      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) {
-        continue;
-      }
-      filesChecked += 1;
-      if (checkedFiles.length < SESSION_FILE_LIST_LIMIT) {
-        checkedFiles.push(path.relative(sessionsDir, entryPath));
-      }
-      scanFileForNeedles(entryPath, pendingNeedles);
-      if (pendingNeedles.size === 0) {
-        break;
-      }
-    }
-  }
-  return { checkedFiles, filesChecked, missingDir: false, pendingNeedles };
+function readMainAgentTranscriptText() {
+  return withSqliteDatabase(agentDatabasePath("main"), (db) =>
+    db
+      .prepare("SELECT event_json FROM transcript_events ORDER BY session_id, seq")
+      .all()
+      .map((row) => String(row.event_json ?? ""))
+      .join("\n"),
+  );
 }
 
 function realPathMaybe(filePath) {
@@ -169,10 +82,17 @@ function writeJson(file, value) {
 }
 
 function installRecords() {
-  const indexPath = path.join(stateDir(), "plugins", "installs.json");
-  const index = fs.existsSync(indexPath) ? readJson(indexPath) : {};
-  const cfg = fs.existsSync(configPath()) ? readJson(configPath()) : {};
-  return index.installRecords || index.records || cfg.plugins?.installs || {};
+  return withSqliteDatabase(stateDatabasePath(), (db) => {
+    const row = db
+      .prepare(
+        "SELECT install_records_json FROM installed_plugin_index WHERE index_key = 'current'",
+      )
+      .get();
+    if (!row?.install_records_json) {
+      return {};
+    }
+    return JSON.parse(String(row.install_records_json));
+  });
 }
 
 function pluginInstallPath() {
@@ -368,14 +288,9 @@ function assertAgentTurn() {
       `live agent reply did not contain tool slug ${expected}:\nstdout tail=${tailText(stdout)}\nstderr tail=${stderrTail}`,
     );
   }
-  const sessionsDir = path.join(stateDir(), "agents", "main", "sessions");
-  const scan = scanSessionTranscripts(sessionsDir, [toolName, expected]);
-  if (scan.pendingNeedles.size > 0) {
-    const checkedFiles = scan.checkedFiles.length > 0 ? scan.checkedFiles.join(", ") : "<none>";
-    const missingDir = scan.missingDir ? " sessions directory was missing." : "";
-    throw new Error(
-      `session transcript did not show ${toolName} returning ${expected}; missing ${Array.from(scan.pendingNeedles).join(", ")} after checking ${scan.filesChecked} jsonl file(s): ${checkedFiles}.${missingDir}`,
-    );
+  const transcript = readMainAgentTranscriptText();
+  if (!transcript.includes(toolName) || !transcript.includes(expected)) {
+    throw new Error(`SQLite session transcript did not show ${toolName} returning ${expected}`);
   }
 }
 

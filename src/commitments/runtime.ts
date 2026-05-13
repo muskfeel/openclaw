@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
 import type { OpenClawConfig } from "../config/config.js";
-import { resolveStateDir } from "../config/paths.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { resolveCommitmentTimezone, resolveCommitmentsConfig } from "./config.js";
@@ -181,17 +179,7 @@ function openTerminalFailureCooldown(agentId: string, error: unknown): void {
   });
 }
 
-function resolveExtractionSessionFile(agentId: string, runId: string): string {
-  return path.join(
-    resolveStateDir(),
-    "commitments",
-    "extractor-sessions",
-    agentId,
-    `${runId}.jsonl`,
-  );
-}
-
-function joinPayloadText(result: EmbeddedAgentPayloadResult): string {
+function joinPayloadText(result: EmbeddedPiPayloadResult): string {
   return (
     result.payloads
       ?.map((payload) => payload.text)
@@ -230,7 +218,6 @@ async function defaultExtractBatch(params: {
     sessionKey: `agent:${first.agentId}:commitments:${runId}`,
     agentId: first.agentId,
     trigger: "manual",
-    sessionFile: resolveExtractionSessionFile(first.agentId, runId),
     workspaceDir: resolveAgentWorkspaceDir(cfg, first.agentId),
     config: cfg,
     provider: modelRef.provider,

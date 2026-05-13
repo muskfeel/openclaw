@@ -1,3 +1,4 @@
+import type { Model } from "openclaw/plugin-sdk/provider-ai";
 import { expect } from "vitest";
 import type { Model } from "../types.js";
 

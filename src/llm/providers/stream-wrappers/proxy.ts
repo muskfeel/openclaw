@@ -1,12 +1,9 @@
-import { resolveProviderRequestPolicy } from "../../../agents/provider-attribution.js";
-import { resolveProviderRequestPolicyConfig } from "../../../agents/provider-request-config.js";
-import type { StreamFn } from "../../../agents/runtime/index.js";
-import type { ThinkLevel } from "../../../auto-reply/thinking.js";
-import {
-  normalizeOptionalLowercaseString,
-  readStringValue,
-} from "../../../shared/string-coerce.js";
-import { streamSimple } from "../../stream.js";
+import type { ThinkLevel } from "../../auto-reply/thinking.js";
+import { normalizeOptionalLowercaseString, readStringValue } from "../../shared/string-coerce.js";
+import type { StreamFn } from "../agent-core-contract.js";
+import { streamSimple } from "../pi-ai-contract.js";
+import { resolveProviderRequestPolicy } from "../provider-attribution.js";
+import { resolveProviderRequestPolicyConfig } from "../provider-request-config.js";
 import { applyAnthropicEphemeralCacheControlMarkers } from "./anthropic-cache-control-payload.js";
 import { isAnthropicModelRef } from "./anthropic-family-cache-semantics.js";
 import { mapThinkingLevelToReasoningEffort } from "./reasoning-effort-utils.js";

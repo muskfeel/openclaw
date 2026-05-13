@@ -5,7 +5,8 @@ import {
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { AssistantMessage } from "../../llm/types.js";
 import { providerSupportsNativePdfDocument } from "../../media-understanding/defaults.js";
-import { extractAssistantText } from "../embedded-agent-utils.js";
+import type { AssistantMessage } from "../pi-ai-contract.js";
+import { extractAssistantText } from "../pi-embedded-utils.js";
 
 export type PdfModelConfig = { primary?: string; fallbacks?: string[] };
 

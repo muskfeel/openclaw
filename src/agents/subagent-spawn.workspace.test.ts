@@ -35,6 +35,17 @@ const hoisted = vi.hoisted(() => ({
 let spawnSubagentDirect: typeof import("./subagent-spawn.js").spawnSubagentDirect;
 let resetSubagentRegistryForTests: typeof import("./subagent-registry.js").resetSubagentRegistryForTests;
 
+vi.mock("./pi-ai-oauth-contract.js", async () => {
+  const actual = await vi.importActual<typeof import("./pi-ai-oauth-contract.js")>(
+    "./pi-ai-oauth-contract.js",
+  );
+  return {
+    ...actual,
+    getOAuthApiKey: () => "",
+    getOAuthProviders: () => [],
+  };
+});
+
 function createConfigOverride(overrides?: Record<string, unknown>) {
   return createSubagentSpawnTestConfig("/tmp/workspace-main", {
     agents: {
@@ -75,7 +86,6 @@ function findLastSessionDeleteCall() {
     | {
         params?: {
           key?: string;
-          deleteTranscript?: boolean;
           emitLifecycleHooks?: boolean;
         };
       }
@@ -283,7 +293,7 @@ describe("spawnSubagentDirect workspace inheritance", () => {
     hoisted.callGatewayMock.mockImplementation(
       async (request: {
         method?: string;
-        params?: { key?: string; deleteTranscript?: boolean; emitLifecycleHooks?: boolean };
+        params?: { key?: string; emitLifecycleHooks?: boolean };
       }) => {
         if (request.method === "sessions.patch") {
           return { ok: true };
@@ -318,7 +328,6 @@ describe("spawnSubagentDirect workspace inheritance", () => {
 
     const deleteCall = findLastSessionDeleteCall();
     expect(deleteCall?.params?.key).toBe(result.childSessionKey);
-    expect(deleteCall?.params?.deleteTranscript).toBe(true);
     expect(deleteCall?.params?.emitLifecycleHooks).toBe(false);
   });
 
@@ -334,7 +343,7 @@ describe("spawnSubagentDirect workspace inheritance", () => {
     hoisted.callGatewayMock.mockImplementation(
       async (request: {
         method?: string;
-        params?: { key?: string; deleteTranscript?: boolean; emitLifecycleHooks?: boolean };
+        params?: { key?: string; emitLifecycleHooks?: boolean };
       }) => {
         if (request.method === "sessions.patch") {
           return { ok: true };
@@ -372,7 +381,6 @@ describe("spawnSubagentDirect workspace inheritance", () => {
 
     const deleteCall = findLastSessionDeleteCall();
     expect(deleteCall?.params?.key).toBe(result.childSessionKey);
-    expect(deleteCall?.params?.deleteTranscript).toBe(true);
     expect(deleteCall?.params?.emitLifecycleHooks).toBe(true);
   });
 });

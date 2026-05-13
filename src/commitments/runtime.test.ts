@@ -175,7 +175,7 @@ describe("commitment extraction runtime", () => {
     expect(firstBatchItem.itemId).not.toContain("telegram");
     expect(firstBatchItem.itemId).not.toContain("15551234567");
     expect(firstBatchItem.itemId).not.toContain("m1");
-    expect(store.commitments.map((commitment) => commitment.dedupeKey)).toEqual([
+    expect(store.commitments.map((commitment) => commitment.dedupeKey).toSorted()).toEqual([
       "event:1",
       "event:2",
     ]);
@@ -219,8 +219,13 @@ describe("commitment extraction runtime", () => {
 
     await expect(drainCommitmentExtractionQueue()).resolves.toBe(1);
     expect(resolveDefaultModelMock).toHaveBeenCalledWith({ cfg, agentId: "main" });
-    expect(runEmbeddedAgentMock).toHaveBeenCalledTimes(1);
-    const request = requireFirstEmbeddedAgentRequest();
+    expect(runEmbeddedPiAgentMock).toHaveBeenCalledTimes(1);
+    const request = runEmbeddedPiAgentMock.mock.calls[0]?.[0] as
+      | { provider?: string; model?: string; disableTools?: boolean }
+      | undefined;
+    if (!request) {
+      throw new Error("Expected embedded PI agent extraction request");
+    }
     expect(request.provider).toBe("openai-codex");
     expect(request.model).toBe("gpt-5.5");
     expect(request.disableTools).toBe(true);

@@ -1,7 +1,4 @@
-import os from "node:os";
-import path from "node:path";
 import type { OpenClawConfig, MemorySearchConfig } from "../config/config.js";
-import { resolveStateDir } from "../config/paths.js";
 import type { SecretInput } from "../config/types.secrets.js";
 import {
   isMemoryMultimodalEnabled,
@@ -10,8 +7,8 @@ import {
 } from "../memory-host-sdk/multimodal.js";
 import { getEmbeddingProvider } from "../plugins/embedding-provider-runtime.js";
 import { getMemoryEmbeddingProvider } from "../plugins/memory-embedding-providers.js";
-import { normalizeStringEntries, uniqueStrings } from "../shared/string-normalization.js";
-import { clampInt, clampNumber, resolveUserPath } from "../utils.js";
+import { resolveOpenClawAgentSqlitePath } from "../state/openclaw-agent-db.js";
+import { clampInt, clampNumber } from "../utils.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { findNormalizedProviderValue, normalizeProviderId } from "./provider-id.js";
 
@@ -50,7 +47,7 @@ export type ResolvedMemorySearchConfig = {
   };
   store: {
     driver: "sqlite";
-    path: string;
+    databasePath: string;
     fts: {
       tokenizer: "unicode61" | "trigram";
     };
@@ -141,14 +138,8 @@ function normalizeSources(
   return Array.from(normalized);
 }
 
-function resolveStorePath(agentId: string, raw?: string): string {
-  const stateDir = resolveStateDir(process.env, os.homedir);
-  const fallback = path.join(stateDir, "memory", `${agentId}.sqlite`);
-  if (!raw) {
-    return fallback;
-  }
-  const withToken = raw.includes("{agentId}") ? raw.replaceAll("{agentId}", agentId) : raw;
-  return resolveUserPath(withToken);
+function resolveMemoryStore(agentId: string): string {
+  return resolveOpenClawAgentSqlitePath({ agentId, env: process.env });
 }
 
 function getConfiguredMemoryEmbeddingProvider(
@@ -264,7 +255,7 @@ function mergeConfig(
   };
   const store = {
     driver: overrides?.store?.driver ?? defaults?.store?.driver ?? "sqlite",
-    path: resolveStorePath(agentId, overrides?.store?.path ?? defaults?.store?.path),
+    databasePath: resolveMemoryStore(agentId),
     fts,
     vector,
   };

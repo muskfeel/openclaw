@@ -4,8 +4,8 @@ import { createConfigRuntimeEnv } from "../config/env-vars.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { unsetEnv, withTempEnv } from "./models-config.e2e-harness.js";
 import {
-  planOpenClawModelsJsonWithDeps,
-  resolveProvidersForModelsJsonWithDeps,
+  planOpenClawModelCatalogWithDeps,
+  resolveProvidersForModelCatalogWithDeps,
 } from "./models-config.plan.js";
 import type { ProviderConfig } from "./models-config.providers.secrets.js";
 
@@ -54,7 +54,7 @@ async function resolveProvidersForConfigEnvTest(params: {
   onResolveImplicitProviders: (env: NodeJS.ProcessEnv) => void;
 }) {
   const env = createConfigRuntimeEnv(params.cfg);
-  return await resolveProvidersForModelsJsonWithDeps(
+  return await resolveProvidersForModelCatalogWithDeps(
     {
       cfg: params.cfg,
       agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -105,7 +105,7 @@ describe("models-config", () => {
       | Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">
       | undefined;
 
-    await resolveProvidersForModelsJsonWithDeps(
+    await resolveProvidersForModelCatalogWithDeps(
       {
         cfg: { models: { providers: {} } },
         agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -126,7 +126,7 @@ describe("models-config", () => {
   it("threads workspace scope into implicit provider discovery", async () => {
     let observedWorkspaceDir: string | undefined;
 
-    await resolveProvidersForModelsJsonWithDeps(
+    await resolveProvidersForModelCatalogWithDeps(
       {
         cfg: { models: { providers: {} } },
         agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -149,7 +149,7 @@ describe("models-config", () => {
     let observedEntriesOnly: boolean | undefined;
     let observedTimeoutMs: number | undefined;
 
-    await resolveProvidersForModelsJsonWithDeps(
+    await resolveProvidersForModelCatalogWithDeps(
       {
         cfg: { models: { providers: {} } },
         agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -177,7 +177,7 @@ describe("models-config", () => {
     expect(observedTimeoutMs).toBe(5000);
   });
 
-  it("threads plugin metadata snapshots through models.json planning", async () => {
+  it("threads plugin metadata snapshots through model catalog planning", async () => {
     const pluginMetadataSnapshot = {
       index: { plugins: [] },
       manifestRegistry: { plugins: [], diagnostics: [] },
@@ -187,7 +187,7 @@ describe("models-config", () => {
       | Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">
       | undefined;
 
-    await planOpenClawModelsJsonWithDeps(
+    await planOpenClawModelCatalogWithDeps(
       {
         cfg: { models: { providers: {} } },
         agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -207,64 +207,8 @@ describe("models-config", () => {
     expect(observedSnapshot).toBe(pluginMetadataSnapshot);
   });
 
-  it("does not write unauthenticated model providers that would invalidate models.json", async () => {
-    const plan = await planOpenClawModelsJsonWithDeps(
-      {
-        cfg: { models: { providers: {} } },
-        agentDir: "/tmp/openclaw-models-config-env-vars-test",
-        env: {},
-        existingRaw: "",
-        existingParsed: null,
-      },
-      {
-        resolveImplicitProviders: async () => ({
-          openai: createImplicitOpenAiProvider(),
-          "auth-only": createImplicitOpenAiProvider({
-            baseUrl: "https://auth.example/v1",
-            api: "openai-responses",
-            models: [],
-          }),
-        }),
-      },
-    );
-
-    expect(plan.action).toBe("write");
-    if (plan.action !== "write") {
-      throw new Error("Expected models.json write plan");
-    }
-    const parsed = JSON.parse(plan.contents) as { providers?: Record<string, unknown> };
-    expect(parsed.providers?.openai).toBeUndefined();
-    expect(parsed.providers?.["auth-only"]).toBeDefined();
-  });
-
-  it("falls back to canonical env markers when provider runtime has no api-key policy", async () => {
-    const plan = await planOpenClawModelsJsonWithDeps(
-      {
-        cfg: { models: { providers: {} } },
-        agentDir: "/tmp/openclaw-models-config-env-vars-test",
-        env: { OPENAI_API_KEY: "sk-test" } as NodeJS.ProcessEnv,
-        existingRaw: "",
-        existingParsed: null,
-      },
-      {
-        resolveImplicitProviders: async () => ({
-          openai: createImplicitOpenAiProvider(),
-        }),
-      },
-    );
-
-    expect(plan.action).toBe("write");
-    if (plan.action !== "write") {
-      throw new Error("Expected models.json write plan");
-    }
-    const parsed = JSON.parse(plan.contents) as {
-      providers?: Record<string, { apiKey?: string }>;
-    };
-    expect(parsed.providers?.openai?.apiKey).toBe("OPENAI_API_KEY");
-  });
-
-  it("normalizes retired Gemini ids preserved from existing models.json rows", async () => {
-    const plan = await planOpenClawModelsJsonWithDeps(
+  it("normalizes retired Gemini ids preserved from stored catalog rows", async () => {
+    const plan = await planOpenClawModelCatalogWithDeps(
       {
         cfg: { models: { mode: "merge", providers: {} } },
         agentDir: "/tmp/openclaw-models-config-env-vars-test",
@@ -311,7 +255,7 @@ describe("models-config", () => {
 
     expect(plan.action).toBe("write");
     if (plan.action !== "write") {
-      throw new Error("Expected models.json write plan");
+      throw new Error("Expected stored model catalog write plan");
     }
     const parsed = JSON.parse(plan.contents) as {
       providers?: Record<string, { models?: Array<{ id?: string }> }>;
@@ -336,7 +280,7 @@ describe("models-config", () => {
     });
   });
 
-  it("does not overwrite already-set host env vars while ensuring models.json", async () => {
+  it("does not overwrite already-set host env vars while ensuring the model catalog", async () => {
     await withTempEnv(["OPENROUTER_API_KEY", TEST_ENV_VAR], async () => {
       process.env.OPENROUTER_API_KEY = "from-host"; // pragma: allowlist secret
       process.env[TEST_ENV_VAR] = "from-host";

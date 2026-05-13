@@ -34,6 +34,13 @@ type ChutesUserInfo = {
   username?: string;
 };
 
+type OAuthCredentials = {
+  access: string;
+  refresh: string;
+  expires: number;
+  email?: string;
+};
+
 type ChutesStoredOAuth = OAuthCredentials & {
   accountId?: string;
   clientId?: string;

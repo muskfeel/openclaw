@@ -2,6 +2,7 @@ import type { ModelDefinitionConfig, ModelProviderConfig } from "../../config/ty
 import { normalizeGoogleApiBaseUrl } from "../../infra/google-api-base-url.js";
 import type { Api } from "../../llm/types.js";
 import { normalizeOptionalLowercaseString } from "../../shared/string-coerce.js";
+import type { Api } from "../pi-ai-contract.js";
 import { isSecretRefHeaderValueMarker } from "../model-auth-markers.js";
 import { attachModelProviderLocalService } from "../provider-local-service.js";
 import {

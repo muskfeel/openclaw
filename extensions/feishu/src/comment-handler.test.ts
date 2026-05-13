@@ -107,25 +107,26 @@ function createTestRuntime(overrides?: {
       },
     );
   const recordInboundSession = vi.fn(async () => {});
-  const dispatchPreparedForTest = vi.fn(async (turn: PreparedInboundReply<unknown>) => {
-    await turn.recordInboundSession({
-      storePath: turn.storePath,
-      sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
-      ctx: turn.ctxPayload,
-      groupResolution: turn.record?.groupResolution,
-      createIfMissing: turn.record?.createIfMissing,
-      updateLastRoute: turn.record?.updateLastRoute,
-      onRecordError: turn.record?.onRecordError ?? (() => undefined),
-    });
-    const dispatchResult = await turn.runDispatch();
-    return {
-      admission: { kind: "dispatch" as const },
-      dispatched: true,
-      ctxPayload: turn.ctxPayload,
-      routeSessionKey: turn.routeSessionKey,
-      dispatchResult,
-    };
-  });
+  const runPrepared = vi.fn(
+    async (turn: Parameters<PluginRuntime["channel"]["turn"]["runPrepared"]>[0]) => {
+      await turn.recordInboundSession({
+        sessionKey: turn.ctxPayload.SessionKey ?? turn.routeSessionKey,
+        ctx: turn.ctxPayload,
+        groupResolution: turn.record?.groupResolution,
+        createIfMissing: turn.record?.createIfMissing,
+        updateLastRoute: turn.record?.updateLastRoute,
+        onRecordError: turn.record?.onRecordError ?? (() => undefined),
+      });
+      const dispatchResult = await turn.runDispatch();
+      return {
+        admission: { kind: "dispatch" as const },
+        dispatched: true,
+        ctxPayload: turn.ctxPayload,
+        routeSessionKey: turn.routeSessionKey,
+        dispatchResult,
+      };
+    },
+  );
 
   return {
     channel: {
@@ -149,7 +150,6 @@ function createTestRuntime(overrides?: {
         withReplyDispatcher,
       },
       session: {
-        resolveStorePath: vi.fn(() => "/tmp/feishu-session-store.json"),
         recordInboundSession,
       },
       inbound: {

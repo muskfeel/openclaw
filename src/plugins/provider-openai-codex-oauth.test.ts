@@ -8,8 +8,10 @@ const mocks = vi.hoisted(() => ({
   formatOpenAIOAuthTlsPreflightFix: vi.fn(),
 }));
 
-vi.mock("../llm/oauth.js", async () => {
-  const actual = await vi.importActual<typeof import("../llm/oauth.js")>("../llm/oauth.js");
+vi.mock("../agents/pi-ai-oauth-contract.js", async () => {
+  const actual = await vi.importActual<typeof import("../agents/pi-ai-oauth-contract.js")>(
+    "../agents/pi-ai-oauth-contract.js",
+  );
   return {
     ...actual,
     loginOpenAICodex: mocks.loginOpenAICodex,

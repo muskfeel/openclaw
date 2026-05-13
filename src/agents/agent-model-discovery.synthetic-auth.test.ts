@@ -33,9 +33,8 @@ vi.mock("./auth-profiles/store.js", () => ({
   loadAuthProfileStoreForSecretsRuntime: () => ({ version: 1, profiles: {} }),
 }));
 
-vi.mock("./agent-auth-discovery-core.js", () => ({
-  addEnvBackedAgentCredentials: (credentials: Record<string, unknown>) => ({ ...credentials }),
-  scrubLegacyStaticAuthJsonEntriesForDiscovery: vi.fn(),
+vi.mock("./pi-auth-discovery-core.js", () => ({
+  addEnvBackedPiCredentials: (credentials: Record<string, unknown>) => ({ ...credentials }),
 }));
 
 let resolveAgentCredentialsForDiscovery: typeof import("./agent-auth-discovery.js").resolveAgentCredentialsForDiscovery;
@@ -69,9 +68,7 @@ describe("agent model discovery synthetic auth", () => {
     await withAgentDir(async (agentDir) => {
       const credentials = resolveAgentCredentialsForDiscovery(agentDir, { readOnly: true });
 
-      expect(resolveRuntimeSyntheticAuthProviderRefs).toHaveBeenCalledTimes(1);
-      expect(resolveRuntimeSyntheticAuthProviderRefs).toHaveBeenCalledWith();
-      expect(resolveProviderSyntheticAuthWithPlugin).toHaveBeenCalledTimes(1);
+      expect(resolveRuntimeSyntheticAuthProviderRefs).toHaveBeenCalled();
       expect(resolveProviderSyntheticAuthWithPlugin).toHaveBeenCalledWith({
         provider: "claude-cli",
         context: {

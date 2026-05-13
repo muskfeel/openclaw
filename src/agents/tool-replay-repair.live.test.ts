@@ -1,23 +1,16 @@
 import type { AgentMessage } from "openclaw/plugin-sdk/agent-core";
-import { SessionManager } from "openclaw/plugin-sdk/agent-sessions";
-import type { Api, Context, Model } from "openclaw/plugin-sdk/llm";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 import { getRuntimeConfig } from "../config/config.js";
 import { discoverAuthStorage, discoverModels } from "./agent-model-discovery.js";
 import { resolveDefaultAgentDir } from "./agent-scope.js";
-import { sanitizeSessionHistory } from "./embedded-agent-runner/replay-history.js";
-import {
-  completeSimpleWithTimeout,
-  type CompleteSimpleContent,
-  isLiveProfileKeyModeEnabled,
-  isLiveTestEnabled,
-  logLiveProgress,
-  requiresLiveProfileCredential,
-  resolveLiveCredentialPrecedence,
-} from "./live-test-helpers.js";
+import { isLiveProfileKeyModeEnabled, isLiveTestEnabled } from "./live-test-helpers.js";
 import { getApiKeyForModel, requireApiKey } from "./model-auth.js";
-import { ensureOpenClawModelsJson } from "./models-config.js";
+import { ensureOpenClawModelCatalog } from "./models-config.js";
+import { completeSimple, type Api, type Context, type Model } from "./pi-ai-contract.js";
+import { sanitizeSessionHistory } from "./pi-embedded-runner/replay-history.js";
+import { discoverAuthStorage, discoverModels } from "./pi-model-discovery.js";
+import { SessionManager } from "./transcript/session-transcript-contract.js";
 import { transformTransportMessages } from "./transport-message-transform.js";
 
 const LIVE = isLiveTestEnabled();
@@ -53,7 +46,38 @@ function parseTargetModelRefs(raw: string | undefined): TargetModelRef[] {
   return refs;
 }
 
-const logProgress = logLiveProgress;
+function logProgress(message: string): void {
+  process.stderr.write(`[live] ${message}\n`);
+}
+
+async function completeSimpleWithTimeout<TApi extends Api>(
+  model: Model<TApi>,
+  context: Parameters<typeof completeSimple<TApi>>[1],
+  options: Parameters<typeof completeSimple<TApi>>[2],
+  timeoutMs: number,
+): Promise<Awaited<ReturnType<typeof completeSimple<TApi>>>> {
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  abortTimer.unref?.();
+  try {
+    return await Promise.race([
+      completeSimple(model, context, {
+        ...options,
+        signal: controller.signal,
+      }),
+      new Promise<never>((_, reject) => {
+        const hardTimer = setTimeout(() => {
+          reject(new Error(`model call timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+        hardTimer.unref?.();
+      }),
+    ]);
+  } finally {
+    clearTimeout(abortTimer);
+  }
+}
 
 function isOpenAIResponsesFamily(api: string): boolean {
   return (
@@ -175,7 +199,7 @@ function assistantToolCallIds(message: AgentMessage): string[] {
   return ids;
 }
 
-function responseText(content: CompleteSimpleContent): string {
+function responseText(content: Awaited<ReturnType<typeof completeSimple<Api>>>["content"]): string {
   const parts: string[] = [];
   for (const block of content) {
     if (block.type === "text") {
@@ -198,7 +222,7 @@ describeLive("tool replay repair live", () => {
       `accepts repaired displaced and missing tool results with ${target.ref}`,
       async () => {
         const cfg = getRuntimeConfig();
-        await ensureOpenClawModelsJson(cfg);
+        await ensureOpenClawModelCatalog(cfg);
 
         const agentDir = resolveDefaultAgentDir(cfg);
         const authStorage = discoverAuthStorage(agentDir);
@@ -309,7 +333,7 @@ describeLive("tool replay repair live", () => {
       `accepts transport replay after dropping aborted assistant tool calls with ${target.ref}`,
       async () => {
         const cfg = getRuntimeConfig();
-        await ensureOpenClawModelsJson(cfg);
+        await ensureOpenClawModelCatalog(cfg);
 
         const agentDir = resolveDefaultAgentDir(cfg);
         const authStorage = discoverAuthStorage(agentDir);

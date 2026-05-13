@@ -1,9 +1,8 @@
-import type { Api, Model } from "openclaw/plugin-sdk/llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { OPENCLAW_EMBEDDED_CONTEXT_ENGINE_HOST } from "../../context-engine/host-compat.js";
 import type { ContextEngine } from "../../context-engine/types.js";
-import { testing as cliBackendsTesting } from "../cli-backends.js";
+import type { Api, Model } from "../pi-ai-contract.js";
 import type {
   EmbeddedRunAttemptParams,
   EmbeddedRunAttemptResult,
@@ -70,7 +69,6 @@ function createAttemptParams(config?: OpenClawConfig): EmbeddedRunAttemptParams 
     prompt: "hello",
     sessionId: "session-1",
     runId: "run-1",
-    sessionFile: "/tmp/session.jsonl",
     workspaceDir: "/tmp/workspace",
     timeoutMs: 5_000,
     provider: "codex",
@@ -720,7 +718,6 @@ describe("selectAgentHarness", () => {
       maybeCompactAgentHarnessSession({
         sessionId: "session-1",
         sessionKey: "agent:main:main",
-        sessionFile: "/tmp/session.jsonl",
         workspaceDir: "/tmp/workspace",
         provider: "ollama",
         model: "llama3.3",

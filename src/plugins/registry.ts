@@ -382,7 +382,6 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
   ).toSorted();
   registry.coreGatewayMethodNames = coreGatewayMethodNames;
   const coreGatewayMethods = new Set(coreGatewayMethodNames);
-  const getHostCronService = () => registryParams.hostServices?.cron;
   const pluginHookRollback = new Map<string, HookRollbackEntry[]>();
   const pluginsWithChannelRegistrationConflict = new Set<string>();
   const pluginSideEffectGuards = new Map<string, Set<PluginSideEffectGuard>>();
@@ -2909,7 +2908,6 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
                   pluginName: record.name,
                   origin: record.origin,
                   schedule,
-                  cron: getHostCronService(),
                   shouldCommit: isLoadedRecordInActiveRegistry,
                   ownerRegistry: registry,
                 });
@@ -2925,7 +2923,6 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
                 return unschedulePluginSessionTurnsByTag({
                   pluginId: record.id,
                   origin: record.origin,
-                  cron: getHostCronService(),
                   request,
                 });
               },

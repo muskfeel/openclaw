@@ -3,7 +3,8 @@ import {
   normalizeOptionalString,
   readStringValue,
 } from "../shared/string-coerce.js";
-import type { AgentMessage } from "./runtime/index.js";
+import type { AgentMessage } from "./agent-core-contract.js";
+import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-id.js";
 import {
   extractToolCallsFromAssistant,
   extractToolResultId,

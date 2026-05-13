@@ -33,45 +33,18 @@ describe("discord voice opus codec", () => {
     const encoder = createDiscordOpusEncodeStream();
     const packetsPromise = collectBuffers(encoder);
 
-    encoder.end(Buffer.alloc(960 * 2 * 2));
-    const packets = await packetsPromise;
-
-    expect(packets).toHaveLength(1);
-    expect(packets[0]?.length).toBeGreaterThan(0);
-
-    const decoded = await decodeOpusStream(Readable.from(packets), {
-      onVerbose: vi.fn(),
-      onWarn: vi.fn(),
-    });
-    expect(decoded.length).toBe(960 * 2 * 2);
-  });
-
-  it("pads final partial PCM frames before encoding", async () => {
-    const encoder = createDiscordOpusEncodeStream();
-    const packetsPromise = collectBuffers(encoder);
-
-    encoder.end(Buffer.alloc((960 * 2 * 2) / 2));
-    const packets = await packetsPromise;
-
-    expect(packets).toHaveLength(1);
-  });
-
-  it("surfaces chunk decode stream failures to callers", async () => {
-    const err = new Error("memory access out of bounds");
-    const onError = vi.fn();
-    const stream = new Readable({
-      read() {
-        this.destroy(err);
-      },
-    });
-
-    await decodeOpusStreamChunks(stream, {
-      onChunk: vi.fn(),
-      onError,
-      onVerbose: vi.fn(),
-      onWarn: vi.fn(),
-    });
-
-    expect(onError).toHaveBeenCalledWith(err);
+    try {
+      expect(resolveOpusDecoderPreference()).toBe("opusscript");
+      expect(resolveOpusDecoderPreference("")).toBe("opusscript");
+      expect(resolveOpusDecoderPreference("opusscript")).toBe("opusscript");
+      expect(resolveOpusDecoderPreference("native")).toBe("native");
+      expect(resolveOpusDecoderPreference("@discordjs/opus")).toBe("native");
+    } finally {
+      if (previousPreference === undefined) {
+        delete process.env.OPENCLAW_DISCORD_OPUS_DECODER;
+      } else {
+        process.env.OPENCLAW_DISCORD_OPUS_DECODER = previousPreference;
+      }
+    }
   });
 });

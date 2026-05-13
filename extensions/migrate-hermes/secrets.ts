@@ -1,4 +1,7 @@
-import { loadAuthProfileStoreWithoutExternalProfiles } from "openclaw/plugin-sdk/agent-runtime";
+import {
+  loadAuthProfileStoreWithoutExternalProfiles,
+  resolveAuthProfileStoreLocationForDisplay,
+} from "openclaw/plugin-sdk/agent-runtime";
 import type { MigrationItem, MigrationProviderContext } from "openclaw/plugin-sdk/plugin-entry";
 import { updateAuthProfileStoreWithLock } from "openclaw/plugin-sdk/provider-auth";
 import {
@@ -117,148 +120,8 @@ const SECRET_MAPPINGS: readonly SecretMapping[] = [
   },
 ] as const;
 
-type SecretCandidate = {
-  id: string;
-  source?: string;
-  envVar?: string;
-  provider: string;
-  profileId: string;
-  mode: SecretCredentialMode;
-  sourceKind?: "hermes-env" | "opencode-auth-json";
-  sourceProvider?: string;
-  secretField?: string;
-};
-
-function secretAuthProfileConfig(details: {
-  provider: string;
-  profileId: string;
-  mode?: SecretCredentialMode;
-}): HermesAuthProfileConfig {
-  return {
-    profileId: details.profileId,
-    provider: details.provider,
-    mode: details.mode ?? "api_key",
-    displayName: "Hermes import",
-  };
-}
-
-function secretMode(mapping: SecretMapping): SecretCredentialMode {
-  return mapping.mode ?? "api_key";
-}
-
-function buildEnvSecretCandidates(params: {
-  env: Record<string, string>;
-  envPath?: string;
-}): SecretCandidate[] {
-  return SECRET_MAPPINGS.flatMap((mapping) => {
-    const value = params.env[mapping.envVar]?.trim();
-    if (!value) {
-      return [];
-    }
-    return [
-      {
-        id: `secret:${mapping.provider}`,
-        source: params.envPath,
-        envVar: mapping.envVar,
-        provider: mapping.provider,
-        profileId: mapping.profileId,
-        mode: secretMode(mapping),
-      },
-    ];
-  });
-}
-
-async function readOpenCodeAuthJson(
-  authPath: string | undefined,
-): Promise<Record<string, unknown>> {
-  const raw = await readText(authPath);
-  if (!raw) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    return isRecord(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-async function buildOpenCodeSecretCandidates(
-  authPath: string | undefined,
-): Promise<SecretCandidate[]> {
-  if (!authPath) {
-    return [];
-  }
-  const auth = await readOpenCodeAuthJson(authPath);
-  const opencode = isRecord(auth.opencode) ? auth.opencode : {};
-  const opencodeGo = isRecord(auth["opencode-go"]) ? auth["opencode-go"] : {};
-  const githubCopilot = isRecord(auth["github-copilot"]) ? auth["github-copilot"] : {};
-  const githubCopilotEnterpriseUrl = readString(githubCopilot.enterpriseUrl);
-  const candidates: SecretCandidate[] = [];
-  if (readString(opencode.key)) {
-    candidates.push({
-      id: "secret:opencode:opencode-auth-json",
-      source: authPath,
-      provider: "opencode",
-      profileId: "opencode:hermes-import",
-      mode: "api_key",
-      sourceKind: "opencode-auth-json",
-      sourceProvider: "opencode",
-      secretField: "key",
-    });
-  }
-  if (readString(opencodeGo.key)) {
-    candidates.push({
-      id: "secret:opencode-go:opencode-auth-json",
-      source: authPath,
-      provider: "opencode-go",
-      profileId: "opencode-go:hermes-import",
-      mode: "api_key",
-      sourceKind: "opencode-auth-json",
-      sourceProvider: "opencode-go",
-      secretField: "key",
-    });
-  }
-  // OpenClaw's Copilot token profile cannot preserve OpenCode enterprise routing yet.
-  if (readString(githubCopilot.refresh) && !githubCopilotEnterpriseUrl) {
-    candidates.push({
-      id: "secret:github-copilot:opencode-auth-json",
-      source: authPath,
-      provider: "github-copilot",
-      profileId: "github-copilot:github",
-      mode: "token",
-      sourceKind: "opencode-auth-json",
-      sourceProvider: "github-copilot",
-      secretField: "refresh",
-    });
-  }
-  return candidates;
-}
-
-async function readSecretCandidateValue(
-  details: {
-    envVar?: string;
-    sourceKind?: string;
-    sourceProvider?: string;
-    secretField?: string;
-  },
-  source: string,
-): Promise<string | undefined> {
-  if (details.sourceKind === "opencode-auth-json") {
-    const auth = await readOpenCodeAuthJson(source);
-    const sourceProvider = details.sourceProvider;
-    const secretField = details.secretField;
-    if (!sourceProvider || !secretField) {
-      return undefined;
-    }
-    const provider = isRecord(auth[sourceProvider]) ? auth[sourceProvider] : {};
-    return readString(provider[secretField]);
-  }
-  if (!details.envVar) {
-    return undefined;
-  }
-  const env = parseEnv(await readText(source));
-  return env[details.envVar]?.trim() || undefined;
+function buildStateEnv(ctx: MigrationProviderContext): NodeJS.ProcessEnv {
+  return { ...process.env, OPENCLAW_STATE_DIR: ctx.stateDir };
 }
 
 export async function buildSecretItems(params: {
@@ -267,7 +130,10 @@ export async function buildSecretItems(params: {
   targets: PlannedTargets;
 }): Promise<MigrationItem[]> {
   const env = parseEnv(await readText(params.source.envPath));
-  const store = loadAuthProfileStoreWithoutExternalProfiles(params.targets.agentDir);
+  const stateEnv = buildStateEnv(params.ctx);
+  const store = loadAuthProfileStoreWithoutExternalProfiles(params.targets.agentDir, {
+    env: stateEnv,
+  });
   const seenProfiles = new Set<string>();
   const items: MigrationItem[] = [];
   const candidates = [
@@ -287,9 +153,12 @@ export async function buildSecretItems(params: {
     );
     items.push(
       createHermesSecretItem({
-        id: candidate.id,
-        source: candidate.source,
-        target: `${params.targets.agentDir}/auth-profiles.json#${candidate.profileId}`,
+        id: `secret:${mapping.provider}`,
+        source: params.source.envPath,
+        target: `${resolveAuthProfileStoreLocationForDisplay(
+          params.targets.agentDir,
+          stateEnv,
+        )}/${mapping.profileId}`,
         includeSecrets: params.ctx.includeSecrets,
         existsAlready: (existsAlready && !params.ctx.overwrite) || configConflict,
         details: {
@@ -332,6 +201,7 @@ export async function applySecretItem(
   let wrote = false;
   const store = await updateAuthProfileStoreWithLock({
     agentDir: targets.agentDir,
+    env: buildStateEnv(ctx),
     updater: (freshStore) => {
       if (!ctx.overwrite && freshStore.profiles[details.profileId]) {
         conflicted = true;

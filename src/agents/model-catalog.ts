@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { getRuntimeConfig } from "../config/config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -29,7 +27,8 @@ import {
   buildConfiguredModelCatalog,
   hasConfiguredProviderModelRows,
 } from "./model-selection-shared.js";
-import { ensureOpenClawModelsJson } from "./models-config.js";
+import { readStoredModelsConfigRaw } from "./models-config-store.js";
+import { ensureOpenClawModelCatalog } from "./models-config.js";
 import { normalizeProviderId } from "./provider-id.js";
 
 const log = createSubsystemLogger("model-catalog");
@@ -304,7 +303,11 @@ async function loadReadOnlyPersistedModelCatalog(params?: {
 }): Promise<ModelCatalogEntry[]> {
   const cfg = params?.config ?? getRuntimeConfig();
   const agentDir = resolveDefaultAgentDir(cfg);
-  const raw = await readFile(join(agentDir, "models.json"), "utf8");
+  const stored = readStoredModelsConfigRaw(agentDir);
+  if (!stored) {
+    throw new Error("persisted model catalog missing");
+  }
+  const raw = stored.raw;
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   const models: ModelCatalogEntry[] = [];
   const { buildShouldSuppressBuiltInModel } = await loadModelSuppression();
@@ -469,8 +472,8 @@ export async function loadModelCatalog(params?: {
         return manifestPlugins;
       };
       if (!readOnly) {
-        await ensureOpenClawModelsJson(cfg);
-        logStage("models-json-ready");
+        await ensureOpenClawModelCatalog(cfg);
+        logStage("model-catalog-ready");
       }
       // Keep discovery inside try/catch so transient filesystem/config failures do not poison
       // the shared catalog cache until restart.
@@ -484,7 +487,19 @@ export async function loadModelCatalog(params?: {
         readOnly ? { readOnly: true } : undefined,
       );
       logStage("auth-storage-ready");
-      const registry = agentDiscovery.discoverModels(authStorage, agentDir);
+      const registry =
+        typeof (piSdk.ModelRegistry as { inMemory?: (authStorage: unknown) => PiRegistryInstance })
+          .inMemory === "function"
+          ? (
+              piSdk.ModelRegistry as { inMemory: (authStorage: unknown) => PiRegistryInstance }
+            ).inMemory(authStorage)
+          : instantiatePiModelRegistry(piSdk, authStorage, undefined as unknown as string);
+      if (typeof piSdk.applyStoredModelsConfigToRegistry === "function") {
+        (piSdk.applyStoredModelsConfigToRegistry as (registry: unknown, agentDir: string) => void)(
+          registry,
+          agentDir,
+        );
+      }
       logStage("registry-ready");
       const entries = registry.getAll() as DiscoveredModel[];
       logStage("registry-read", `entries=${entries.length}`);

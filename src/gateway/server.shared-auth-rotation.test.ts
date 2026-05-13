@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
@@ -38,16 +37,8 @@ afterAll(() => {
   }
 });
 
-async function openDeviceTokenWsWithDetails(
-  params: { issuerGeneration?: string; browserClient?: boolean } = {},
-): Promise<{
-  ws: WebSocket;
-  deviceId: string;
-  hello: Awaited<ReturnType<typeof connectOk>> & {
-    auth?: { deviceToken?: unknown };
-  };
-}> {
-  const identityPath = path.join(os.tmpdir(), `openclaw-shared-auth-${process.pid}-${port}.json`);
+async function openDeviceTokenWs(): Promise<WebSocket> {
+  const identityKey = `test:shared-auth:${process.pid}:${port}`;
   const { loadOrCreateDeviceIdentity, publicKeyRawBase64UrlFromPem } =
     await import("../infra/device-identity.js");
   const { approveDevicePairing, ensureDeviceToken, requestDevicePairing, rotateDeviceToken } =
@@ -66,7 +57,7 @@ async function openDeviceTokenWsWithDetails(
         mode: "test",
       };
 
-  const identity = loadOrCreateDeviceIdentity(identityPath);
+  const identity = loadOrCreateDeviceIdentity({ key: identityKey });
   const pending = await requestDevicePairing({
     deviceId: identity.deviceId,
     publicKey: publicKeyRawBase64UrlFromPem(identity.publicKeyPem),
@@ -109,9 +100,8 @@ async function openDeviceTokenWsWithDetails(
   await new Promise<void>((resolve) => ws.once("open", resolve));
   const hello = (await connectOk(ws, {
     skipDefaultAuth: true,
-    client,
-    deviceIdentityPath: identityPath,
-    deviceToken: issuedDeviceToken,
+    deviceIdentityKey: identityKey,
+    deviceToken: rotated.ok ? rotated.entry.token : "",
     scopes: ["operator.admin"],
   })) as Awaited<ReturnType<typeof connectOk>> & {
     auth?: { deviceToken?: unknown };

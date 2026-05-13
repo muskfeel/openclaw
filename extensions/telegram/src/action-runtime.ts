@@ -312,7 +312,7 @@ export async function handleTelegramAction(
     inboundEventKind?: string;
     gatewayClientScopes?: readonly string[];
   },
-): Promise<AgentToolResult<unknown>> {
+): Promise<AgentToolResult> {
   const { action, accountId } = {
     action: normalizeTelegramActionName(readStringParam(params, "action", { required: true })),
     accountId: readStringParam(params, "accountId"),

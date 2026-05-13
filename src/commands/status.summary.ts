@@ -1,23 +1,17 @@
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
-import { areRuntimeModelRefsEquivalent } from "../agents/model-runtime-aliases.js";
 import { getRuntimeConfig } from "../config/config.js";
 import { resolveMainSessionKey } from "../config/sessions/main-session.js";
-import { hasSessionAutoModelFallbackProvenance } from "../config/sessions/model-override-provenance.js";
-import { resolveStorePath } from "../config/sessions/paths.js";
-import { readSessionStoreReadOnly } from "../config/sessions/store-read.js";
+import { listSessionEntries } from "../config/sessions/store.js";
 import { resolveSessionTotalTokens, type SessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.js";
-import { resolveCronStorePath } from "../cron/store.js";
+import { resolveCronStoreKey } from "../cron/store.js";
 import { listGatewayAgentsBasic } from "../gateway/agent-list.js";
 import { resolveHeartbeatSummaryForAgent } from "../infra/heartbeat-summary.js";
 import { peekSystemEvents } from "../infra/system-events.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
 import { createLazyImportLoader } from "../shared/lazy-promise.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
-import {
-  summarizeActionableTaskAuditFindings,
-  summarizeRetainedLostTaskAuditFindings,
-} from "../tasks/task-registry.audit.js";
+import { resolveOpenClawAgentSqlitePath } from "../state/openclaw-agent-db.js";
 import { resolveRuntimeServiceVersion } from "../version.js";
 import type { HeartbeatStatus, SessionStatus, StatusSummary } from "./status.types.js";
 
@@ -92,59 +86,12 @@ const buildFlags = (entry?: SessionEntry): string[] => {
   return flags;
 };
 
-function discountRetainedLostTaskFailures(
-  tasks: StatusSummary["tasks"],
-  retainedLostCount: number,
-): StatusSummary["tasks"] {
-  if (retainedLostCount <= 0 || tasks.failures <= 0) {
-    return tasks;
-  }
-  return {
-    ...tasks,
-    failures: Math.max(0, tasks.failures - retainedLostCount),
-  };
-}
-
-function hasUserPinnedModelSelection(entry: SessionEntry | undefined): boolean {
-  if (!entry?.modelOverride) {
-    return false;
-  }
-  if (entry.modelOverrideSource === "user") {
-    return true;
-  }
-  if (entry.modelOverrideSource === "auto") {
-    return false;
-  }
-  return !hasSessionAutoModelFallbackProvenance(entry);
-}
-
-type SessionCandidate = {
-  key: string;
-  entry: SessionEntry | undefined;
-  updatedAt: number | null;
-};
-
-function compareSessionCandidatesByUpdatedAt(left: SessionCandidate, right: SessionCandidate) {
-  return (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
-}
-
-function listSessionCandidates(store: Record<string, SessionEntry | undefined>) {
-  return Object.entries(store)
-    .filter(([key]) => key !== "global" && key !== "unknown")
-    .map(([key, entry]) => ({
-      key,
-      entry,
-      updatedAt: entry?.updatedAt ?? null,
-    }))
-    .toSorted(compareSessionCandidatesByUpdatedAt);
-}
-
 export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSummary {
   return {
     ...summary,
     sessions: {
       ...summary.sessions,
-      paths: [],
+      databasePaths: [],
       defaults: {
         model: null,
         contextTokens: null,
@@ -152,7 +99,7 @@ export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSumm
       recent: [],
       byAgent: summary.sessions.byAgent.map((entry) => ({
         ...entry,
-        path: "[redacted]",
+        databasePath: "[redacted]",
         recent: [],
       })),
     },
@@ -213,7 +160,7 @@ export async function getStatusSummary(
   const queuedSystemEvents = peekSystemEvents(mainSessionKey);
   const taskMaintenanceModule = await loadTaskRegistryMaintenanceModule();
   taskMaintenanceModule.configureTaskRegistryMaintenance({
-    cronStorePath: resolveCronStorePath(cfg.cron?.store),
+    cronStoreKey: resolveCronStoreKey(),
   });
   const rawTasks = taskMaintenanceModule.getInspectableTaskRegistrySummary();
   const taskAuditFindings = taskMaintenanceModule.getInspectableTaskAuditFindings();
@@ -240,16 +187,16 @@ export async function getStatusSummary(
       allowAsyncLoad: false,
     }) ?? DEFAULT_CONTEXT_TOKENS;
 
-  const storeCache = new Map<string, Record<string, SessionEntry | undefined>>();
-  const candidateCache = new Map<string, SessionCandidate[]>();
-  const loadStore = (storePath: string) => {
-    const cached = storeCache.get(storePath);
+  const now = Date.now();
+  const sessionCache = new Map<string, Array<{ sessionKey: string; entry: SessionEntry }>>();
+  const loadSessionRows = (agentId: string) => {
+    const cached = sessionCache.get(agentId);
     if (cached) {
       return cached;
     }
-    const store = readSessionStoreReadOnly(storePath);
-    storeCache.set(storePath, store);
-    return store;
+    const rows = listSessionEntries({ agentId });
+    sessionCache.set(agentId, rows);
+    return rows;
   };
   const loadSessionCandidates = (storePath: string) => {
     const cached = candidateCache.get(storePath);
@@ -261,110 +208,67 @@ export async function getStatusSummary(
     return candidates;
   };
   const buildSessionRows = (
-    candidates: SessionCandidate[],
+    rows: Array<{ sessionKey: string; entry: SessionEntry }>,
     opts: { agentIdOverride?: string } = {},
   ) =>
-    candidates.map(({ key, entry, updatedAt }) => {
-      const age = updatedAt ? now - updatedAt : null;
-      const parsedAgentId = parseAgentSessionKey(key)?.agentId;
-      const agentId = opts.agentIdOverride ?? parsedAgentId;
-      const configuredForSession = resolveConfiguredStatusModelRef({
-        cfg,
-        defaultProvider: DEFAULT_PROVIDER,
-        defaultModel: DEFAULT_MODEL,
-        agentId,
-      });
-      const configuredSessionModel = configuredForSession.model ?? DEFAULT_MODEL;
-      const configuredSessionModelLabel = `${configuredForSession.provider ?? DEFAULT_PROVIDER}/${configuredSessionModel}`;
-      const resolvedModel = resolveSessionModelRef(cfg, entry, opts.agentIdOverride);
-      const model = resolvedModel.model ?? configuredSessionModel ?? null;
-      const selectedModelLabel =
-        resolvedModel.provider && model ? `${resolvedModel.provider}/${model}` : model;
-      const modelSelectionDiffers =
-        selectedModelLabel != null &&
-        selectedModelLabel !== configuredSessionModelLabel &&
-        !areRuntimeModelRefsEquivalent(selectedModelLabel, configuredSessionModelLabel) &&
-        hasUserPinnedModelSelection(entry);
-      const contextTokens =
-        resolveContextTokensForModel({
+    rows
+      .filter((row) => row.sessionKey !== "global" && row.sessionKey !== "unknown")
+      .map(({ sessionKey: key, entry }) => {
+        const updatedAt = entry?.updatedAt ?? null;
+        const age = updatedAt ? now - updatedAt : null;
+        const parsedAgentId = parseAgentSessionKey(key)?.agentId;
+        const agentId = opts.agentIdOverride ?? parsedAgentId;
+        const resolvedModel = resolveSessionModelRef(cfg, entry, opts.agentIdOverride);
+        const model = resolvedModel.model ?? configModel ?? null;
+        const contextTokens =
+          resolveContextTokensForModel({
+            cfg,
+            provider: resolvedModel.provider,
+            model,
+            contextTokensOverride: entry?.contextTokens,
+            fallbackContextTokens: configContextTokens ?? undefined,
+            allowAsyncLoad: false,
+          }) ?? null;
+        const total = resolveSessionTotalTokens(entry);
+        const totalTokensFresh =
+          typeof entry?.totalTokens === "number" ? entry?.totalTokensFresh !== false : false;
+        const remaining =
+          contextTokens != null && total !== undefined ? Math.max(0, contextTokens - total) : null;
+        const pct =
+          contextTokens && contextTokens > 0 && total !== undefined
+            ? Math.min(999, Math.round((total / contextTokens) * 100))
+            : null;
+        const runtime = resolveSessionRuntimeLabel({
           cfg,
+          entry,
           provider: resolvedModel.provider,
           model,
-          contextTokensOverride: entry?.contextTokens,
-          fallbackContextTokens: configContextTokens ?? undefined,
-          allowAsyncLoad: false,
-        }) ?? null;
-      const total = resolveSessionTotalTokens(entry);
-      const totalTokensFresh =
-        typeof entry?.totalTokens === "number" ? entry?.totalTokensFresh !== false : false;
-      const remaining =
-        contextTokens != null && total !== undefined ? Math.max(0, contextTokens - total) : null;
-      const pct =
-        contextTokens && contextTokens > 0 && total !== undefined
-          ? Math.min(999, Math.round((total / contextTokens) * 100))
-          : null;
-      const runtime = resolveSessionRuntimeLabel({
-        cfg,
-        entry,
-        provider: resolvedModel.provider,
-        model: model ?? "",
-        agentId,
-        sessionKey: key,
-      });
+          runtime,
+          contextTokens,
+          flags: buildFlags(entry),
+        } satisfies SessionStatus;
+      })
+      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 
-      return {
-        agentId,
-        key,
-        kind: classifySessionKey(key, entry),
-        sessionId: entry?.sessionId,
-        updatedAt,
-        age,
-        thinkingLevel: entry?.thinkingLevel,
-        fastMode: entry?.fastMode,
-        verboseLevel: entry?.verboseLevel,
-        traceLevel: entry?.traceLevel,
-        reasoningLevel: entry?.reasoningLevel,
-        elevatedLevel: entry?.elevatedLevel,
-        systemSent: entry?.systemSent,
-        abortedLastRun: entry?.abortedLastRun,
-        inputTokens: entry?.inputTokens,
-        outputTokens: entry?.outputTokens,
-        cacheRead: entry?.cacheRead,
-        cacheWrite: entry?.cacheWrite,
-        totalTokens: total ?? null,
-        totalTokensFresh,
-        remainingTokens: remaining,
-        percentUsed: pct,
-        model,
-        configuredModel: configuredSessionModelLabel,
-        selectedModel: selectedModelLabel,
-        modelSelectionReason: modelSelectionDiffers ? "session override" : null,
-        runtime,
-        contextTokens,
-        flags: buildFlags(entry),
-      } satisfies SessionStatus;
-    });
-
-  const paths = new Set<string>();
+  const databasePaths = new Set<string>();
+  const allSessionsByAgent: SessionStatus[] = [];
   const byAgent = agentList.agents.map((agent) => {
-    const storePath = resolveStorePath(cfg.session?.store, { agentId: agent.id });
-    paths.add(storePath);
-    const candidates = loadSessionCandidates(storePath);
-    const sessions = buildSessionRows(candidates.slice(0, RECENT_SESSION_LIMIT), {
-      agentIdOverride: agent.id,
-    });
+    const databasePath = resolveOpenClawAgentSqlitePath({ agentId: agent.id });
+    databasePaths.add(databasePath);
+    const sessions = buildSessionRows(loadSessionRows(agent.id), { agentIdOverride: agent.id });
+    allSessionsByAgent.push(...sessions);
     return {
       agentId: agent.id,
-      path: storePath,
-      count: candidates.length,
-      recent: sessions,
+      databasePath,
+      count: sessions.length,
+      recent: sessions.slice(0, 10),
     };
   });
 
-  const allSessions = Array.from(paths)
-    .flatMap((storePath) => loadSessionCandidates(storePath))
-    .toSorted((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-  const recent = buildSessionRows(allSessions.slice(0, RECENT_SESSION_LIMIT));
+  const allSessions = allSessionsByAgent.toSorted(
+    (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+  );
+  const recent = allSessions.slice(0, 10);
   const totalSessions = allSessions.length;
 
   const summary: StatusSummary = {
@@ -387,7 +291,7 @@ export async function getStatusSummary(
     taskAudit,
     ...(taskAuditRetainedLost.count > 0 ? { taskAuditRetainedLost } : {}),
     sessions: {
-      paths: Array.from(paths),
+      databasePaths: Array.from(databasePaths),
       count: totalSessions,
       defaults: {
         model: configModel ?? null,

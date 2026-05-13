@@ -1,5 +1,6 @@
 import { modelKey } from "../../agents/model-ref-shared.js";
 import { normalizeModelRef } from "../../agents/model-selection.js";
+import type { Api, Message } from "../../agents/pi-ai-contract.js";
 import type { NormalizedUsage, UsageLike } from "../../agents/usage.js";
 import { normalizeUsage } from "../../agents/usage.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";

@@ -45,24 +45,22 @@ const MEMORY_SEARCH_RULE: LegacyConfigRule = {
     'top-level memorySearch was moved; use agents.defaults.memorySearch instead. Run "openclaw doctor --fix".',
 };
 
-const LEGACY_MEMORY_SEARCH_AUTO_PROVIDER_RULES: LegacyConfigRule[] = [
+const LEGACY_MEMORY_SEARCH_STORE_PATH_RULES: LegacyConfigRule[] = [
   {
-    path: ["memorySearch", "provider"],
+    path: ["memorySearch", "store", "path"],
     message:
-      'memorySearch.provider = "auto" is legacy; use "openai" explicitly. Run "openclaw doctor --fix".',
-    match: isLegacyMemorySearchAutoProvider,
+      'memorySearch.store.path is legacy; memory indexes now live in each agent database. Run "openclaw doctor --fix".',
   },
   {
-    path: ["agents", "defaults", "memorySearch", "provider"],
+    path: ["agents", "defaults", "memorySearch", "store", "path"],
     message:
-      'agents.defaults.memorySearch.provider = "auto" is legacy; use "openai" explicitly. Run "openclaw doctor --fix".',
-    match: isLegacyMemorySearchAutoProvider,
+      'agents.defaults.memorySearch.store.path is legacy; memory indexes now live in each agent database. Run "openclaw doctor --fix".',
   },
   {
     path: ["agents", "list"],
     message:
-      'agents.list[].memorySearch.provider = "auto" is legacy; use "openai" explicitly. Run "openclaw doctor --fix".',
-    match: hasAgentListLegacyMemorySearchAutoProvider,
+      'agents.list[].memorySearch.store.path is legacy; memory indexes now live in each agent database. Run "openclaw doctor --fix".',
+    match: (value) => hasAgentListMemorySearchStorePath(value),
   },
 ];
 
@@ -227,6 +225,32 @@ function sandboxScopeFromPerSession(perSession: boolean): "session" | "shared" {
   return perSession ? "session" : "shared";
 }
 
+function hasMemorySearchStorePath(value: unknown): boolean {
+  const memorySearch = getRecord(value);
+  const store = getRecord(memorySearch?.store);
+  return typeof store?.path === "string";
+}
+
+function hasAgentListMemorySearchStorePath(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.some((entry) => hasMemorySearchStorePath(getRecord(entry)?.memorySearch))
+  );
+}
+
+function removeLegacyMemorySearchStorePath(
+  memorySearch: Record<string, unknown> | null | undefined,
+  pathLabel: string,
+  changes: string[],
+): void {
+  const store = getRecord(memorySearch?.store);
+  if (!store || typeof store.path !== "string") {
+    return;
+  }
+  delete store.path;
+  changes.push(`Removed ${pathLabel}.store.path; memory indexes now use each agent database.`);
+}
+
 function splitLegacyHeartbeat(legacyHeartbeat: Record<string, unknown>): {
   agentHeartbeat: Record<string, unknown> | null;
   channelHeartbeat: Record<string, unknown> | null;
@@ -354,31 +378,6 @@ function migrateLegacyEmbeddedAgentKey(
     );
   }
   delete container.embeddedPi;
-}
-
-function isLegacyMemorySearchAutoProvider(value: unknown): boolean {
-  return typeof value === "string" && value.trim().toLowerCase() === "auto";
-}
-
-function hasAgentListLegacyMemorySearchAutoProvider(value: unknown): boolean {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-  return value.some((agent) =>
-    isLegacyMemorySearchAutoProvider(getRecord(getRecord(agent)?.memorySearch)?.provider),
-  );
-}
-
-function rewriteLegacyMemorySearchAutoProvider(
-  memorySearch: Record<string, unknown> | null,
-  pathLabel: string,
-  changes: string[],
-): void {
-  if (!memorySearch || !isLegacyMemorySearchAutoProvider(memorySearch.provider)) {
-    return;
-  }
-  memorySearch.provider = "openai";
-  changes.push(`Moved ${pathLabel}.provider from legacy "auto" to "openai".`);
 }
 
 function migrateLegacySandboxPerSession(
@@ -1292,12 +1291,14 @@ export const LEGACY_CONFIG_MIGRATIONS_RUNTIME_AGENTS: LegacyConfigMigrationSpec[
     },
   }),
   defineLegacyConfigMigration({
-    id: "memorySearch.provider-auto->openai",
-    describe: 'Rewrite legacy memorySearch provider "auto" to "openai"',
-    legacyRules: LEGACY_MEMORY_SEARCH_AUTO_PROVIDER_RULES,
+    id: "memorySearch.store.path->agent-database",
+    describe: "Remove legacy memory search sidecar index paths",
+    legacyRules: LEGACY_MEMORY_SEARCH_STORE_PATH_RULES,
     apply: (raw, changes) => {
+      removeLegacyMemorySearchStorePath(getRecord(raw.memorySearch), "memorySearch", changes);
+
       const agents = getRecord(raw.agents);
-      rewriteLegacyMemorySearchAutoProvider(
+      removeLegacyMemorySearchStorePath(
         getRecord(getRecord(agents?.defaults)?.memorySearch),
         "agents.defaults.memorySearch",
         changes,
@@ -1307,9 +1308,9 @@ export const LEGACY_CONFIG_MIGRATIONS_RUNTIME_AGENTS: LegacyConfigMigrationSpec[
         return;
       }
       for (const [index, agent] of agents.list.entries()) {
-        rewriteLegacyMemorySearchAutoProvider(
+        removeLegacyMemorySearchStorePath(
           getRecord(getRecord(agent)?.memorySearch),
-          `agents.list.${index}.memorySearch`,
+          `agents.list[${index}].memorySearch`,
           changes,
         );
       }

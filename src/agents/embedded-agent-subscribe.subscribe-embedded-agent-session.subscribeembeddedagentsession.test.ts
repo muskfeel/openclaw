@@ -1,7 +1,7 @@
-import type { AssistantMessage } from "openclaw/plugin-sdk/llm";
 import { describe, expect, it, vi } from "vitest";
 import { HEARTBEAT_RESPONSE_TOOL_NAME } from "../auto-reply/heartbeat-tool-response.js";
 import * as agentEvents from "../infra/agent-events.js";
+import type { AssistantMessage } from "./pi-ai-contract.js";
 import {
   THINKING_TAG_CASES,
   createSubscribedSessionHarness,

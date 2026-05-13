@@ -15,7 +15,8 @@ import {
   type AssistantPhase,
 } from "../shared/chat-message-content.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import { uniqueStrings } from "../shared/string-normalization.js";
+import type { AgentEvent, AgentMessage } from "./agent-core-contract.js";
+import type { AssistantMessage } from "./pi-ai-contract.js";
 import {
   isMessagingToolDuplicateNormalized,
   normalizeTextForComparison,

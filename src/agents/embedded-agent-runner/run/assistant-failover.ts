@@ -2,6 +2,8 @@ import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import type { AssistantMessage } from "../../../llm/types.js";
 import { sanitizeForLog } from "../../../terminal/ansi.js";
 import type { AuthProfileFailureReason } from "../../auth-profiles.js";
+import { FailoverError, resolveFailoverStatus } from "../../failover-error.js";
+import type { AssistantMessage } from "../../pi-ai-contract.js";
 import {
   formatAssistantErrorText,
   formatBillingErrorMessage,
