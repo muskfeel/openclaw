@@ -169,51 +169,8 @@ export async function resolveLiveDirectModelPool(params: {
   envVar: string;
   preferredModelIds: readonly string[];
 }): Promise<LiveResolvedModelPool> {
-  const cfg = getRuntimeConfig();
-  await ensureOpenClawModelsJson(cfg);
-  const agentDir = resolveDefaultAgentDir(cfg);
-  const authStorage = discoverAuthStorage(agentDir);
-  const models = discoverModels(authStorage, agentDir).getAll();
-  const candidates = models.filter(
-    (model) => normalizeProviderId(model.provider) === params.provider && model.api === params.api,
-  );
   const rawModel = process.env[params.envVar]?.trim();
   const parsed = rawModel ? parseModelRef(rawModel, params.provider) : null;
-  const requestedModelId =
-    parsed && normalizeProviderId(parsed.provider) === params.provider ? parsed.model : rawModel;
-  const selectModel = (): Model | undefined => {
-    if (parsed) {
-      return candidates.find(
-        (model) =>
-          normalizeProviderId(model.provider) === parsed.provider && model.id === parsed.model,
-      );
-    }
-    if (requestedModelId) {
-      return candidates.find((model) => model.id === requestedModelId);
-    }
-    return params.preferredModelIds
-      .map((id) => candidates.find((model) => model.id === id))
-      .find(Boolean);
-  };
-  const liveKeys = collectProviderApiKeys(params.provider);
-  if (liveKeys.length > 0) {
-    const selectedModel = selectModel();
-    if (!selectedModel || selectedModel.api !== params.api) {
-      throw new Error(
-        requestedModelId
-          ? `Model not found for ${params.provider}: ${requestedModelId}`
-          : `No built-in ${params.provider} ${params.api} model available.`,
-      );
-    }
-    logLiveCache(`resolved ${params.provider} model ${selectedModel.id} from live env key`);
-    return {
-      apiKeys: liveKeys,
-      fixture: {
-        model: selectedModel,
-        apiKey: liveKeys[0] ?? "",
-      },
-    };
-  }
 
   logLiveCache(`resolving ${params.provider} model from configured auth storage`);
   const cfg = getRuntimeConfig();
@@ -222,8 +179,6 @@ export async function resolveLiveDirectModelPool(params: {
   const authStorage = discoverAuthStorage(agentDir);
   const models = discoverModels(authStorage, agentDir).getAll();
 
-  const rawModel = process.env[params.envVar]?.trim();
-  const parsed = rawModel ? parseModelRef(rawModel, params.provider) : null;
   const candidates = models.filter(
     (model) => normalizeProviderId(model.provider) === params.provider && model.api === params.api,
   );
@@ -260,7 +215,7 @@ export async function resolveLiveDirectModelPool(params: {
       resolvedModel.provider,
     );
   return {
-    apiKeys: [apiKey],
+    apiKeys: liveKeys.length > 0 ? liveKeys : [apiKey],
     fixture: {
       model: resolvedModel,
       apiKey,

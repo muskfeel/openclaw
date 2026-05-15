@@ -1,11 +1,15 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { Insertable, Selectable } from "kysely";
 import { formatCliCommand } from "../cli/command-format.js";
+import { resolveStateDir } from "../config/paths.js";
 import type { DB as OpenClawStateKyselyDatabase } from "../state/openclaw-state-db.generated.js";
 import {
   openOpenClawStateDatabase,
   runOpenClawStateWriteTransaction,
 } from "../state/openclaw-state-db.js";
 import { resolveRuntimeServiceVersion } from "../version.js";
+import { writeJson } from "./json-files.js";
 import {
   executeSqliteQuerySync,
   executeSqliteQueryTakeFirstSync,
@@ -75,6 +79,7 @@ export const DEFAULT_RESTART_SUCCESS_CONTINUATION_MESSAGE =
   "The gateway restart completed successfully. Tell the user OpenClaw restarted successfully and continue any pending work.";
 
 const RESTART_SENTINEL_KEY = "current";
+const SENTINEL_FILENAME = "restart-sentinel.json";
 
 type RestartSentinelDatabase = Pick<OpenClawStateKyselyDatabase, "gateway_restart_sentinel">;
 type RestartSentinelRow = Selectable<RestartSentinelDatabase["gateway_restart_sentinel"]>;
@@ -185,10 +190,14 @@ export function formatDoctorNonInteractiveHint(
   )} in a terminal or approvals-capable OpenClaw surface.`;
 }
 
+export function resolveRestartSentinelPath(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(resolveStateDir(env), SENTINEL_FILENAME);
+}
+
 export async function writeRestartSentinel(
   payload: RestartSentinelPayload,
   env: NodeJS.ProcessEnv = process.env,
-) {
+): Promise<string> {
   const row = restartSentinelToRow(payload);
   const { sentinel_key: _sentinelKey, ...updates } = row;
   runOpenClawStateWriteTransaction(
@@ -204,6 +213,9 @@ export async function writeRestartSentinel(
     },
     { env },
   );
+  const filePath = resolveRestartSentinelPath(env);
+  await writeJson(filePath, { version: 1, payload }, { trailingNewline: true, dirMode: 0o700 });
+  return filePath;
 }
 
 function cloneRestartSentinelPayload(payload: RestartSentinelPayload): RestartSentinelPayload {
@@ -279,6 +291,7 @@ export async function clearRestartSentinel(env: NodeJS.ProcessEnv = process.env)
     },
     { env },
   );
+  await fs.unlink(resolveRestartSentinelPath(env)).catch(() => {});
 }
 
 export function buildRestartSuccessContinuation(params: {
@@ -298,15 +311,26 @@ export async function readRestartSentinel(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<RestartSentinel | null> {
   const row = readRestartSentinelRow(env);
-  if (!row) {
+  if (row) {
+    const sentinel = rowToRestartSentinel(row);
+    if (!sentinel) {
+      await clearRestartSentinel(env);
+      return null;
+    }
+    return sentinel;
+  }
+  const filePath = resolveRestartSentinelPath(env);
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    const parsed = JSON.parse(raw) as RestartSentinel | undefined;
+    if (!parsed || parsed.version !== 1 || !parsed.payload) {
+      await fs.unlink(filePath).catch(() => {});
+      return null;
+    }
+    return parsed;
+  } catch {
     return null;
   }
-  const sentinel = rowToRestartSentinel(row);
-  if (!sentinel) {
-    await clearRestartSentinel(env);
-    return null;
-  }
-  return sentinel;
 }
 
 export async function hasRestartSentinel(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
