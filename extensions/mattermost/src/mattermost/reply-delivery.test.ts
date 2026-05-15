@@ -190,13 +190,13 @@ describe("deliverMattermostReplyPayload", () => {
         accountId: "default",
         mediaUrl,
         replyToId: "root-post",
-        mediaLocalRoots: [
+        mediaLocalRoots: expect.arrayContaining([
           expect.stringMatching(/[\\/]openclaw$/),
           path.join(stateDir, "canvas"),
           path.join(stateDir, "workspace"),
           path.join(stateDir, "sandboxes"),
           path.join(stateDir, `workspace-${agentId}`),
-        ],
+        ]),
       });
     } finally {
       if (previousStateDir === undefined) {

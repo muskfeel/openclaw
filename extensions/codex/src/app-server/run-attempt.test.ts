@@ -362,8 +362,14 @@ describe("runCodexAppServerAttempt", () => {
   });
 
   afterEach(async () => {
-    await drainActiveAppServerAttemptsForTest();
-    await closeCodexSandboxExecServersForTests();
+    await clearCodexAppServerBinding({ sessionKey: "agent:main:session-1" });
+    await clearCodexAppServerBinding("session");
+    await clearCodexAppServerBinding("session-1");
+    replaceSqliteSessionTranscriptEvents({
+      agentId: "main",
+      sessionId: "session-1",
+      events: [],
+    });
     resetCodexAppServerClientFactoryForTest();
     __testing.resetOpenClawCodingToolsFactoryForTests();
     resetCodexRateLimitCacheForTests();
@@ -725,30 +731,33 @@ describe("runCodexAppServerAttempt", () => {
       } as never;
       const { requests, waitForMethod, completeTurn } = createStartedThreadHarness();
 
-    await startOrResumeThread({
-      client: { request } as never,
-      params,
-      cwd: workspaceDir,
-      dynamicTools: dynamicTools as never,
-      appServer: createThreadLifecycleAppServerOptions(),
-      nativeCodeModeEnabled: nativeToolSurfaceEnabled,
-      nativeCodeModeOnlyEnabled: false,
-      userMcpServersEnabled: nativeToolSurfaceEnabled,
-      environmentSelection: [],
-    });
+      await startOrResumeThread({
+        client: { request } as never,
+        params,
+        cwd: workspaceDir,
+        dynamicTools: dynamicTools as never,
+        appServer: createThreadLifecycleAppServerOptions(),
+        nativeCodeModeEnabled: nativeToolSurfaceEnabled,
+        nativeCodeModeOnlyEnabled: false,
+        userMcpServersEnabled: nativeToolSurfaceEnabled,
+        environmentSelection: [],
+      });
 
-    const startRequest = request.mock.calls.find(([method]) => method === "thread/start");
-    const startParams = startRequest?.[1] as Record<string, unknown> | undefined;
-    const startConfig = startParams?.config as Record<string, unknown> | undefined;
-    const startDynamicTools = startParams?.dynamicTools as Array<{ name: string }> | undefined;
-    expect(startConfig?.["features.code_mode"]).toBe(false);
-    expect(startConfig?.["features.code_mode_only"]).toBe(false);
-    expect(startParams?.environments).toEqual([]);
-    expect(startDynamicTools?.map((tool) => tool.name)).toEqual([
-      "message",
-      "sandbox_exec",
-      "sandbox_process",
-    ]);
+      const startRequest = request.mock.calls.find(([method]) => method === "thread/start");
+      const startParams = startRequest?.[1] as Record<string, unknown> | undefined;
+      const startConfig = startParams?.config as Record<string, unknown> | undefined;
+      const startDynamicTools = startParams?.dynamicTools as Array<{ name: string }> | undefined;
+      expect(startConfig?.["features.code_mode"]).toBe(false);
+      expect(startConfig?.["features.code_mode_only"]).toBe(false);
+      expect(startParams?.environments).toEqual([]);
+      expect(startDynamicTools?.map((tool) => tool.name)).toEqual([
+        "message",
+        "sandbox_exec",
+        "sandbox_process",
+      ]);
+    } finally {
+      restoreSandboxBackend();
+    }
   });
 
   it("routes native Codex execution through an OpenClaw sandbox exec-server when opted in", async () => {

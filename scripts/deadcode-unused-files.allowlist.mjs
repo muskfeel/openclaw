@@ -21,7 +21,6 @@ export const KNIP_OPTIONAL_UNUSED_FILE_ALLOWLIST = [
   "extensions/skill-workshop/src/doctor-legacy-state.ts",
   "extensions/voice-call/src/utils.ts",
   "src/agents/pi-embedded-runner/resource-loader.ts",
-  "src/agents/provider-operation-retry.ts",
   "src/agents/subagent-registry.runtime.ts",
   "src/auto-reply/inbound.group-require-mention-test-plugins.ts",
   "src/auto-reply/reply/get-reply.test-loader.ts",
