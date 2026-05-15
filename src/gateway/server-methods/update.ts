@@ -232,7 +232,7 @@ export const updateHandlers: GatewayRequestHandlers = {
 
     let sentinelPath: string | null = null;
     try {
-      await writeRestartSentinel(payload);
+      sentinelPath = await writeRestartSentinel(payload);
       recordLatestUpdateRestartSentinel(payload);
     } catch {
       sentinelPath = null;
