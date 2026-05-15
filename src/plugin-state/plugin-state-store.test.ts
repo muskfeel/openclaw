@@ -228,7 +228,7 @@ describe("plugin state keyed store", () => {
     });
   });
 
-  it("registerIfAbsent preserves eviction and plugin row cap behavior", async () => {
+  it("registerIfAbsent preserves namespace eviction without capping sibling namespaces", async () => {
     await withPluginStateTestState(async () => {
       vi.useFakeTimers();
       const evicting = createPluginStateKeyedStore<number>("discord", {
@@ -266,7 +266,6 @@ describe("plugin state keyed store", () => {
         maxEntries: 10,
       });
       await expect(limited.registerIfAbsent("overflow", { overflow: true })).resolves.toBe(true);
-      await expect(limited.lookup("k-0")).resolves.toBeUndefined();
       await expect(limited.lookup("overflow")).resolves.toEqual({ overflow: true });
       await expect(sibling.lookup("k-0")).resolves.toEqual({ sibling: true });
     });
@@ -373,7 +372,7 @@ describe("plugin state keyed store", () => {
     });
   });
 
-  it("evicts current namespace rows when sibling namespaces consume plugin row budget", async () => {
+  it("applies entry limits per namespace without evicting siblings", async () => {
     await withPluginStateTestState(async () => {
       seedPluginStateEntriesForTests([
         ...Array.from({ length: 5_989 }, (_, entryIndex) => ({
@@ -399,99 +398,12 @@ describe("plugin state keyed store", () => {
         maxEntries: 100,
       });
 
-      await expect(
-        messageStore.register("new-message", { kind: "message", fresh: true }),
-      ).resolves.toBeUndefined();
-
-      await expect(messageStore.lookup("k-0")).resolves.toBeUndefined();
-      await expect(messageStore.lookup("new-message")).resolves.toEqual({
-        kind: "message",
-        fresh: true,
-      });
-      await expect(topicStore.lookup("topic-0")).resolves.toEqual({
-        kind: "topic",
+      await expect(limitStore.register("overflow", { overflow: true })).resolves.toBeUndefined();
+      await expect(siblingStore.lookup("k-0")).resolves.toEqual({
+        namespaceIndex: 1,
         entryIndex: 0,
       });
-      await expect(messageStore.entries()).resolves.toHaveLength(5_989);
-      await expect(topicStore.entries()).resolves.toHaveLength(11);
-    });
-  });
-
-  it("leaves room for Telegram sibling namespaces at their persistent budgets", async () => {
-    await withPluginStateTestState(async () => {
-      seedPluginStateEntriesForTests([
-        ...Array.from({ length: 3_000 }, (_, entryIndex) => ({
-          pluginId: "telegram",
-          namespace: "telegram.message-cache",
-          key: `message-${entryIndex}`,
-          value: { kind: "message", entryIndex },
-        })),
-        ...Array.from({ length: 2_047 }, (_, entryIndex) => ({
-          pluginId: "telegram",
-          namespace: "telegram.topic-name-cache",
-          key: `topic-${entryIndex}`,
-          value: { kind: "topic", updatedAt: entryIndex },
-        })),
-        ...Array.from({ length: 127 }, (_, entryIndex) => ({
-          pluginId: "telegram",
-          namespace: "telegram.bot-info-cache",
-          key: `bot-${entryIndex}`,
-          value: { kind: "bot-info", fetchedAt: String(entryIndex) },
-        })),
-      ]);
-
-      const topicStore = createPluginStateKeyedStore("telegram", {
-        namespace: "telegram.topic-name-cache",
-        maxEntries: 2_048,
-      });
-      const botInfoStore = createPluginStateKeyedStore("telegram", {
-        namespace: "telegram.bot-info-cache",
-        maxEntries: 128,
-      });
-
-      await expect(
-        topicStore.register("topic-final", { kind: "topic", updatedAt: 2_048 }),
-      ).resolves.toBeUndefined();
-      await expect(
-        botInfoStore.register("default", { kind: "bot-info", fetchedAt: "now" }),
-      ).resolves.toBeUndefined();
-
-      await expect(topicStore.lookup("topic-final")).resolves.toEqual({
-        kind: "topic",
-        updatedAt: 2_048,
-      });
-      await expect(botInfoStore.lookup("default")).resolves.toEqual({
-        kind: "bot-info",
-        fetchedAt: "now",
-      });
-    });
-  });
-
-  it("rejects plugin overflow when the current namespace cannot shed old rows", async () => {
-    await withPluginStateTestState(async () => {
-      seedPluginStateEntriesForTests(
-        Array.from({ length: 6_000 }, (_, entryIndex) => ({
-          pluginId: "telegram",
-          namespace: "telegram.topic-name-cache",
-          key: `topic-${entryIndex}`,
-          value: { entryIndex },
-        })),
-      );
-
-      const messageStore = createPluginStateKeyedStore("telegram", {
-        namespace: "telegram.message-cache",
-        maxEntries: 6_000,
-      });
-      const topicStore = createPluginStateKeyedStore("telegram", {
-        namespace: "telegram.topic-name-cache",
-        maxEntries: 6_000,
-      });
-
-      await expectPluginStateStoreError(messageStore.register("new-message", { fresh: true }), {
-        code: "PLUGIN_STATE_LIMIT_EXCEEDED",
-      });
-      await expect(messageStore.lookup("new-message")).resolves.toBeUndefined();
-      await expect(topicStore.lookup("topic-0")).resolves.toEqual({ entryIndex: 0 });
+      await expect(limitStore.lookup("overflow")).resolves.toEqual({ overflow: true });
     });
   });
 
