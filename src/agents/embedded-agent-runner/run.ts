@@ -1469,7 +1469,6 @@ export async function runEmbeddedAgent(
               durationMs: Date.now() - started,
               agentMeta: buildErrorAgentMeta({
                 sessionId: activeSessionId,
-                sessionFile: activeSessionFile,
                 provider,
                 model: model.id,
                 contextTokens: ctxInfo.tokens,
@@ -1794,7 +1793,6 @@ export async function runEmbeddedAgent(
               durationMs: Date.now() - started,
               agentMeta: buildErrorAgentMeta({
                 sessionId: activeSessionId,
-                sessionFile: activeSessionFile,
                 provider,
                 model: model.id,
                 contextTokens: ctxInfo.tokens,
@@ -2323,7 +2321,6 @@ export async function runEmbeddedAgent(
                 durationMs: Date.now() - started,
                 agentMeta: buildErrorAgentMeta({
                   sessionId: sessionIdUsed,
-                  sessionFile: activeSessionFile,
                   provider,
                   model: model.id,
                   contextTokens: ctxInfo.tokens,
@@ -2356,7 +2353,6 @@ export async function runEmbeddedAgent(
                 durationMs: Date.now() - started,
                 agentMeta: buildErrorAgentMeta({
                   sessionId: sessionIdUsed,
-                  sessionFile: activeSessionFile,
                   provider,
                   model: model.id,
                   contextTokens: ctxInfo.tokens,
@@ -2447,7 +2443,6 @@ export async function runEmbeddedAgent(
                   durationMs: Date.now() - started,
                   agentMeta: buildErrorAgentMeta({
                     sessionId: sessionIdUsed,
-                    sessionFile: activeSessionFile,
                     provider,
                     model: model.id,
                     contextTokens: ctxInfo.tokens,
@@ -2488,7 +2483,6 @@ export async function runEmbeddedAgent(
                   durationMs: Date.now() - started,
                   agentMeta: buildErrorAgentMeta({
                     sessionId: sessionIdUsed,
-                    sessionFile: activeSessionFile,
                     provider,
                     model: model.id,
                     contextTokens: ctxInfo.tokens,

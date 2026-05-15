@@ -114,6 +114,21 @@ async function resolveQueueEmbeddedAgentMessageOutcome(
   );
 }
 
+async function runAnnounceAgentCall(params: {
+  agentParams: Record<string, unknown>;
+  expectFinal?: boolean;
+  timeoutMs?: number;
+}): Promise<unknown> {
+  return await subagentAnnounceDeliveryDeps.dispatchGatewayMethodInProcess(
+    "agent",
+    params.agentParams,
+    {
+      expectFinal: params.expectFinal,
+      timeoutMs: params.timeoutMs,
+    },
+  );
+}
+
 function formatQueueWakeFailureError(
   fallback: string,
   outcome: EmbeddedAgentQueueMessageOutcome,

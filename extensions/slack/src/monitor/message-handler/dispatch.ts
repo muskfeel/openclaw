@@ -74,7 +74,7 @@ import {
 import { resolveSlackThreadTargets } from "../../threading.js";
 import type { SlackMessageEvent } from "../../types.js";
 import { normalizeSlackAllowOwnerEntry } from "../allow-list.js";
-import { resolveStorePath, updateLastRoute } from "../config.runtime.js";
+import { updateLastRoute } from "../config.runtime.js";
 import { recordInboundSession } from "../conversation.runtime.js";
 import { escapeSlackMrkdwn } from "../mrkdwn.js";
 import {
@@ -359,10 +359,6 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
     : undefined;
 
   if (prepared.isDirectMessage) {
-    const sessionCfg = cfg.session;
-    const storePath = resolveStorePath(sessionCfg?.store, {
-      agentId: route.agentId,
-    });
     const pinnedMainDmOwner = resolvePinnedMainDmOwnerFromAllowlist({
       dmScope: cfg.session?.dmScope,
       allowFrom: ctx.allowFrom,
@@ -384,7 +380,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
       );
     } else {
       await updateLastRoute({
-        storePath,
+        agentId: route.agentId,
         sessionKey: inboundLastRouteSessionKey,
         deliveryContext: {
           channel: "slack",
