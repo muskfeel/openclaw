@@ -612,6 +612,7 @@ export async function runPreparedReply(
     envelopeOptions,
     { sourceReplyDeliveryMode },
   );
+  const inboundUserContextPromptJoiner = resolveInboundUserContextPromptJoiner(sessionCtx);
   const hasUserBody =
     baseBodyFinal.trim().length > 0 ||
     softResetTail.length > 0 ||
