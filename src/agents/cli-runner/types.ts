@@ -16,6 +16,7 @@ import type {
 } from "../../sessions/user-turn-transcript.js";
 import type { BootstrapContextMode } from "../bootstrap-files.js";
 import type { ResolvedCliBackend } from "../cli-backends.js";
+import type { ContextWindowInfo } from "../context-window-guard.js";
 import type { ImageContent } from "../pi-ai-contract.js";
 import type {
   CurrentInboundPromptContext,

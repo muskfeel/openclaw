@@ -49,6 +49,7 @@ import {
   type CodexAppServerContextEngineBinding,
   type CodexAppServerContextEngineProjectionBinding,
   type CodexAppServerBindingIdentity,
+  type CodexAppServerContextEngineBinding,
   type CodexAppServerThreadBinding,
 } from "./session-binding.js";
 
@@ -106,10 +107,9 @@ export const CODEX_CODE_MODE_DISABLED_THREAD_CONFIG: JsonObject = {
   "features.code_mode_only": false,
 };
 
-const CODEX_LIGHTWEIGHT_CONTEXT_THREAD_CONFIG: JsonObject = {
+export const CODEX_LIGHTWEIGHT_CONTEXT_THREAD_CONFIG: JsonObject = {
   project_doc_max_bytes: 0,
 };
-
 function resolveCodexAppServerBindingIdentity(
   params: EmbeddedRunAttemptParams,
 ): CodexAppServerBindingIdentity {

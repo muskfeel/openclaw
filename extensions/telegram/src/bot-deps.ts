@@ -3,9 +3,9 @@ import { buildChannelInboundEventContext } from "openclaw/plugin-sdk/channel-inb
 import {
   createChannelMessageReplyPipeline,
   deliverInboundReplyWithMessageSendContext,
-} from "openclaw/plugin-sdk/channel-outbound";
-import { readChannelAllowFromStore } from "openclaw/plugin-sdk/conversation-runtime";
+} from "openclaw/plugin-sdk/channel-message";
 import {
+  readChannelAllowFromStore,
   recordInboundSession,
   upsertChannelPairingRequest,
 } from "openclaw/plugin-sdk/conversation-runtime";
@@ -19,7 +19,6 @@ import {
   listSessionEntries,
   patchSessionEntry,
   readSessionUpdatedAt,
-  resolveStorePath,
 } from "openclaw/plugin-sdk/session-store-runtime";
 import { listSkillCommandsForAgents } from "openclaw/plugin-sdk/skill-commands-runtime";
 import { enqueueSystemEvent } from "openclaw/plugin-sdk/system-event-runtime";
@@ -38,7 +37,6 @@ export type TelegramBotDeps = {
   getSessionEntry: typeof getSessionEntry;
   listSessionEntries: typeof listSessionEntries;
   patchSessionEntry: typeof patchSessionEntry;
-  resolveStorePath: typeof resolveStorePath;
   readSessionUpdatedAt?: typeof readSessionUpdatedAt;
   recordInboundSession?: typeof recordInboundSession;
   recordChannelActivity?: typeof recordChannelActivity;
@@ -77,9 +75,6 @@ export const defaultTelegramBotDeps: TelegramBotDeps = {
   },
   get patchSessionEntry() {
     return patchSessionEntry;
-  },
-  get resolveStorePath() {
-    return resolveStorePath;
   },
   get readSessionUpdatedAt() {
     return readSessionUpdatedAt;
