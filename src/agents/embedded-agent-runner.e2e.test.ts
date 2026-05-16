@@ -383,9 +383,8 @@ describe("runEmbeddedPiAgent", () => {
     expect(ensureOpenClawModelCatalogMock).not.toHaveBeenCalled();
   });
 
-  it("resolves explicit OpenAI OpenClaw runs through Codex when auth order starts with Codex OAuth", async () => {
-    const sessionFile = nextSessionFile();
-    const baseConfig = createEmbeddedAgentRunnerOpenAiConfig(["mock-1"]);
+  it("resolves explicit OpenAI PI runs through Codex when auth order starts with Codex OAuth", async () => {
+    const baseConfig = createEmbeddedPiRunnerOpenAiConfig(["mock-1"]);
     const openAIProvider = baseConfig.models?.providers?.openai;
     if (!openAIProvider) {
       throw new Error("expected OpenAI provider test config");
@@ -424,9 +423,8 @@ describe("runEmbeddedPiAgent", () => {
       }),
     );
 
-    await runEmbeddedAgent({
-      sessionId: "codex-first-openclaw",
-      sessionFile,
+    await runEmbeddedPiAgent({
+      sessionId: "codex-first-pi",
       workspaceDir,
       config: cfg,
       prompt: "hello",
