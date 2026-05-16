@@ -30,6 +30,7 @@ export type RunCliAgentParams = {
   sessionKey?: string;
   sessionEntry?: SessionEntry;
   agentId?: string;
+  sessionFile?: string;
   trigger?: EmbeddedRunTrigger;
   workspaceDir: string;
   /** Task working directory for CLI execution. Defaults to workspaceDir. */

@@ -10,7 +10,11 @@ import type {
 import type { ModelsProviderData } from "openclaw/plugin-sdk/command-auth-native";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import * as globalsModule from "openclaw/plugin-sdk/runtime-env";
-import { getSessionEntry, upsertSessionEntry } from "openclaw/plugin-sdk/session-store-runtime";
+import {
+  getSessionEntry,
+  listSessionEntries,
+  upsertSessionEntry,
+} from "openclaw/plugin-sdk/session-store-runtime";
 import * as commandTextModule from "openclaw/plugin-sdk/text-utility-runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineThrowingDiscordChannelGetter } from "../test-support/partial-channel.js";
@@ -431,16 +435,10 @@ describe("Discord model picker interactions", () => {
       dispatchSpy,
       model: "openai/gpt-4o",
     });
-    const store = loadSessionStore(
-      resolveStorePath(context.cfg.session?.store, { agentId: "main" }),
-      {
-        skipCache: true,
-      },
-    );
-    const entry = Object.values(store).find(
-      (candidate) =>
+    const entry = listSessionEntries({ agentId: "main" }).find(
+      ({ entry: candidate }) =>
         candidate.providerOverride === "openai" && candidate.modelOverride === "gpt-4o",
-    );
+    )?.entry;
     expect(typeof entry?.sessionId).toBe("string");
     expect(entry?.sessionId).not.toBe("");
     expect(entry?.agentRuntimeOverride).toBe("codex");
@@ -478,17 +476,11 @@ describe("Discord model picker interactions", () => {
       dispatchSpy,
       model: "anthropic/claude-sonnet-4-5",
     });
-    const store = loadSessionStore(
-      resolveStorePath(context.cfg.session?.store, { agentId: "main" }),
-      {
-        skipCache: true,
-      },
-    );
-    const entry = Object.values(store).find(
-      (candidate) =>
+    const entry = listSessionEntries({ agentId: "main" }).find(
+      ({ entry: candidate }) =>
         candidate.providerOverride === "anthropic" &&
         candidate.modelOverride === "claude-sonnet-4-5",
-    );
+    )?.entry;
     expect(entry?.agentRuntimeOverride).toBeUndefined();
   });
 
@@ -523,17 +515,11 @@ describe("Discord model picker interactions", () => {
       dispatchSpy,
       model: "anthropic/claude-sonnet-4-5",
     });
-    const store = loadSessionStore(
-      resolveStorePath(context.cfg.session?.store, { agentId: "main" }),
-      {
-        skipCache: true,
-      },
-    );
-    const entry = Object.values(store).find(
-      (candidate) =>
+    const entry = listSessionEntries({ agentId: "main" }).find(
+      ({ entry: candidate }) =>
         candidate.providerOverride === "anthropic" &&
         candidate.modelOverride === "claude-sonnet-4-5",
-    );
+    )?.entry;
     expect(entry?.agentRuntimeOverride).toBeUndefined();
   });
 
