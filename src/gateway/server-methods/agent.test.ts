@@ -532,6 +532,7 @@ describe("gateway agent handler", () => {
           lastInteractionAt: entry?.lastInteractionAt,
         }),
       );
+    mocks.performGatewaySessionReset.mockReset();
     dateOnlyFakeClockActive = false;
     vi.useRealTimers();
     resetExecApprovalFollowupRuntimeHandoffsForTests();
@@ -2352,22 +2353,24 @@ describe("gateway agent handler", () => {
       lastChannel: "telegram",
       lastTo: "123",
     });
-    let releaseFirstSessionWrite: (() => void) | undefined;
-    let sessionWriteCalls = 0;
-    mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
-      sessionWriteCalls += 1;
-      if (sessionWriteCalls === 1) {
+    const backendAdminClient = backendGatewayClient();
+    if (backendAdminClient?.connect) {
+      backendAdminClient.connect.scopes = ["operator.admin"];
+    }
+    let releaseFirstReset: (() => void) | undefined;
+    let resetCalls = 0;
+    mocks.performGatewaySessionReset.mockImplementation(async () => {
+      resetCalls += 1;
+      if (resetCalls === 1) {
         await new Promise<void>((resolve) => {
-          releaseFirstSessionWrite = resolve;
+          releaseFirstReset = resolve;
         });
       }
-      const store = {
-        "agent:main:main": buildExistingMainStoreEntry({
-          lastChannel: "telegram",
-          lastTo: "123",
-        }),
+      return {
+        ok: true,
+        key: "agent:main:telegram:direct:123",
+        entry: { sessionId: "reset-session-id" },
       };
-      return await updater(store);
     });
     mocks.agentCommand.mockImplementation(() => new Promise(() => {}));
     const context = makeContext();
@@ -2375,7 +2378,7 @@ describe("gateway agent handler", () => {
 
     const first = invokeAgent(
       {
-        message: "exec followup",
+        message: "/reset exec followup",
         sessionKey: "agent:main:telegram:direct:123",
         channel: "telegram",
         idempotencyKey: firstRegistration.idempotencyKey,
@@ -2383,12 +2386,12 @@ describe("gateway agent handler", () => {
       },
       {
         reqId: "exec-followup-overlap-1",
-        client: backendGatewayClient(),
+        client: backendAdminClient,
         context,
         flushDispatch: false,
       },
     );
-    await waitForAssertion(() => expect(sessionWriteCalls).toBe(1));
+    await waitForAssertion(() => expect(resetCalls).toBe(1));
 
     const secondRespond = await invokeAgent(
       {
@@ -2400,14 +2403,14 @@ describe("gateway agent handler", () => {
       },
       {
         reqId: "exec-followup-overlap-2",
-        client: backendGatewayClient(),
+        client: backendAdminClient,
         context,
         flushDispatch: false,
       },
     );
 
     expect(mocks.agentCommand).toHaveBeenCalledTimes(agentCommandCallsBefore);
-    expect(sessionWriteCalls).toBe(1);
+    expect(resetCalls).toBe(1);
     expect(mockCallArg(secondRespond, 0, 1)).toMatchObject({
       runId: firstRegistration.idempotencyKey,
       status: "in_flight",
@@ -2417,7 +2420,7 @@ describe("gateway agent handler", () => {
       runId: firstRegistration.idempotencyKey,
     });
 
-    releaseFirstSessionWrite?.();
+    releaseFirstReset?.();
     await first;
     await flushScheduledDispatchStep();
     await flushScheduledDispatchStep();
@@ -2449,14 +2452,18 @@ describe("gateway agent handler", () => {
       lastChannel: "telegram",
       lastTo: "123",
     });
+    const backendAdminClient = backendGatewayClient();
+    if (backendAdminClient?.connect) {
+      backendAdminClient.connect.scopes = ["operator.admin"];
+    }
     const context = makeContext();
     const agentCommandCallsBefore = mocks.agentCommand.mock.calls.length;
-    mocks.updateSessionStore.mockRejectedValueOnce(new Error("session write failed"));
+    mocks.performGatewaySessionReset.mockRejectedValueOnce(new Error("session reset failed"));
 
     await expect(
       invokeAgent(
         {
-          message: "exec followup",
+          message: "/reset exec followup",
           sessionKey: "agent:main:telegram:direct:123",
           channel: "telegram",
           idempotencyKey: firstRegistration.idempotencyKey,
@@ -2464,12 +2471,12 @@ describe("gateway agent handler", () => {
         },
         {
           reqId: "exec-followup-pre-run-fail-1",
-          client: backendGatewayClient(),
+          client: backendAdminClient,
           context,
           flushDispatch: false,
         },
       ),
-    ).rejects.toThrow("session write failed");
+    ).rejects.toThrow("session reset failed");
 
     expect(context.dedupe.get(`agent:${firstRegistration.idempotencyKey}`)).toBeUndefined();
     expect(
@@ -2487,7 +2494,7 @@ describe("gateway agent handler", () => {
       },
       {
         reqId: "exec-followup-pre-run-fail-2",
-        client: backendGatewayClient(),
+        client: backendAdminClient,
         context,
         flushDispatch: false,
       },
