@@ -1,5 +1,6 @@
 import { appendSessionTranscriptMessage } from "openclaw/plugin-sdk/agent-harness-runtime";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
+import { getSessionEntry } from "openclaw/plugin-sdk/session-store-runtime";
 import { normalizeOptionalLowercaseString } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { tryNormalizeBotFrameworkServiceUrl } from "./bot-framework-service-url.js";
 import { formatUnknownError } from "./errors.js";
@@ -251,9 +252,14 @@ async function handleFeedbackInvoke(
 
   // Append feedback to the SQLite transcript.
   try {
+    const transcriptSessionId =
+      getSessionEntry({
+        agentId: route.agentId,
+        sessionKey: route.sessionKey,
+      })?.sessionId ?? route.sessionKey;
     await appendSessionTranscriptMessage({
       agentId: route.agentId,
-      sessionId: route.sessionKey,
+      sessionId: transcriptSessionId,
       message: feedbackEvent,
     });
   } catch {
