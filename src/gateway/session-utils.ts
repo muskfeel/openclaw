@@ -2015,6 +2015,7 @@ export function listSessionsFromStore(params: {
 
   return {
     ts: now,
+    path: params.databasePath ?? "(multiple)",
     databasePath: params.databasePath ?? "(multiple)",
     count: sessions.length,
     totalCount,
@@ -2128,6 +2129,7 @@ export async function listSessionsFromStoreAsync(params: {
 
   return {
     ts: now,
+    path: params.databasePath ?? "(multiple)",
     databasePath: params.databasePath ?? "(multiple)",
     count: sessions.length,
     totalCount,
