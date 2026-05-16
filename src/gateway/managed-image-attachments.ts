@@ -851,6 +851,8 @@ export async function createManagedOutgoingImageBlocks(params: {
               "outgoing/originals",
               limits.maxBytes,
               `generated-image-${index + 1}`,
+              undefined,
+              managedImageRecordDbOptions(stateDir),
             )
           : await (async () => {
               const localMediaPath = resolveLocalMediaPath(mediaUrl);
@@ -862,6 +864,7 @@ export async function createManagedOutgoingImageBlocks(params: {
                 undefined,
                 "outgoing/originals",
                 Math.max(limits.maxBytes, MEDIA_MAX_BYTES),
+                managedImageRecordDbOptions(stateDir),
               );
             })();
       let savedOriginalContentType = savedOriginal.contentType;
@@ -923,6 +926,8 @@ export async function createManagedOutgoingImageBlocks(params: {
           "outgoing/originals",
           limits.maxBytes,
           toRecordFilename(savedOriginal.path) ?? `generated-image-${index + 1}`,
+          undefined,
+          managedImageRecordDbOptions(stateDir),
         );
         await deleteManagedImageOriginal({
           mediaId: savedOriginal.id,
