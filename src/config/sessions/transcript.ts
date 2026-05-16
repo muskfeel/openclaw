@@ -114,6 +114,14 @@ function isTranscriptOnlyOpenClawAssistantMessage(message: {
   );
 }
 
+function isTranscriptMessageEvent(event: unknown): boolean {
+  if (!event || typeof event !== "object" || Array.isArray(event)) {
+    return false;
+  }
+  const parsed = event as { message?: unknown; type?: unknown };
+  return parsed.type === "message" && Boolean(parsed.message) && typeof parsed.message === "object";
+}
+
 export async function resolveSessionTranscriptTarget(params: {
   sessionId: string;
   sessionKey: string;
@@ -174,8 +182,16 @@ export async function readTailAssistantTextFromSessionTranscript(
 ): Promise<TailAssistantTranscriptText | undefined> {
   const scopedEvents = loadScopedSqliteTranscriptEvents(scope);
   if (scopedEvents) {
-    const tail = scopedEvents.at(-1);
-    return tail === undefined ? undefined : parseAssistantTranscriptEventText(tail);
+    for (const event of scopedEvents.toReversed()) {
+      const assistantText = parseAssistantTranscriptEventText(event);
+      if (assistantText) {
+        return assistantText;
+      }
+      if (isTranscriptMessageEvent(event)) {
+        return undefined;
+      }
+    }
+    return undefined;
   }
 
   return undefined;
