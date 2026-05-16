@@ -11,6 +11,7 @@ import type { EmbeddedFullAccessBlockedReason } from "../../agents/embedded-agen
 import { resolveFastModeState } from "../../agents/fast-mode.js";
 import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
 import { resolveAgentHarnessPolicy } from "../../agents/harness/selection.js";
+import { normalizeProviderId } from "../../agents/model-selection.js";
 import { listOpenAIAuthProfileProvidersForAgentRuntime } from "../../agents/openai-codex-routing.js";
 import { normalizeProviderId } from "../../agents/provider-id.js";
 import { resolveIngressWorkspaceOverrideForSpawnedRun } from "../../agents/spawned-context.js";
@@ -84,6 +85,7 @@ import { resolveBareSessionResetPromptState } from "./session-reset-prompt.js";
 import { resolveBareResetBootstrapFileAccess } from "./session-reset-prompt.js";
 import { drainFormattedSystemEventBlock } from "./session-system-events.js";
 import { buildSessionStartupContextPrelude, shouldApplyStartupContext } from "./startup-context.js";
+import { resolveStoredModelOverride } from "./stored-model-override.js";
 import { resolveTypingMode } from "./typing-mode.js";
 import { resolveRunTypingPolicy } from "./typing-policy.js";
 import type { TypingController } from "./typing.js";
