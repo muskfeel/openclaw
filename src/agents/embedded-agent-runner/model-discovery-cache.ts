@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import path from "node:path";
 import {
@@ -7,7 +8,8 @@ import {
 import { discoverAuthStorage, discoverModels } from "../agent-model-discovery.js";
 import { resolveDefaultAgentDir } from "../agent-scope.js";
 import { hasAnyRuntimeAuthProfileStoreSource } from "../auth-profiles/runtime-snapshots.js";
-import type { AuthStorage, ModelRegistry } from "../sessions/index.js";
+import { readStoredModelsConfigRaw } from "../models-config-store.js";
+import { discoverAuthStorage, discoverModels } from "../pi-model-discovery.js";
 
 type DiscoveryStores = {
   authStorage: AuthStorage;
@@ -47,7 +49,18 @@ function authFingerprint(agentDir: string): object {
   };
 }
 
-function discoveryFingerprint(params: DiscoverCachedAgentStoresOptions): string {
+function storedModelCatalogFingerprint(agentDir: string): object | null {
+  const stored = readStoredModelsConfigRaw(agentDir);
+  if (!stored) {
+    return null;
+  }
+  return {
+    updatedAt: stored.updatedAt,
+    rawHash: createHash("sha256").update(stored.raw).digest("hex"),
+  };
+}
+
+function discoveryFingerprint(params: DiscoverCachedPiStoresOptions): string {
   const inheritedAuthDir =
     params.inheritedAuthDir && params.inheritedAuthDir !== params.agentDir
       ? params.inheritedAuthDir
@@ -57,7 +70,7 @@ function discoveryFingerprint(params: DiscoverCachedAgentStoresOptions): string 
     inheritedAuthDir,
     localAuth: authFingerprint(params.agentDir),
     inheritedAuth: inheritedAuthDir ? authFingerprint(inheritedAuthDir) : undefined,
-    modelsJson: fileFingerprint(path.join(params.agentDir, "models.json")),
+    modelCatalog: storedModelCatalogFingerprint(params.agentDir),
   });
 }
 
