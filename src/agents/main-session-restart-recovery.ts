@@ -11,6 +11,7 @@ import {
   resolveAgentIdFromSessionKey,
   upsertSessionEntry,
 } from "../config/sessions.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { callGateway } from "../gateway/call.js";
 import { readSessionMessagesAsync } from "../gateway/session-transcript-readers.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -26,6 +27,17 @@ const RETRY_BACKOFF_MULTIPLIER = 2;
 const UNRESUMABLE_SESSION_NOTICE =
   "I was interrupted by a gateway restart and couldn't safely resume the previous turn. " +
   "Please send that last request again and I'll pick it up cleanly.";
+
+function normalizeStringSet(values: Iterable<string> | undefined): Set<string> {
+  const result = new Set<string>();
+  for (const value of values ?? []) {
+    const trimmed = value.trim();
+    if (trimmed) {
+      result.add(trimmed);
+    }
+  }
+  return result;
+}
 
 function shouldSkipMainRecovery(entry: SessionEntry, sessionKey: string): boolean {
   if (typeof entry.spawnDepth === "number" && entry.spawnDepth > 0) {
@@ -95,6 +107,66 @@ function buildResumeMessage(pendingFinalDeliveryText?: string | null): string {
     return `${base}\n\nNote: The interrupted final reply was captured: "${sanitizedPendingText}"`;
   }
   return base;
+}
+
+export async function markRestartAbortedMainSessions(params: {
+  cfg?: OpenClawConfig;
+  additionalCfgs?: Iterable<OpenClawConfig | undefined>;
+  stateDir?: string;
+  sessionKeys?: Iterable<string>;
+  sessionIds?: Iterable<string>;
+  reason?: string;
+}): Promise<{ marked: number; skipped: number }> {
+  const sessionKeys = normalizeStringSet(params.sessionKeys);
+  const sessionIds = normalizeStringSet(params.sessionIds);
+  const preferSessionIdMatch = sessionIds.size > 0;
+  const result = { marked: 0, skipped: 0 };
+  if (sessionKeys.size === 0 && sessionIds.size === 0) {
+    return result;
+  }
+
+  const env = resolveRecoveryEnv(params.stateDir);
+  for (const agentDatabase of listOpenClawRegisteredAgentDatabases({ env })) {
+    for (const { sessionKey, entry } of listSessionEntries({
+      agentId: agentDatabase.agentId,
+      env,
+    })) {
+      if (!entry || entry.status !== "running") {
+        continue;
+      }
+      const matches =
+        typeof entry.sessionId === "string" && sessionIds.has(entry.sessionId)
+          ? true
+          : !preferSessionIdMatch && sessionKeys.has(sessionKey);
+      if (!matches) {
+        continue;
+      }
+      if (shouldSkipMainRecovery(entry, sessionKey)) {
+        result.skipped++;
+        continue;
+      }
+      upsertSessionEntry({
+        agentId: agentDatabase.agentId,
+        env,
+        sessionKey,
+        entry: {
+          ...entry,
+          abortedLastRun: true,
+          updatedAt: Date.now(),
+        },
+      });
+      result.marked++;
+    }
+  }
+
+  if (result.marked > 0) {
+    log.warn(
+      `marked ${result.marked} interrupted main session(s) for restart recovery${
+        params.reason ? ` (${params.reason})` : ""
+      }`,
+    );
+  }
+  return result;
 }
 
 async function markSessionFailed(params: {
