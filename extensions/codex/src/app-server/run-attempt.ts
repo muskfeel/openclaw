@@ -450,12 +450,17 @@ export async function runCodexAppServerAttempt(
     ...(startupAuthProfileId ? { authProfileId: startupAuthProfileId } : {}),
   };
   let activeSessionId = params.sessionId;
-  let activeSessionFile = params.sessionFile;
   const buildActiveRunAttemptParams = (): EmbeddedRunAttemptParams => ({
     ...runtimeParams,
     sessionId: activeSessionId,
-    sessionFile: activeSessionFile,
   });
+  const adoptContextEngineCompactionTranscript = (compactResult: {
+    result?: { sessionId?: string };
+  }): void => {
+    if (compactResult.result?.sessionId) {
+      activeSessionId = compactResult.result.sessionId;
+    }
+  };
   const startupAuthAccountCacheKey = await resolveCodexAppServerAuthAccountCacheKey({
     authProfileId: startupAuthProfileId,
     authProfileStore: params.authProfileStore,
@@ -589,6 +594,10 @@ export async function runCodexAppServerAttempt(
       ? { contextWindowReferenceTokens: params.contextWindowInfo.referenceTokens }
       : {}),
   };
+  const hadTranscript = hasSqliteSessionTranscriptEvents({
+    agentId: sessionAgentId,
+    sessionId: activeSessionId,
+  });
   let historyMessages =
     (await readMirroredSessionHistoryMessages({
       agentId: sessionAgentId,
