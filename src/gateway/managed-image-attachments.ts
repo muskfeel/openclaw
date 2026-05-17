@@ -695,13 +695,16 @@ async function getSessionManagedOutgoingAttachmentIndex(
     return cache.get(sessionKey) ?? null;
   }
   const agentId = resolveAgentIdFromSessionKey(sessionKey) ?? DEFAULT_AGENT_ID;
-  const entry = stateDir
-    ? getSessionEntry({
-        agentId,
-        env: managedImageRecordDbOptions(stateDir).env,
-        sessionKey,
-      })
-    : loadSessionEntry(sessionKey).entry;
+  const loaded = stateDir ? undefined : loadSessionEntry(sessionKey);
+  const entry =
+    loaded?.entry ??
+    (stateDir
+      ? getSessionEntry({
+          agentId,
+          env: managedImageRecordDbOptions(stateDir).env,
+          sessionKey,
+        })
+      : undefined);
   const sessionId = entry?.sessionId;
   if (!sessionId) {
     cache?.set(sessionKey, null);
@@ -711,6 +714,7 @@ async function getSessionManagedOutgoingAttachmentIndex(
   const transcriptStat = getSqliteSessionTranscriptStats({
     agentId,
     sessionId,
+    ...(loaded?.databasePath ? { path: loaded.databasePath } : {}),
     ...(stateDir ? { env: { ...process.env, OPENCLAW_STATE_DIR: stateDir } } : {}),
   });
   if (transcriptStat) {
@@ -727,7 +731,11 @@ async function getSessionManagedOutgoingAttachmentIndex(
     {
       agentId,
       sessionId,
-      ...(stateDir ? { path: managedImageAgentDbPath(agentId, stateDir) } : {}),
+      ...(loaded?.databasePath
+        ? { path: loaded.databasePath }
+        : stateDir
+          ? { path: managedImageAgentDbPath(agentId, stateDir) }
+          : {}),
     },
     {
       mode: "full",
