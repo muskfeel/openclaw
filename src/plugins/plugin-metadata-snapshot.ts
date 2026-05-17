@@ -12,8 +12,12 @@ import { resolveCompatibilityHostVersion } from "../version.js";
 import { getCurrentPluginMetadataSnapshot } from "./current-plugin-metadata-snapshot.js";
 import { resolveDefaultPluginNpmDir } from "./install-paths.js";
 import { hashJson } from "./installed-plugin-index-hash.js";
+import {
+  readPersistedInstalledPluginIndexFingerprintSync,
+  readPersistedInstalledPluginIndexSync,
+} from "./installed-plugin-index-persisted-read.js";
 import { resolveInstalledPluginIndexPolicyHash } from "./installed-plugin-index-policy.js";
-import { resolveInstalledPluginIndexStorePath } from "./installed-plugin-index-store-path.js";
+import { loadInstalledPluginIndexInstallRecordsSync } from "./installed-plugin-index-record-reader.js";
 import type { InstalledPluginIndex } from "./installed-plugin-index.js";
 import {
   loadPluginManifestRegistryForInstalledIndex,
@@ -184,15 +188,14 @@ function resolvePersistedRegistryFastMemoFingerprint(params: {
   if (disabled) {
     return { disabled: true };
   }
-  const indexPath = resolveInstalledPluginIndexStorePath({
-    env: params.env,
-    ...(params.stateDir ? { stateDir: params.stateDir } : {}),
-  });
   const npmRoot = params.stateDir
     ? path.join(params.stateDir, "npm")
     : resolveDefaultPluginNpmDir(params.env);
   return {
-    index: fileFingerprint(indexPath),
+    index: readPersistedInstalledPluginIndexFingerprintSync({
+      env: params.env,
+      ...(params.stateDir ? { stateDir: params.stateDir } : {}),
+    }),
     npmPackageJson: fileFingerprint(path.join(npmRoot, "package.json")),
   };
 }
@@ -230,11 +233,83 @@ function resolvePersistedRegistryMemoState(params: {
       fingerprint: fastFingerprint,
     };
   }
-  const indexPath = resolveInstalledPluginIndexStorePath({
-    env: params.env,
-    ...(params.stateDir ? { stateDir: params.stateDir } : {}),
+  const npmRoot = params.stateDir
+    ? path.join(params.stateDir, "npm")
+    : resolveDefaultPluginNpmDir(params.env);
+  const index =
+    params.index ??
+    readPersistedInstalledPluginIndexSync({
+      env: params.env,
+      ...(params.stateDir ? { stateDir: params.stateDir } : {}),
+    }) ??
+    undefined;
+  const plugins = Array.isArray(index?.plugins) ? index.plugins : [];
+  const diagnostics = Array.isArray(index?.diagnostics) ? index.diagnostics : [];
+  const pluginRootById = new Map<string, string>();
+  const watchedFiles = new Set<string>();
+  for (const rawPlugin of plugins) {
+    if (!isRecord(rawPlugin)) {
+      continue;
+    }
+    const pluginId = normalizeString(rawPlugin.pluginId);
+    const rootDir = normalizeString(rawPlugin.rootDir);
+    if (pluginId && rootDir) {
+      pluginRootById.set(pluginId, rootDir);
+    }
+  }
+  const installRecords =
+    params.index?.installRecords ??
+    loadInstalledPluginIndexInstallRecordsSync({
+      env: params.env,
+      ...(params.stateDir ? { stateDir: params.stateDir } : {}),
+    });
+  const watchedPlugins = plugins.map((rawPlugin) => {
+    if (!isRecord(rawPlugin)) {
+      return rawPlugin;
+    }
+    const rootDir = normalizeString(rawPlugin.rootDir);
+    const manifestPath = normalizeString(rawPlugin.manifestPath);
+    const packageJsonPath = resolveRecordPackageJsonPath(rawPlugin);
+    const source = normalizeString(rawPlugin.source);
+    const setupSource = normalizeString(rawPlugin.setupSource);
+    return [
+      normalizeString(rawPlugin.pluginId),
+      rootDir,
+      rootDir ? fileFingerprint(rootDir) : null,
+      manifestPath,
+      persistedPluginFileFingerprint(rootDir, manifestPath, { watchedFiles }),
+      source,
+      persistedPluginFileFingerprint(rootDir, source, { watchedFiles }),
+      setupSource,
+      persistedPluginFileFingerprint(rootDir, setupSource, { watchedFiles }),
+      packageJsonPath,
+      persistedPluginFileFingerprint(rootDir, packageJsonPath, {
+        allowSymlinkOutsideRoot: true,
+        watchedFiles,
+      }),
+    ];
   });
-  const index = params.index ?? readJsonObject(indexPath);
+  const watchedDiagnostics = diagnostics.map((rawDiagnostic) => {
+    if (!isRecord(rawDiagnostic)) {
+      return rawDiagnostic;
+    }
+    const pluginId = normalizeString(rawDiagnostic.pluginId);
+    const source = normalizeString(rawDiagnostic.source);
+    return [
+      pluginId,
+      source,
+      persistedPluginFileFingerprint(pluginId ? pluginRootById.get(pluginId) : undefined, source, {
+        watchedFiles,
+      }),
+    ];
+  });
+  const installRecordFiles = installRecordPathFingerprints(
+    params.env,
+    installRecords,
+    watchedFiles,
+  );
+  const managedNpmDependencyFiles = managedNpmDependencyMetadataFingerprints(npmRoot, watchedFiles);
+  const watchedFilesList = [...watchedFiles].toSorted();
   return {
     contextHash,
     fastHash,
