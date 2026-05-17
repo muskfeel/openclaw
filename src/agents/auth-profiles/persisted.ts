@@ -38,8 +38,11 @@ import type {
   ProfileUsageStats,
 } from "./types.js";
 
-export function authProfileStoreKey(agentDir?: string): string {
-  return resolveAuthProfileStoreKey(agentDir);
+export function authProfileStoreKey(
+  agentDir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return resolveAuthProfileStoreKey(agentDir, env);
 }
 
 export type PersistedAuthProfileStoreEntry = {
@@ -890,11 +893,11 @@ function preserveLegacyOAuthRefsForDoctorMigration(
 export function loadPersistedAuthProfileStoreEntryFromDatabase(
   database: OpenClawStateDatabase,
   agentDir?: string,
-  _options: Pick<OpenClawStateDatabaseOptions, "env"> = {},
+  options: Pick<OpenClawStateDatabaseOptions, "env"> = {},
 ): PersistedAuthProfileStoreEntry | null {
   const result = readAuthProfileStorePayloadResultFromDatabase(
     database,
-    authProfileStoreKey(agentDir),
+    authProfileStoreKey(agentDir, options.env),
   );
   if (!result.exists || result.value === undefined) {
     return null;
@@ -908,7 +911,7 @@ export function loadPersistedAuthProfileStoreEntryFromDatabase(
     ...store,
     ...mergeAuthProfileState(
       coerceAuthProfileState(raw),
-      loadPersistedAuthProfileStateFromDatabase(database, agentDir),
+      loadPersistedAuthProfileStateFromDatabase(database, agentDir, options),
     ),
   };
   return {
@@ -921,7 +924,10 @@ export function loadPersistedAuthProfileStoreEntry(
   agentDir?: string,
   options: OpenClawStateDatabaseOptions = {},
 ): PersistedAuthProfileStoreEntry | null {
-  const result = readAuthProfileStorePayloadResult(authProfileStoreKey(agentDir), options);
+  const result = readAuthProfileStorePayloadResult(
+    authProfileStoreKey(agentDir, options.env),
+    options,
+  );
   if (!result.exists || result.value === undefined) {
     return null;
   }
@@ -945,10 +951,10 @@ export function loadPersistedAuthProfileStoreEntry(
 
 export function loadLegacyAuthProfileStoreEntry(
   agentDir?: string,
-  _options: OpenClawStateDatabaseOptions = {},
+  options: OpenClawStateDatabaseOptions = {},
 ): PersistedAuthProfileStoreEntry | null {
   const authPath = path.join(
-    resolveAuthProfileStoreAgentDir(agentDir),
+    resolveAuthProfileStoreAgentDir(agentDir, options.env),
     LEGACY_AUTH_PROFILE_FILENAME,
   );
   const raw = loadJsonFile(authPath);
@@ -985,7 +991,7 @@ export function savePersistedAuthProfileSecretsStore(
     env: options.env,
   });
   writeAuthProfileStorePayload(
-    authProfileStoreKey(agentDir),
+    authProfileStoreKey(agentDir, options.env),
     payload as unknown as AuthProfilePayloadValue,
     options,
   );
@@ -996,10 +1002,11 @@ export function savePersistedAuthProfileSecretsStoreInTransaction(
   store: AuthProfileSecretsStore,
   agentDir?: string,
   updatedAt: number = Date.now(),
+  options: Pick<OpenClawStateDatabaseOptions, "env"> = {},
 ): void {
   writeAuthProfileStorePayloadInTransaction(
     database,
-    authProfileStoreKey(agentDir),
+    authProfileStoreKey(agentDir, options.env),
     store as unknown as AuthProfilePayloadValue,
     updatedAt,
   );
@@ -1009,5 +1016,6 @@ export function hasPersistedAuthProfileSecretsStore(
   agentDir?: string,
   options: OpenClawStateDatabaseOptions = {},
 ): boolean {
-  return readAuthProfileStorePayloadResult(authProfileStoreKey(agentDir), options).exists;
+  return readAuthProfileStorePayloadResult(authProfileStoreKey(agentDir, options.env), options)
+    .exists;
 }
