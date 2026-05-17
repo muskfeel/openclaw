@@ -339,10 +339,9 @@ function resolvePersistedRegistryMemoStateForLookup(
     if (
       registryState &&
       registryState.contextHash === contextHash &&
-      registryState.fastHash === fastHash
+      registryState.fastHash === fastHash &&
+      hashWatchedFiles(registryState.watchedFiles) === registryState.watchedFilesHash
     ) {
-      // Plugin files are immutable for a running gateway; plugin edits require
-      // an explicit reload/restart, so hot lookups only validate the registry envelope.
       return registryState;
     }
   }
