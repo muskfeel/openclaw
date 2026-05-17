@@ -67,6 +67,10 @@ const emptyTotals = (): CostUsageTotals => ({
 });
 
 type UsageCostRefreshResult = "refreshed" | "busy";
+type SessionUsageTimePointBase = Omit<
+  SessionUsageTimePoint,
+  "cumulativeCost" | "cumulativeTokens"
+>;
 
 const extractCostBreakdown = (usageRaw?: UsageLike | null): CostBreakdown | undefined => {
   if (!usageRaw || typeof usageRaw !== "object") {
@@ -914,10 +918,7 @@ export async function loadSessionUsageTimeSeries(params: {
     return null;
   }
 
-  const points: SessionUsageTimePoint[] = [];
-  let cumulativeTokens = 0;
-  let cumulativeCost = 0;
-  const resolveCost = createUsageCostResolver(params.config);
+  const points: SessionUsageTimePointBase[] = [];
 
   scanUsageEvents({
     events,
@@ -934,9 +935,6 @@ export async function loadSessionUsageTimeSeries(params: {
       );
       const cost = entry.costTotal ?? 0;
 
-      cumulativeTokens += totalTokens;
-      cumulativeCost += cost;
-
       points.push({
         timestamp: ts,
         input,
@@ -945,14 +943,22 @@ export async function loadSessionUsageTimeSeries(params: {
         cacheWrite,
         totalTokens,
         cost,
-        cumulativeTokens,
-        cumulativeCost,
       });
     },
   });
 
-  // Sort by timestamp
   const sortedPoints = points.toSorted((a, b) => a.timestamp - b.timestamp);
+  let cumulativeTokens = 0;
+  let cumulativeCost = 0;
+  const cumulativePoints: SessionUsageTimePoint[] = sortedPoints.map((point) => {
+    cumulativeTokens += point.totalTokens;
+    cumulativeCost += point.cost;
+    return {
+      ...point,
+      cumulativeTokens,
+      cumulativeCost,
+    };
+  });
 
   // Optionally downsample if too many points
   if (params.maxPoints !== undefined && params.maxPoints !== null) {
@@ -961,13 +967,13 @@ export async function loadSessionUsageTimeSeries(params: {
     }
   }
   const maxPoints = params.maxPoints ?? 100;
-  if (sortedPoints.length > maxPoints) {
-    const step = Math.ceil(sortedPoints.length / maxPoints);
+  if (cumulativePoints.length > maxPoints) {
+    const step = Math.ceil(cumulativePoints.length / maxPoints);
     const downsampled: SessionUsageTimePoint[] = [];
     let downsampledCumulativeTokens = 0;
     let downsampledCumulativeCost = 0;
-    for (let i = 0; i < sortedPoints.length; i += step) {
-      const bucket = sortedPoints.slice(i, i + step);
+    for (let i = 0; i < cumulativePoints.length; i += step) {
+      const bucket = cumulativePoints.slice(i, i + step);
       const bucketLast = bucket[bucket.length - 1];
       if (!bucketLast) {
         continue;
@@ -1006,7 +1012,7 @@ export async function loadSessionUsageTimeSeries(params: {
     return { sessionId: scope.sessionId, points: downsampled };
   }
 
-  return { sessionId: scope.sessionId, points: sortedPoints };
+  return { sessionId: scope.sessionId, points: cumulativePoints };
 }
 
 export async function loadSessionLogs(params: {
