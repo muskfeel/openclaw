@@ -724,7 +724,6 @@ export function createFollowupRunner(params: {
                     sessionKey: replySessionKey,
                     agentId: run.agentId,
                     trigger: opts?.isHeartbeat === true ? "heartbeat" : "user",
-                    sessionFile: run.sessionFile,
                     workspaceDir: run.workspaceDir,
                     cwd: run.cwd,
                     config: runtimeConfig,

@@ -31,6 +31,7 @@ vi.mock("./session-utils.js", () => ({
     agentId: "main",
     store: {},
     entry: undefined,
+    databasePath: "/tmp/openclaw-agent.sqlite",
     canonicalKey: "session-1",
   })),
 }));
@@ -62,6 +63,7 @@ describe("agent event handler", () => {
         agentId: "main",
         store: {},
         entry: undefined,
+        databasePath: "/tmp/openclaw-agent.sqlite",
         canonicalKey: "session-1",
       } as unknown as ReturnType<typeof loadSessionEntry>);
     vi.mocked(loadGatewaySessionRow).mockReset().mockReturnValue(null);
@@ -1398,6 +1400,7 @@ describe("agent event handler", () => {
       agentId: "main",
       store: {},
       entry: { sessionId: "session-1", verboseLevel: "on", updatedAt: 1_500 },
+      databasePath: "/tmp/openclaw-agent.sqlite",
       canonicalKey: "session-1",
     });
 
@@ -1435,6 +1438,7 @@ describe("agent event handler", () => {
       agentId: "main",
       store: {},
       entry: { sessionId: "session-1", verboseLevel: "off", updatedAt: 1_500 },
+      databasePath: "/tmp/openclaw-agent.sqlite",
       canonicalKey: "session-1",
     });
 
