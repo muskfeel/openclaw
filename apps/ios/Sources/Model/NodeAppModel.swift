@@ -2595,6 +2595,16 @@ extension NodeAppModel {
             var key: String
             var updatedAt: Double?
             var deliveryContext: DeliveryContext?
+            var lastChannel: String?
+            var lastTo: String?
+
+            var deliveryChannel: String? {
+                self.deliveryContext?.channel ?? self.lastChannel
+            }
+
+            var deliveryTo: String? {
+                self.deliveryContext?.to ?? self.lastTo
+            }
         }
         struct DeliveryContext: Decodable {
             var channel: String?
@@ -2622,12 +2632,12 @@ extension NodeAppModel {
             let sorted = decoded.sessions.sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
             let exactMatch = sorted.first { row in
                 row.key == currentKey
-                    && normalize(row.deliveryContext?.channel) != nil
-                    && normalize(row.deliveryContext?.to) != nil
+                    && normalize(row.deliveryChannel) != nil
+                    && normalize(row.deliveryTo) != nil
             }
             let selected = exactMatch
-            let channel = normalize(selected?.deliveryContext?.channel)
-            let to = normalize(selected?.deliveryContext?.to)
+            let channel = normalize(selected?.deliveryChannel)
+            let to = normalize(selected?.deliveryTo)
 
             await MainActor.run {
                 self.shareDeliveryChannel = channel
