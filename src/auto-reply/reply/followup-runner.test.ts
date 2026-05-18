@@ -1226,10 +1226,6 @@ describe("createFollowupRunner progress forwarding", () => {
   });
 
   it("suppresses queued follow-up progress when verbose progress is disabled", async () => {
-    const storePath = path.join(
-      await fs.mkdtemp(path.join(tmpdir(), "openclaw-followup-progress-off-")),
-      "sessions.json",
-    );
     const sessionEntry: SessionEntry = {
       sessionId: "session",
       updatedAt: Date.now(),
@@ -1238,9 +1234,7 @@ describe("createFollowupRunner progress forwarding", () => {
     const onToolStart = vi.fn(async () => {});
     const onItemEvent = vi.fn(async () => {});
     const onCommandOutput = vi.fn(async () => {});
-    const onCompactionStart = vi.fn(async () => {});
-    const onCompactionEnd = vi.fn(async () => {});
-    registerFollowupTestSessionStore(storePath, sessionStore);
+    registerFollowupTestSessionStore(sessionStore);
 
     runEmbeddedAgentMock.mockImplementationOnce(
       async (args: {
@@ -1277,7 +1271,6 @@ describe("createFollowupRunner progress forwarding", () => {
       sessionEntry,
       sessionStore,
       sessionKey: "main",
-      storePath,
       defaultModel: "claude",
     });
 
