@@ -6,7 +6,12 @@ import { resolveOAuthDir } from "../../config/paths.js";
 import { AUTH_STORE_VERSION } from "./constants.js";
 import { legacyOAuthSidecarTestUtils } from "./legacy-oauth-sidecar.js";
 import { resolveAuthStorePath } from "./paths.js";
-import { coercePersistedAuthProfileStore, loadLegacyAuthProfileStoreEntry } from "./persisted.js";
+import {
+  coercePersistedAuthProfileStore,
+  loadLegacyAuthProfileStoreEntry,
+  loadPersistedAuthProfileStore,
+  loadPersistedAuthProfileStoreEntry,
+} from "./persisted.js";
 
 function withEnvValue(key: string, value: string | undefined): () => void {
   const previous = process.env[key];
@@ -211,138 +216,39 @@ describe("persisted auth profile boundary", () => {
     }
   });
 
-  it("lets authoritative runtime external metadata remove stale base profiles", () => {
-    const merged = mergeAuthProfileStores(
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: ["anthropic:claude-cli"],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {
-          "anthropic:claude-cli": {
-            type: "oauth",
-            provider: "anthropic",
-            access: "stale-access",
-            refresh: "stale-refresh",
-            expires: 1,
+  it("keeps direct persisted auth-profile readers compatible with legacy files", () => {
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-auth-legacy-read-"));
+    const agentDir = path.join(stateDir, "agents", "main", "agent");
+    const env = { ...process.env, OPENCLAW_STATE_DIR: stateDir };
+    try {
+      fs.mkdirSync(agentDir, { recursive: true });
+      fs.writeFileSync(
+        resolveAuthStorePath(agentDir),
+        `${JSON.stringify(
+          {
+            version: AUTH_STORE_VERSION,
+            profiles: {
+              "openai:default": {
+                type: "api_key",
+                provider: "openai",
+                key: "legacy-key",
+              },
+            },
           },
-        },
-        order: {
-          anthropic: ["anthropic:claude-cli"],
-        },
-        lastGood: {
-          anthropic: "anthropic:claude-cli",
-        },
-      },
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: [],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {},
-      },
-    );
+          null,
+          2,
+        )}\n`,
+      );
 
-    expect(merged.runtimeExternalProfileIds).toEqual([]);
-    expect(merged.runtimeExternalProfileIdsAuthoritative).toBe(true);
-    expect(merged.profiles["anthropic:claude-cli"]).toBeUndefined();
-    expect(merged.order?.anthropic).toBeUndefined();
-    expect(merged.lastGood?.anthropic).toBeUndefined();
-  });
-
-  it("keeps override profiles when authoritative metadata removes base runtime external state", () => {
-    const profileId = "anthropic:claude-cli";
-    const merged = mergeAuthProfileStores(
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: [profileId],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {
-          [profileId]: {
-            type: "oauth",
-            provider: "anthropic",
-            access: "stale-access",
-            refresh: "stale-refresh",
-            expires: 1,
-          },
-        },
-        order: {
-          anthropic: [profileId],
-        },
-        lastGood: {
-          anthropic: profileId,
-        },
-      },
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: [],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {
-          [profileId]: {
-            type: "api_key",
-            provider: "anthropic",
-            key: "sk-local",
-          },
-        },
-        order: {
-          anthropic: [profileId],
-        },
-        lastGood: {
-          anthropic: profileId,
-        },
-      },
-    );
-
-    expect(merged.runtimeExternalProfileIds).toEqual([]);
-    expect(merged.runtimeExternalProfileIdsAuthoritative).toBe(true);
-    expect(merged.profiles[profileId]).toMatchObject({
-      type: "api_key",
-      provider: "anthropic",
-      key: "sk-local",
-    });
-    expect(merged.order?.anthropic).toEqual([profileId]);
-    expect(merged.lastGood?.anthropic).toBe(profileId);
-  });
-
-  it("preserves inherited base runtime external profiles during agent-store merges", () => {
-    const profileId = "anthropic:claude-cli";
-    const merged = mergeAuthProfileStores(
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: [profileId],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {
-          [profileId]: {
-            type: "oauth",
-            provider: "anthropic",
-            access: "main-access",
-            refresh: "main-refresh",
-            expires: 1,
-          },
-        },
-        order: {
-          anthropic: [profileId],
-        },
-        lastGood: {
-          anthropic: profileId,
-        },
-      },
-      {
-        version: AUTH_STORE_VERSION,
-        runtimeExternalProfileIds: [],
-        runtimeExternalProfileIdsAuthoritative: true,
-        profiles: {},
-      },
-      { preserveBaseRuntimeExternalProfiles: true },
-    );
-
-    expect(merged.runtimeExternalProfileIds).toEqual([profileId]);
-    expect(merged.runtimeExternalProfileIdsAuthoritative).toBe(true);
-    expect(merged.profiles[profileId]).toMatchObject({
-      type: "oauth",
-      provider: "anthropic",
-      access: "main-access",
-      refresh: "main-refresh",
-    });
-    expect(merged.order?.anthropic).toEqual([profileId]);
-    expect(merged.lastGood?.anthropic).toBe(profileId);
+      expect(loadPersistedAuthProfileStore(agentDir, { env })?.profiles).toHaveProperty(
+        "openai:default",
+      );
+      expect(loadPersistedAuthProfileStoreEntry(agentDir, { env })?.store.profiles).toHaveProperty(
+        "openai:default",
+      );
+      expect(loadPersistedAuthProfileStoreEntry(agentDir, { env, legacyFallback: false })).toBeNull();
+    } finally {
+      fs.rmSync(stateDir, { recursive: true, force: true });
+    }
   });
 });
