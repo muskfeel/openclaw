@@ -1047,6 +1047,8 @@ export function hasPersistedAuthProfileSecretsStore(
   agentDir?: string,
   options: OpenClawStateDatabaseOptions = {},
 ): boolean {
-  return readAuthProfileStorePayloadResult(authProfileStoreKey(agentDir, options.env), options)
-    .exists;
+  return readAuthProfileStorePayloadResultReadOnly(
+    authProfileStoreKey(agentDir, options.env),
+    options,
+  ).exists;
 }
