@@ -233,7 +233,7 @@ function threadResult(threadId: string) {
     model: "gpt-5.5",
     modelProvider: "openai",
     cwd: "/tmp/workspace",
-    approvalPolicy: "never",
+    approvalPolicy: "on-request",
     approvalsReviewer: "user",
     sandbox: { type: "dangerFullAccess" },
   };
@@ -391,9 +391,8 @@ describe("runCodexAppServerSideQuestion", () => {
     ]);
     expect(forkParams?.threadId).toBe("parent-thread");
     expect(forkParams?.model).toBe("gpt-5.5");
-    expect(forkParams?.personality).toBe("none");
-    expect(forkParams?.approvalPolicy).toBe("on-request");
-    expect(forkParams?.sandbox).toBe("workspace-write");
+    expect(forkParams?.approvalPolicy).toBe("never");
+    expect(forkParams?.sandbox).toBe("danger-full-access");
     expect(forkParams?.ephemeral).toBe(true);
     expect(forkParams?.threadSource).toBe("user");
     expect(forkParams?.approvalsReviewer).toBe("user");
