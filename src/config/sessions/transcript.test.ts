@@ -286,8 +286,8 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     writeTranscriptStore();
 
     const finalResult = await appendExactAssistantMessageToSessionTranscript({
+      agentId: "main",
       sessionKey,
-      storePath: fixture.storePath(),
       message: createExactAssistantMessage({ text: "Complete final answer" }),
     });
     expect(finalResult.ok).toBe(true);
@@ -296,13 +296,13 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     }
 
     await appendAssistantMessageToSessionTranscript({
+      agentId: "main",
       sessionKey,
       text: "Earlier retained preview",
-      storePath: fixture.storePath(),
     });
     await appendExactAssistantMessageToSessionTranscript({
+      agentId: "main",
       sessionKey,
-      storePath: fixture.storePath(),
       message: createExactAssistantMessage({
         text: "Injected transcript text",
         provider: "openclaw",
@@ -310,9 +310,10 @@ describe("appendAssistantMessageToSessionTranscript", () => {
       }),
     });
 
-    const latestAssistantText = await readLatestAssistantTextFromSessionTranscript(
-      finalResult.sessionFile,
-    );
+    const latestAssistantText = await readLatestAssistantTextFromSessionTranscript({
+      agentId: "main",
+      sessionId,
+    });
     expect(latestAssistantText?.id).toBe(finalResult.messageId);
     expect(latestAssistantText?.text).toBe("Complete final answer");
   });
@@ -321,18 +322,19 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     writeTranscriptStore();
 
     const mirrorResult = await appendAssistantMessageToSessionTranscript({
+      agentId: "main",
       sessionKey,
       text: "Only delivery mirror",
-      storePath: fixture.storePath(),
     });
     expect(mirrorResult.ok).toBe(true);
     if (!mirrorResult.ok) {
       return;
     }
 
-    const latestAssistantText = await readLatestAssistantTextFromSessionTranscript(
-      mirrorResult.sessionFile,
-    );
+    const latestAssistantText = await readLatestAssistantTextFromSessionTranscript({
+      agentId: "main",
+      sessionId,
+    });
     expect(latestAssistantText).toBeUndefined();
   });
 
@@ -340,18 +342,19 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     writeTranscriptStore();
 
     const mirrorResult = await appendAssistantMessageToSessionTranscript({
+      agentId: "main",
       sessionKey,
       text: "Tail delivery mirror",
-      storePath: fixture.storePath(),
     });
     expect(mirrorResult.ok).toBe(true);
     if (!mirrorResult.ok) {
       return;
     }
 
-    const tailAssistantText = await readTailAssistantTextFromSessionTranscript(
-      mirrorResult.sessionFile,
-    );
+    const tailAssistantText = await readTailAssistantTextFromSessionTranscript({
+      agentId: "main",
+      sessionId,
+    });
     expect(tailAssistantText?.id).toBe(mirrorResult.messageId);
     expect(tailAssistantText?.text).toBe("Tail delivery mirror");
   });
