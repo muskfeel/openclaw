@@ -5,7 +5,7 @@ import {
   type OpenClawStateDatabase,
 } from "../../state/openclaw-state-db.js";
 import { cloneAuthProfileStore } from "./clone.js";
-import { AUTH_STORE_VERSION, EXTERNAL_CLI_SYNC_TTL_MS } from "./constants.js";
+import { AUTH_STORE_VERSION } from "./constants.js";
 import { overlayExternalAuthProfiles, shouldPersistExternalAuthProfile } from "./external-auth.js";
 import type { ExternalCliAuthDiscovery } from "./external-cli-discovery.js";
 import { isSafeToAdoptMainStoreOAuthIdentity } from "./oauth-shared.js";
@@ -29,6 +29,11 @@ import {
 } from "./runtime-snapshots.js";
 import { readAuthProfileStorePayloadResultFromDatabase } from "./sqlite-storage.js";
 import { savePersistedAuthProfileStateInTransaction } from "./state.js";
+import {
+  clearLoadedAuthStoreCache,
+  readCachedAuthProfileStore,
+  writeCachedAuthProfileStore,
+} from "./store-cache.js";
 import type { AuthProfileStore } from "./types.js";
 
 type LoadAuthProfileStoreOptions = {
@@ -56,15 +61,6 @@ type ResolvedExternalCliOverlayOptions = {
   externalCliProviderIds?: Iterable<string>;
   externalCliProfileIds?: Iterable<string>;
 };
-
-const loadedAuthStoreCache = new Map<
-  string,
-  {
-    authMtimeMs: number | null;
-    syncedAtMs: number;
-    store: AuthProfileStore;
-  }
->();
 
 function resolveLoadedAuthStoreCacheKey(
   agentDir?: string,
@@ -170,32 +166,6 @@ function resolveRuntimeAuthProfileStore(agentDir?: string): AuthProfileStore | n
   }
 
   return null;
-}
-
-function readCachedAuthProfileStore(params: {
-  storeKey: string;
-  authMtimeMs: number | null;
-}): AuthProfileStore | null {
-  const cached = loadedAuthStoreCache.get(params.storeKey);
-  if (!cached || cached.authMtimeMs !== params.authMtimeMs) {
-    return null;
-  }
-  if (Date.now() - cached.syncedAtMs >= EXTERNAL_CLI_SYNC_TTL_MS) {
-    return null;
-  }
-  return cloneAuthProfileStore(cached.store);
-}
-
-function writeCachedAuthProfileStore(params: {
-  storeKey: string;
-  authMtimeMs: number | null;
-  store: AuthProfileStore;
-}): void {
-  loadedAuthStoreCache.set(params.storeKey, {
-    authMtimeMs: params.authMtimeMs,
-    syncedAtMs: Date.now(),
-    store: cloneAuthProfileStore(params.store),
-  });
 }
 
 function resolveExternalCliOverlayOptions(
@@ -366,6 +336,7 @@ function saveAuthProfileStoreInTransaction(
   database: OpenClawStateDatabase,
   store: AuthProfileStore,
   agentDir?: string,
+  updatedAt: number = Date.now(),
   options?: SaveAuthProfileStoreOptions,
 ): AuthProfileStore {
   const localStore = buildLocalAuthProfileStoreForSave({ store, agentDir, options });
@@ -378,7 +349,6 @@ function saveAuthProfileStoreInTransaction(
     env: options?.env,
     existingRaw: previousRaw.exists ? previousRaw.value : undefined,
   });
-  const updatedAt = Date.now();
   savePersistedAuthProfileSecretsStoreInTransaction(database, payload, agentDir, updatedAt, {
     env: options?.env,
   });
@@ -396,6 +366,7 @@ export async function updateAuthProfileStoreWithLock(params: {
 }): Promise<AuthProfileStore | null> {
   try {
     let savedStore: AuthProfileStore | null = null;
+    let savedUpdatedAt: number | null = null;
     runOpenClawStateWriteTransaction(
       (database) => {
         // SQLite serializes these updates; always reload inside the write
@@ -416,13 +387,22 @@ export async function updateAuthProfileStoreWithLock(params: {
             version: AUTH_STORE_VERSION,
             profiles: {},
           } satisfies AuthProfileStore);
+        savedUpdatedAt = persisted?.updatedAt ?? legacy?.updatedAt ?? null;
         const shouldSave = params.updater(store);
         savedStore = store;
         if (shouldSave) {
           const saveOptions = params.env
             ? { ...params.saveOptions, env: params.saveOptions?.env ?? params.env }
             : params.saveOptions;
-          saveAuthProfileStoreInTransaction(database, store, params.agentDir, saveOptions);
+          const updatedAt = Date.now();
+          savedUpdatedAt = updatedAt;
+          saveAuthProfileStoreInTransaction(
+            database,
+            store,
+            params.agentDir,
+            updatedAt,
+            saveOptions,
+          );
         }
       },
       { env: params.env },
@@ -430,7 +410,7 @@ export async function updateAuthProfileStoreWithLock(params: {
     if (savedStore) {
       writeCachedAuthProfileStore({
         storeKey: resolveAuthProfileStoreKey(params.agentDir, params.env),
-        authMtimeMs: Date.now(),
+        authMtimeMs: savedUpdatedAt,
         store: savedStore,
       });
     }
@@ -708,7 +688,7 @@ export function replaceRuntimeAuthProfileStoreSnapshots(
 
 export function clearRuntimeAuthProfileStoreSnapshots(): void {
   clearRuntimeAuthProfileStoreSnapshotsImpl();
-  loadedAuthStoreCache.clear();
+  clearLoadedAuthStoreCache();
 }
 
 export function saveAuthProfileStore(
@@ -717,12 +697,11 @@ export function saveAuthProfileStore(
   options?: SaveAuthProfileStoreOptions,
 ): void {
   const storeKey = resolveAuthProfileStoreKey(agentDir, options?.env);
-  let updatedAt: number | null = null;
+  const updatedAt = Date.now();
   let savedStore = store;
   runOpenClawStateWriteTransaction(
     (database) => {
-      savedStore = saveAuthProfileStoreInTransaction(database, store, agentDir, options);
-      updatedAt = Date.now();
+      savedStore = saveAuthProfileStoreInTransaction(database, store, agentDir, updatedAt, options);
     },
     { env: options?.env },
   );

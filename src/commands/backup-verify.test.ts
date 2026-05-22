@@ -375,65 +375,42 @@ describe("backupVerifyCommand", () => {
     }
   });
 
-  it("rejects unsafe hardlink targets", async () => {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-backup-linkpath-"));
-    const archivePath = path.join(tempDir, "broken.tar.gz");
-    const payloadArchivePath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw/target.txt`;
-    const hardlinkArchivePath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw/hardlink.txt`;
+  it("rejects symlink payload entries before restore", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-backup-symlink-payload-"));
+    const archivePath = path.join(tempDir, "backup.tar.gz");
+    const manifestPath = path.join(tempDir, "manifest.json");
+    const linkPath = path.join(tempDir, "payload-link");
+    const payloadArchivePath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw`;
+    const linkArchivePath = `${payloadArchivePath}/credentials`;
     try {
-      const archive = gzipSync(
-        Buffer.concat([
-          encodeTarEntry({
-            path: `${TEST_ARCHIVE_ROOT}/manifest.json`,
-            contents: `${JSON.stringify(createBackupManifest(payloadArchivePath), null, 2)}\n`,
-          }),
-          encodeTarEntry({ path: payloadArchivePath, contents: "payload\n" }),
-          encodeTarEntry({
-            path: hardlinkArchivePath,
-            type: "Link",
-            linkpath: `${TEST_ARCHIVE_ROOT}/payload/../escaped.txt`,
-          }),
-          Buffer.alloc(1024),
-        ]),
+      await fs.symlink("/tmp/outside-openclaw-credentials", linkPath);
+      await fs.writeFile(
+        manifestPath,
+        `${JSON.stringify(createBackupManifest(payloadArchivePath), null, 2)}\n`,
+        "utf8",
       );
-      await fs.writeFile(archivePath, archive);
+      await tar.c(
+        {
+          file: archivePath,
+          gzip: true,
+          portable: true,
+          preservePaths: true,
+          onWriteEntry: (entry) => {
+            if (entry.path === manifestPath) {
+              entry.path = `${TEST_ARCHIVE_ROOT}/manifest.json`;
+              return;
+            }
+            if (entry.path === linkPath) {
+              entry.path = linkArchivePath;
+            }
+          },
+        },
+        [manifestPath, linkPath],
+      );
 
       const runtime = createBackupVerifyRuntime();
       await expect(backupVerifyCommand(runtime, { archive: archivePath })).rejects.toThrow(
-        /hardlink target.*path traversal segments/i,
-      );
-    } finally {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    }
-  });
-
-  it("rejects hardlink targets missing from archive entries", async () => {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-backup-missing-linkpath-"));
-    const archivePath = path.join(tempDir, "broken.tar.gz");
-    const payloadArchivePath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw/target.txt`;
-    const hardlinkArchivePath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw/hardlink.txt`;
-    const missingTargetPath = `${TEST_ARCHIVE_ROOT}/payload/posix/tmp/.openclaw/missing-target.txt`;
-    try {
-      const archive = gzipSync(
-        Buffer.concat([
-          encodeTarEntry({
-            path: `${TEST_ARCHIVE_ROOT}/manifest.json`,
-            contents: `${JSON.stringify(createBackupManifest(payloadArchivePath), null, 2)}\n`,
-          }),
-          encodeTarEntry({ path: payloadArchivePath, contents: "payload\n" }),
-          encodeTarEntry({
-            path: hardlinkArchivePath,
-            type: "Link",
-            linkpath: missingTargetPath,
-          }),
-          Buffer.alloc(1024),
-        ]),
-      );
-      await fs.writeFile(archivePath, archive);
-
-      const runtime = createBackupVerifyRuntime();
-      await expect(backupVerifyCommand(runtime, { archive: archivePath })).rejects.toThrow(
-        /hardlink target is missing from archive entries/i,
+        /unsupported link type symboliclink/i,
       );
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true });

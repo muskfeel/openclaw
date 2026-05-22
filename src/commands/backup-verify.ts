@@ -199,18 +199,27 @@ function parseManifest(raw: string): BackupManifest {
   };
 }
 
-async function listArchiveEntries(archivePath: string): Promise<ArchiveEntry[]> {
-  const entries: ArchiveEntry[] = [];
+type BackupArchiveEntry = {
+  path: string;
+  type: string;
+};
+
+function archiveEntryType(entry: unknown): string {
+  const type = (entry as { type?: unknown }).type;
+  return typeof type === "string" ? type : "";
+}
+
+function isUnsafeBackupArchiveEntryType(type: string): boolean {
+  return type === "SymbolicLink" || type === "Link";
+}
+
+async function listArchiveEntries(archivePath: string): Promise<BackupArchiveEntry[]> {
+  const entries: BackupArchiveEntry[] = [];
   await tar.t({
     file: archivePath,
     gzip: true,
     onentry: (entry) => {
-      entries.push({
-        path: entry.path,
-        ...(entry.linkpath ? { linkpath: entry.linkpath } : {}),
-        ...(entry.type ? { type: entry.type } : {}),
-      });
-      entry.resume();
+      entries.push({ path: entry.path, type: archiveEntryType(entry) });
     },
   });
   return entries;
@@ -411,16 +420,14 @@ export async function verifyBackupArchive(opts: {
   const entries = rawEntries.map((entry) => ({
     raw: entry.path,
     normalized: normalizeArchivePath(entry.path, "Archive entry"),
+    type: entry.type,
   }));
-  const hardlinkTargets = rawEntries
-    .filter((entry) => entry.type === "Link" && entry.linkpath)
-    .map((entry) => ({
-      entryPath: entry.path,
-      normalized: normalizeArchivePath(
-        entry.linkpath ?? "",
-        `Archive hardlink target for ${entry.path}`,
-      ),
-    }));
+  const unsafeEntry = entries.find((entry) => isUnsafeBackupArchiveEntryType(entry.type));
+  if (unsafeEntry) {
+    throw new Error(
+      `Archive entry uses unsupported link type ${unsafeEntry.type}: ${unsafeEntry.normalized}`,
+    );
+  }
   const normalizedEntrySet = new Set(entries.map((entry) => entry.normalized));
 
   const manifestMatches = entries.filter((entry) => isRootManifestEntry(entry.normalized));
