@@ -5,6 +5,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { EmbeddedRunAttemptParams } from "openclaw/plugin-sdk/agent-harness";
 import {
   embeddedAgentLog,
+  openTranscriptSessionManagerForSession,
   type HarnessContextEngine as ContextEngine,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import { replaceSqliteSessionTranscriptEvents } from "openclaw/plugin-sdk/session-store-runtime";
@@ -1140,49 +1141,16 @@ describe("runCodexAppServerAttempt context-engine lifecycle", () => {
     expect(result.assistantTexts).toContain("final answer");
   });
 
-  it("fails first-turn Codex context overflow instead of falling back to OpenClaw compaction", async () => {
+  it("bounds a hung owning context-engine compaction during Codex overflow recovery", async () => {
+    const sessionId = "session-1";
     const sessionFile = path.join(tempDir, "session.jsonl");
     const workspaceDir = path.join(tempDir, "workspace");
-    const compact = vi.fn<ContextEngine["compact"]>(async () => ({
-      ok: true,
-      compacted: true,
-      result: { summary: "summary", firstKeptEntryId: "entry-1", tokensBefore: 100_000 },
-    }));
-    const assemble = vi.fn<ContextEngine["assemble"]>().mockResolvedValue({
-      messages: [assistantMessage("large projected context", 10)],
-      estimatedTokens: 100_000,
-      contextProjection: { mode: "thread_bootstrap", epoch: "epoch-before" },
-    });
-    const contextEngine = createContextEngine({ assemble, compact });
-    const harness = createStartedThreadHarness(async (method) => {
-      if (method === "turn/start") {
-        throw new Error("Codex ran out of room in the model's context window");
-      }
-      return undefined;
-    });
-    const params = createParams(sessionFile, workspaceDir);
-    params.contextEngine = contextEngine;
-    params.contextTokenBudget = 16_000;
-
-    await expect(runCodexAppServerAttempt(params)).rejects.toThrow(
-      "Codex ran out of room in the model's context window",
-    );
-
-    expect(compact).not.toHaveBeenCalled();
-    expect(assemble).toHaveBeenCalledTimes(1);
-    expect(harness.requests.map((request) => request.method)).toEqual([
-      "thread/start",
-      "turn/start",
-      "thread/unsubscribe",
-    ]);
-  });
-
-  it("does not call hung owning context-engine compaction during Codex overflow recovery", async () => {
-    const sessionFile = path.join(tempDir, "session.jsonl");
-    const workspaceDir = path.join(tempDir, "workspace");
-    SessionManager.open(sessionFile).appendMessage(
-      assistantMessage("pre-compaction context", Date.now()) as never,
-    );
+    openTranscriptSessionManagerForSession({
+      agentId: "main",
+      path: sessionFile,
+      sessionId,
+      cwd: workspaceDir,
+    }).appendMessage(assistantMessage("pre-compaction context", Date.now()) as never);
     await writeCodexAppServerBinding(sessionFile, {
       threadId: "thread-old",
       cwd: workspaceDir,

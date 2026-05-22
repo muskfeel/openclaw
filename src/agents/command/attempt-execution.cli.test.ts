@@ -568,7 +568,7 @@ describe("CLI attempt execution", () => {
       updatedAt: Date.now(),
     };
     const sessionStore: Record<string, SessionEntry> = { [sessionKey]: sessionEntry };
-    await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2), "utf-8");
+    await writeSessionEntries(sessionStore);
 
     const result = makeCliResult("canonical answer");
     result.meta.executionTrace = {
@@ -585,7 +585,6 @@ describe("CLI attempt execution", () => {
       sessionKey,
       sessionEntry,
       sessionStore,
-      storePath,
       sessionAgentId: "main",
       sessionCwd: tmpDir,
       config: {},
@@ -617,7 +616,6 @@ describe("CLI attempt execution", () => {
       sessionKey,
       sessionEntry: updatedFirst,
       sessionStore,
-      storePath,
       sessionAgentId: "main",
       sessionCwd: tmpDir,
       config: {},
@@ -885,7 +883,7 @@ describe("CLI attempt execution", () => {
       updatedAt: Date.now(),
     };
     const sessionStore: Record<string, SessionEntry> = { [sessionKey]: sessionEntry };
-    await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2), "utf-8");
+    await writeSessionEntries(sessionStore);
     runCliAgentMock.mockResolvedValueOnce(makeCliResult("shorthand cli"));
 
     await runAgentAttempt({
@@ -905,7 +903,6 @@ describe("CLI attempt execution", () => {
       sessionId: sessionEntry.sessionId,
       sessionKey,
       sessionAgentId: "main",
-      sessionFile: path.join(tmpDir, "session.jsonl"),
       workspaceDir: tmpDir,
       body: "route this",
       isFallbackRetry: false,
@@ -922,7 +919,6 @@ describe("CLI attempt execution", () => {
       onAgentEvent: vi.fn(),
       authProfileProvider: "anthropic",
       sessionStore,
-      storePath,
       sessionHasHistory: false,
     });
 

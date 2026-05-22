@@ -121,6 +121,10 @@ function readTranscriptEvents(): Array<Record<string, unknown>> {
   }).map((entry) => entry.event as Record<string, unknown>);
 }
 
+function readTranscriptJsonLines(_path: unknown): Array<Record<string, unknown>> {
+  return readTranscriptEvents();
+}
+
 const bindingMocks = vi.hoisted(() => ({
   resolveByConversation: vi.fn(
     (_ref: unknown) =>
@@ -844,7 +848,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       expectBroadcast: false,
     });
 
-    const persistedAssistant = readTranscriptJsonLines(mockState.transcriptPath)
+    const persistedAssistant = readTranscriptJsonLines(undefined)
       .map((entry) => entry.message)
       .find(
         (message): message is Record<string, unknown> =>

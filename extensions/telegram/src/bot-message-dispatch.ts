@@ -240,35 +240,10 @@ type DispatchTelegramMessageParams = {
 
 type TelegramReasoningLevel = "off" | "on" | "stream";
 
-type TelegramTranscriptMirrorPayload = { text?: string; mediaUrls?: string[] };
-type TelegramSessionStore = ReturnType<typeof loadSessionStore>;
-type FreshTelegramSessionStoreLoader = ((agentId: string) => {
-  storePath: string;
-  store: TelegramSessionStore;
-}) & {
-  clear: () => void;
-};
-
-function createFreshTelegramSessionStoreLoader(params: {
-  cfg: OpenClawConfig;
-  telegramDeps: TelegramBotDeps;
-}): FreshTelegramSessionStoreLoader {
-  const storesByPath = new Map<string, TelegramSessionStore>();
-  const load = ((agentId: string) => {
-    const storePath = params.telegramDeps.resolveStorePath(params.cfg.session?.store, { agentId });
-    const cachedStore = storesByPath.get(storePath);
-    if (cachedStore) {
-      return { storePath, store: cachedStore };
-    }
-    const store = (params.telegramDeps.loadSessionStore ?? loadSessionStore)(storePath, {
-      skipCache: true,
-    });
-    storesByPath.set(storePath, store);
-    return { storePath, store };
-  }) as FreshTelegramSessionStoreLoader;
-  load.clear = () => storesByPath.clear();
-  return load;
-}
+type TelegramTranscriptMirror = (payload: {
+  text?: string;
+  mediaUrls?: string[];
+}) => void | Promise<void>;
 
 function resolveTelegramReasoningLevel(params: {
   cfg: OpenClawConfig;
@@ -1207,6 +1182,7 @@ export const dispatchTelegramMessage = async ({
     replyQuotePosition,
     replyQuoteEntities,
     replyQuoteByMessageId,
+    transcriptMirror: undefined as TelegramTranscriptMirror | undefined,
   };
   const silentErrorReplies = telegramCfg.silentErrorReplies === true;
   const isDmTopic = !isGroup && threadSpec.scope === "dm" && threadSpec.id != null;

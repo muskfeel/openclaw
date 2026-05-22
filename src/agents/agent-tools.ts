@@ -294,6 +294,8 @@ function applyModelProviderToolPolicy(
   tools: AnyAgentTool[],
   params?: {
     config?: OpenClawConfig;
+    agentId?: string;
+    sessionKey?: string;
     modelProvider?: string;
     modelApi?: string;
     modelId?: string;
@@ -393,6 +395,7 @@ export const __testing = {
   assertRequiredParams,
   applyModelProviderToolPolicy,
 } as const;
+export { __testing as testing };
 
 export type OpenClawCodingToolConstructionPlan = {
   includeBaseCodingTools: boolean;
@@ -528,6 +531,7 @@ export function createOpenClawCodingTools(options?: {
   recordToolPrepStage?: (name: string) => void;
   /** Live observer called after wrapped tool outcomes are recorded. */
   onToolOutcome?: ToolOutcomeObserver;
+  emitBeforeToolCallDiagnostics?: boolean;
   /** Optional run-scoped store for tool-generated artifact manifests. */
   artifactStore?: AgentToolArtifactStore;
   /** Runtime-only resolved skill paths that the read tool may load under workspaceOnly. */

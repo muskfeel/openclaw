@@ -340,6 +340,7 @@ export interface ContextEngine {
    */
   compact(params: {
     sessionId: string;
+    sessionFile?: string;
     sessionKey?: string;
     transcriptScope?: ContextEngineTranscriptScope;
     tokenBudget?: number;

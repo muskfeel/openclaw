@@ -283,7 +283,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
   });
 
   it("skips transcript-only OpenClaw assistant entries when reading latest assistant text", async () => {
-    writeTranscriptStore();
+    await writeTranscriptStore();
 
     const finalResult = await appendExactAssistantMessageToSessionTranscript({
       agentId: "main",
@@ -319,7 +319,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
   });
 
   it("does not report transcript-only OpenClaw assistant entries as latest assistant text", async () => {
-    writeTranscriptStore();
+    await writeTranscriptStore();
 
     const mirrorResult = await appendAssistantMessageToSessionTranscript({
       agentId: "main",
@@ -339,7 +339,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
   });
 
   it("keeps transcript-only OpenClaw assistant entries available to the tail reader", async () => {
-    writeTranscriptStore();
+    await writeTranscriptStore();
 
     const mirrorResult = await appendAssistantMessageToSessionTranscript({
       agentId: "main",
@@ -365,11 +365,10 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     // undefined on the first non-assistant line, so the gap-fill check in
     // persistTextTurnTranscript wrote a duplicate `api: "cli"` assistant
     // message — poisoning the model's own context with verbatim duplicates.
-    writeTranscriptStore();
+    await writeTranscriptStore();
 
     const assistantResult = await appendExactAssistantMessageToSessionTranscript({
       sessionKey,
-      storePath: fixture.storePath(),
       message: createExactAssistantMessage({
         text: "Canonical answer",
         provider: "anthropic",
@@ -390,11 +389,16 @@ describe("appendAssistantMessageToSessionTranscript", () => {
         modelId: "claude-haiku-4-5-20251001",
       },
     })}\n`;
-    fs.appendFileSync(assistantResult.sessionFile, cacheTtlEntry, "utf-8");
+    appendSqliteSessionTranscriptEvent({
+      agentId: "main",
+      sessionId,
+      event: JSON.parse(cacheTtlEntry) as Record<string, unknown>,
+    });
 
-    const tailAssistantText = await readTailAssistantTextFromSessionTranscript(
-      assistantResult.sessionFile,
-    );
+    const tailAssistantText = await readTailAssistantTextFromSessionTranscript({
+      agentId: "main",
+      sessionId,
+    });
     expect(tailAssistantText?.id).toBe(assistantResult.messageId);
     expect(tailAssistantText?.text).toBe("Canonical answer");
   });

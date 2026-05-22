@@ -304,6 +304,7 @@ async function resetGatewayTestState(options: { uniqueConfigRoot: boolean }) {
   testState.migrationChanges = [];
   testState.cronEnabled = false;
   testState.cronStoreKey = undefined;
+  testState.cronStorePath = undefined;
   testState.sessionConfig = undefined;
   testState.agentConfig = undefined;
   testState.agentsConfig = undefined;
@@ -395,6 +396,7 @@ async function resetGatewayTestRuntimeOnly() {
   testState.migrationChanges = [];
   testState.cronEnabled = false;
   testState.cronStoreKey = undefined;
+  testState.cronStorePath = undefined;
   testState.sessionConfig = undefined;
   testState.agentConfig = undefined;
   testState.agentsConfig = undefined;

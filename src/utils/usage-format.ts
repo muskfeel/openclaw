@@ -731,3 +731,5 @@ export function estimateUsageCost(params: {
 export function __resetUsageFormatCachesForTest(): void {
   storedModelCatalogCostCache = null;
 }
+
+export const resetUsageFormatCachesForTest = __resetUsageFormatCachesForTest;

@@ -37,6 +37,7 @@ import {
   getSessionEntry,
   listSessionEntries,
   patchSessionEntry,
+  resolveStorePath,
   type SessionEntry,
 } from "openclaw/plugin-sdk/session-store-runtime";
 import { normalizeStringEntries } from "openclaw/plugin-sdk/string-coerce-runtime";
@@ -209,7 +210,7 @@ export const registerTelegramHandlers = ({
     persistedScopeKey: resolveTelegramMessageCacheScopeKey(accountId),
   });
   const messageDispatchReplayGuard = createTelegramMessageDispatchReplayGuard({
-    storePath: telegramDeps.resolveStorePath(cfg.session?.store),
+    storePath: (telegramDeps.resolveStorePath ?? resolveStorePath)(cfg.session?.store),
     onDiskError: (error) => {
       runtime.error?.(danger(`[telegram] message dispatch dedupe store failed: ${String(error)}`));
     },

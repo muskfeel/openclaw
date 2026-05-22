@@ -19,6 +19,7 @@ import {
   listSessionEntries,
   patchSessionEntry,
   readSessionUpdatedAt,
+  resolveStorePath,
 } from "openclaw/plugin-sdk/session-store-runtime";
 import { listSkillCommandsForAgents } from "openclaw/plugin-sdk/skill-commands-runtime";
 import { enqueueSystemEvent } from "openclaw/plugin-sdk/system-event-runtime";
@@ -35,6 +36,7 @@ import { wasSentByBot } from "./sent-message-cache.js";
 export type TelegramBotDeps = {
   getRuntimeConfig: typeof getRuntimeConfig;
   getSessionEntry: typeof getSessionEntry;
+  resolveStorePath?: typeof resolveStorePath;
   listSessionEntries: typeof listSessionEntries;
   patchSessionEntry: typeof patchSessionEntry;
   readSessionUpdatedAt?: typeof readSessionUpdatedAt;
@@ -69,6 +71,9 @@ export const defaultTelegramBotDeps: TelegramBotDeps = {
   },
   get getSessionEntry() {
     return getSessionEntry;
+  },
+  get resolveStorePath() {
+    return resolveStorePath;
   },
   get listSessionEntries() {
     return listSessionEntries;

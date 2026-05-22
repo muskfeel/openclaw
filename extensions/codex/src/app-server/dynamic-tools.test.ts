@@ -57,7 +57,7 @@ function textToolResult(text: string, details: unknown = {}): AgentToolResult {
 
 function createBridgeWithToolResult(
   toolName: string,
-  toolResult: AgentToolResult<unknown>,
+  toolResult: AgentToolResult,
   hookContext?: Parameters<typeof createCodexDynamicToolBridge>[0]["hookContext"],
 ) {
   return createCodexDynamicToolBridge({
@@ -679,7 +679,7 @@ describe("createCodexDynamicToolBridge", () => {
     const toolResult = {
       content: [{ type: "text", text: "Sent." }],
       details: { messageId: "message-1" },
-    } satisfies AgentToolResult<unknown>;
+    } satisfies AgentToolResult;
     const tool = createTool({
       name: "message",
       execute: vi.fn(async () => toolResult),
