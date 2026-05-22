@@ -869,11 +869,15 @@ export async function runPreparedReply(
     : undefined;
   const laneSize = sessionLaneKey ? getQueueSize(sessionLaneKey) : 0;
   const activeRunQueueMode = effectiveResetTriggered ? "interrupt" : resolvedQueue.mode;
+  const providedReplyOperation = opts?.replyOperation;
   const activeSessionIdForInterrupt = piRuntime?.resolveActiveEmbeddedRunSessionId(sessionKey);
+  const ownsActivePreDispatchRun =
+    providedReplyOperation && activeSessionIdForInterrupt === providedReplyOperation.sessionId;
   if (
     activeRunQueueMode === "interrupt" &&
     !isRoomEvent &&
     sessionLaneKey &&
+    !ownsActivePreDispatchRun &&
     (laneSize > 0 || activeSessionIdForInterrupt)
   ) {
     const cleared = clearCommandLane(sessionLaneKey);
@@ -964,6 +968,9 @@ export async function runPreparedReply(
       embeddedActiveSessionId ?? replyOperationActiveSessionId ?? preparedSessionState.sessionId;
     if (!activeSessionId || (!embeddedAgentRuntime && !replyOperationActiveSessionId)) {
       return { activeSessionId: undefined, isActive: false, isStreaming: false };
+    }
+    if (providedReplyOperation?.sessionId === activeSessionId) {
+      return { activeSessionId, isActive: false, isStreaming: false };
     }
     return {
       activeSessionId,
@@ -1246,6 +1253,7 @@ export async function runPreparedReply(
     shouldInjectGroupIntro,
     typingMode,
     resetTriggered: effectiveResetTriggered,
+    replyOperation: providedReplyOperation,
     replyThreadingOverride,
   });
 }

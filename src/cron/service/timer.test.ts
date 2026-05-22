@@ -52,6 +52,7 @@ describe("cron service timer seam coverage", () => {
   it("persists the next schedule and hands off next-heartbeat main jobs", async () => {
     const { storeKey } = await makeStoreKey();
     const now = Date.parse("2026-03-23T12:00:00.000Z");
+    const cronRunSessionKey = "agent:main:cron:main-heartbeat-job:run:1774267200000";
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeat = vi.fn();
     const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
@@ -75,7 +76,7 @@ describe("cron service timer seam coverage", () => {
 
     expect(enqueueSystemEvent).toHaveBeenCalledWith("heartbeat seam tick", {
       agentId: undefined,
-      sessionKey: "agent:main:main",
+      sessionKey: cronRunSessionKey,
       contextKey: "cron:main-heartbeat-job",
     });
     expect(requestHeartbeat).toHaveBeenCalledWith({
@@ -83,7 +84,7 @@ describe("cron service timer seam coverage", () => {
       intent: "event",
       reason: "cron:main-heartbeat-job",
       agentId: undefined,
-      sessionKey: "agent:main:main",
+      sessionKey: cronRunSessionKey,
       heartbeat: { target: "last" },
     });
 
@@ -103,7 +104,7 @@ describe("cron service timer seam coverage", () => {
     expect(task.sourceId).toBe("main-heartbeat-job");
     expect(task.ownerKey).toBe("");
     expect(task.scopeKind).toBe("system");
-    expect(task.childSessionKey).toBe("agent:main:main");
+    expect(task.childSessionKey).toBe(cronRunSessionKey);
     expect(task.runId).toBe(`cron:main-heartbeat-job:${now}`);
     expect(task.label).toBe("main heartbeat job");
     expect(task.task).toBe("main heartbeat job");
@@ -215,6 +216,7 @@ describe("cron service timer seam coverage", () => {
   it("keeps scheduler progress when task ledger creation fails", async () => {
     const { storeKey } = await makeStoreKey();
     const now = Date.parse("2026-03-23T12:00:00.000Z");
+    const cronRunSessionKey = "agent:main:cron:main-heartbeat-job:run:1774267200000";
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeat = vi.fn();
     const ledgerError = new Error("disk full");
@@ -248,7 +250,7 @@ describe("cron service timer seam coverage", () => {
     );
     expect(enqueueSystemEvent).toHaveBeenCalledWith("heartbeat seam tick", {
       agentId: undefined,
-      sessionKey: "agent:main:main",
+      sessionKey: cronRunSessionKey,
       contextKey: "cron:main-heartbeat-job",
     });
 
