@@ -12,8 +12,8 @@ import {
   emitAgentEvent as emitGlobalAgentEvent,
   finalizeHarnessContextEngineTurn,
   formatErrorMessage,
-  getAgentHarnessHookRunner,
-  getBeforeToolCallPolicyDiagnosticState,
+  hasSqliteSessionTranscriptEvents,
+  hasBeforeToolCallPolicy,
   isActiveHarnessContextEngine,
   loadCodexBundleMcpThreadConfig,
   resolveAgentHarnessBeforePromptBuildResult,
@@ -42,8 +42,8 @@ import {
   onInternalDiagnosticEvent,
   resolveDiagnosticModelContentCapturePolicy,
 } from "openclaw/plugin-sdk/diagnostic-runtime";
-import { pathExists } from "openclaw/plugin-sdk/security-runtime";
-import { resolveCodexAppServerForOpenClawToolPolicy } from "./app-server-policy.js";
+import { isToolAllowed } from "openclaw/plugin-sdk/sandbox";
+import { defaultCodexAppInventoryCache } from "./app-inventory-cache.js";
 import { handleCodexAppServerApprovalRequest } from "./approval-bridge.js";
 import {
   CODEX_APP_SERVER_INTERRUPT_TIMEOUT_MS,
@@ -203,8 +203,13 @@ import {
   readCodexAppServerBinding,
   type CodexAppServerThreadBinding,
 } from "./session-binding.js";
-import { rotateOversizedCodexAppServerStartupBinding } from "./startup-binding.js";
 import {
+  readCodexMirroredSessionHistoryMessages,
+  type CodexMirroredSessionHistoryScope,
+} from "./session-history.js";
+import { clearSharedCodexAppServerClientIfCurrent } from "./shared-client.js";
+import {
+  areCodexDynamicToolFingerprintsCompatible,
   buildDeveloperInstructions,
   buildContextEngineBinding,
   buildTurnCollaborationMode,
@@ -299,38 +304,15 @@ function hasCodexAppServerPotentialSideEffectEvidence(result: EmbeddedRunAttempt
   return result.replayMetadata.hadPotentialSideEffects;
 }
 
-function buildCodexAppServerPromptTimeoutOutcome(params: {
-  result: EmbeddedRunAttemptResult;
-  turnCompletionIdleTimedOut: boolean;
-}): EmbeddedRunAttemptResult["promptTimeoutOutcome"] {
-  const completionIdleTimeoutHadPotentialSideEffects = hasCodexAppServerPotentialSideEffectEvidence(
-    params.result,
-  );
-  if (
-    !params.turnCompletionIdleTimedOut ||
-    (params.result.itemLifecycle.completedCount === 0 &&
-      !completionIdleTimeoutHadPotentialSideEffects)
-  ) {
-    return undefined;
-  }
-  return {
-    message: completionIdleTimeoutHadPotentialSideEffects
-      ? CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_SIDE_EFFECT_USER_MESSAGE
-      : CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_USER_MESSAGE,
-    ...(completionIdleTimeoutHadPotentialSideEffects
-      ? {
-          replayInvalid: true,
-          livenessState: "abandoned" as const,
-        }
-      : {}),
-  };
-}
+type CodexAppServerReplayBlockedReason =
+  | "potential_side_effect"
+  | "assistant_output"
+  | "tool_activity"
+  | "active_item";
 
 function resolveCodexAppServerReplayBlockedReason(
   result: EmbeddedRunAttemptResult,
-):
-  | NonNullable<EmbeddedRunAttemptResult["codexAppServerFailure"]>["replayBlockedReason"]
-  | undefined {
+): CodexAppServerReplayBlockedReason | undefined {
   if (result.replayMetadata.hadPotentialSideEffects) {
     return "potential_side_effect";
   }
@@ -972,7 +954,6 @@ export async function runCodexAppServerAttempt(
   startupBinding = await rotateOversizedCodexAppServerStartupBinding({
     binding: startupBinding,
     bindingIdentity: startupBindingIdentity,
-    sessionFile: params.sessionFile,
     agentDir,
     codexHome: appServer.start.env?.CODEX_HOME,
     config: params.config,
@@ -1004,6 +985,10 @@ export async function runCodexAppServerAttempt(
   let activeSessionId = params.sessionId;
   const buildActiveRunAttemptParams = (): EmbeddedRunAttemptParams => ({
     ...runtimeParams,
+    sessionId: activeSessionId,
+  });
+  const activeTranscriptScope = (): CodexMirroredSessionHistoryScope => ({
+    agentId: sessionAgentId,
     sessionId: activeSessionId,
   });
   const adoptContextEngineCompactionTranscript = (compactResult: {
@@ -2592,7 +2577,7 @@ export async function runCodexAppServerAttempt(
     if (activeContextEngine) {
       const activeContextEnginePluginId = resolveContextEngineOwnerPluginId(activeContextEngine);
       const finalMessages =
-        (await readMirroredSessionHistoryMessages(activeSessionFile)) ??
+        (await readMirroredSessionHistoryMessages(activeTranscriptScope())) ??
         historyMessages.concat(result.messagesSnapshot);
       await finalizeHarnessContextEngineTurn({
         contextEngine: activeContextEngine,
@@ -2601,7 +2586,7 @@ export async function runCodexAppServerAttempt(
         yieldAborted: Boolean(result.yieldDetected),
         sessionIdUsed: activeSessionId,
         sessionKey: contextSessionKey,
-        sessionFile: activeSessionFile,
+        transcriptScope: activeTranscriptScope(),
         messagesSnapshot: finalMessages,
         prePromptMessageCount,
         tokenBudget: params.contextTokenBudget,
@@ -2770,6 +2755,1044 @@ async function clearCodexBindingAfterInvalidImagePayload(
   await clearCodexAppServerBinding(identity);
 }
 
+function describeNotificationActivity(
+  notification: CodexServerNotification,
+): Record<string, unknown> | undefined {
+  if (!isJsonObject(notification.params)) {
+    return { lastNotificationMethod: notification.method };
+  }
+  if (notification.method !== "rawResponseItem/completed") {
+    return { lastNotificationMethod: notification.method };
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  if (!item) {
+    return { lastNotificationMethod: notification.method };
+  }
+  return {
+    lastNotificationMethod: notification.method,
+    lastNotificationItemId: readString(item, "id"),
+    lastNotificationItemType: readString(item, "type"),
+    lastNotificationItemRole: readString(item, "role"),
+    lastAssistantTextPreview: readRawAssistantTextPreview(item),
+  };
+}
+
+function updateActiveTurnItemIds(
+  notification: CodexServerNotification,
+  activeItemIds: Set<string>,
+): void {
+  if (notification.method !== "item/started" && notification.method !== "item/completed") {
+    return;
+  }
+  const itemId = readNotificationItemId(notification);
+  if (!itemId) {
+    return;
+  }
+  if (notification.method === "item/started") {
+    activeItemIds.add(itemId);
+    return;
+  }
+  activeItemIds.delete(itemId);
+}
+
+function isCompletedAssistantNotification(notification: CodexServerNotification): boolean {
+  if (!isJsonObject(notification.params)) {
+    return false;
+  }
+  if (notification.method !== "item/completed") {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return Boolean(
+    item &&
+    readString(item, "type") === "agentMessage" &&
+    readString(item, "phase") !== "commentary",
+  );
+}
+
+function isReasoningItemCompletionNotification(notification: CodexServerNotification): boolean {
+  if (!isJsonObject(notification.params) || notification.method !== "item/completed") {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return item ? readString(item, "type") === "reasoning" : false;
+}
+
+function isRawReasoningCompletionNotification(notification: CodexServerNotification): boolean {
+  if (!isJsonObject(notification.params) || notification.method !== "rawResponseItem/completed") {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return item ? readString(item, "type") === "reasoning" : false;
+}
+
+function isAssistantCompletionReleaseNotification(
+  notification: CodexServerNotification,
+  turnCrossedToolHandoff: boolean,
+): boolean {
+  if (isCompletedAssistantNotification(notification)) {
+    return true;
+  }
+  return !turnCrossedToolHandoff && isRawAssistantCompletionNotification(notification);
+}
+
+function shouldDisarmAssistantCompletionIdleWatch(notification: CodexServerNotification): boolean {
+  if (!isJsonObject(notification.params)) {
+    return false;
+  }
+  if (notification.method === "item/started") {
+    return true;
+  }
+  if (notification.method === "item/agentMessage/delta") {
+    return true;
+  }
+  return false;
+}
+
+function readNotificationItemId(notification: CodexServerNotification): string | undefined {
+  if (!isJsonObject(notification.params)) {
+    return undefined;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return (
+    (item ? readString(item, "id") : undefined) ??
+    readString(notification.params, "itemId") ??
+    readString(notification.params, "id")
+  );
+}
+
+function isPendingOpenClawDynamicToolCompletionNotification(
+  notification: CodexServerNotification,
+  pendingOpenClawDynamicToolCompletionIds: ReadonlySet<string>,
+): boolean {
+  if (notification.method !== "item/completed" || !isJsonObject(notification.params)) {
+    return false;
+  }
+  const itemId = readNotificationItemId(notification);
+  if (!itemId || !pendingOpenClawDynamicToolCompletionIds.has(itemId)) {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  const itemType = item ? readString(item, "type") : undefined;
+  return itemType === undefined || itemType === "dynamicToolCall";
+}
+
+function isRawToolOutputCompletionNotification(notification: CodexServerNotification): boolean {
+  if (notification.method !== "rawResponseItem/completed" || !isJsonObject(notification.params)) {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return item ? readString(item, "type") === "custom_tool_call_output" : false;
+}
+
+function isNativeToolProgressNotification(notification: CodexServerNotification): boolean {
+  if (
+    notification.method !== "item/started" &&
+    notification.method !== "item/completed" &&
+    notification.method !== "item/updated"
+  ) {
+    return false;
+  }
+  if (!isJsonObject(notification.params)) {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  switch (item ? readString(item, "type") : undefined) {
+    case "commandExecution":
+    case "fileChange":
+    case "mcpToolCall":
+    case "webSearch":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isRawAssistantCompletionNotification(notification: CodexServerNotification): boolean {
+  if (notification.method !== "rawResponseItem/completed" || !isJsonObject(notification.params)) {
+    return false;
+  }
+  const item = isJsonObject(notification.params.item) ? notification.params.item : undefined;
+  return Boolean(
+    item &&
+    readString(item, "type") === "message" &&
+    readString(item, "role") === "assistant" &&
+    readString(item, "phase") !== "commentary" &&
+    readRawAssistantTextPreview(item),
+  );
+}
+
+function readRawAssistantTextPreview(item: JsonObject): string | undefined {
+  if (readString(item, "role") !== "assistant" || !Array.isArray(item.content)) {
+    return undefined;
+  }
+  const text = item.content
+    .flatMap((content) => {
+      if (!isJsonObject(content)) {
+        return [];
+      }
+      const contentText = readString(content, "text");
+      return contentText ? [contentText] : [];
+    })
+    .join("\n")
+    .trim();
+  if (!text) {
+    return undefined;
+  }
+  return text.length > 240 ? `${text.slice(0, 237)}...` : text;
+}
+
+function isTurnNotification(
+  value: JsonValue | undefined,
+  threadId: string,
+  turnId: string,
+): boolean {
+  return isCodexNotificationForTurn(value, threadId, turnId);
+}
+
+function isCodexNotificationOutsideActiveRun(
+  correlation: ReturnType<typeof describeCodexNotificationCorrelation>,
+): boolean {
+  const hasThreadScope = Boolean(correlation.threadId || correlation.nestedTurnThreadId);
+  if (!hasThreadScope) {
+    return false;
+  }
+  if (!correlation.matchesActiveThread) {
+    return true;
+  }
+  const hasTurnScope = Boolean(correlation.turnId || correlation.nestedTurnId);
+  return hasTurnScope && correlation.matchesActiveTurn === false;
+}
+
+function isCurrentThreadTurnRequestParams(
+  value: JsonValue | undefined,
+  threadId: string,
+  turnId: string,
+): boolean {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+  return readString(value, "threadId") === threadId && readString(value, "turnId") === turnId;
+}
+
+function isCurrentApprovalTurnRequestParams(
+  value: JsonValue | undefined,
+  threadId: string,
+  turnId: string,
+): boolean {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+  const requestThreadId = readString(value, "threadId") ?? readString(value, "conversationId");
+  return requestThreadId === threadId && readString(value, "turnId") === turnId;
+}
+
+function isCurrentThreadOptionalTurnRequestParams(
+  value: JsonValue | undefined,
+  threadId: string,
+  turnId: string,
+): boolean {
+  if (!isJsonObject(value) || readString(value, "threadId") !== threadId) {
+    return false;
+  }
+  const requestTurnId = value.turnId;
+  return requestTurnId === null || requestTurnId === undefined || requestTurnId === turnId;
+}
+
+function isRetryableErrorNotification(value: JsonValue | undefined): boolean {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+  return readBoolean(value, "willRetry") === true || readBoolean(value, "will_retry") === true;
+}
+
+function isTerminalTurnStatus(status: string | undefined): boolean {
+  return status === "completed" || status === "interrupted" || status === "failed";
+}
+
+const CODEX_TURN_ABORT_MARKER_START = "<turn_aborted>";
+const CODEX_TURN_ABORT_MARKER_END = "</turn_aborted>";
+const CODEX_INTERRUPTED_USER_GUIDANCE =
+  "The user interrupted the previous turn on purpose. Any running unified exec processes may still be running in the background. If any tools/commands were aborted, they may have partially executed.";
+const CODEX_INTERRUPTED_DEVELOPER_GUIDANCE =
+  "The previous turn was interrupted on purpose. Any running unified exec processes may still be running in the background. If any tools/commands were aborted, they may have partially executed.";
+const CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_USER_MESSAGE =
+  "Codex stopped before confirming the turn was complete. The response may be incomplete; retry if needed.";
+const CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_SIDE_EFFECT_USER_MESSAGE =
+  "Codex stopped before confirming the turn was complete. Some work may already have been performed; verify the current state before retrying.";
+
+function isCodexTurnAbortMarkerNotification(
+  notification: CodexServerNotification,
+  options: { currentPromptText?: string; currentPromptTexts?: readonly string[] } = {},
+): boolean {
+  if (notification.method !== "rawResponseItem/completed" || !isJsonObject(notification.params)) {
+    return false;
+  }
+  const item = notification.params.item;
+  const role = isJsonObject(item) ? readString(item, "role") : undefined;
+  if (!isJsonObject(item) || (role !== "user" && role !== "developer")) {
+    return false;
+  }
+  const text = extractRawResponseItemText(item).trim();
+  const currentPromptTexts = [options.currentPromptText, ...(options.currentPromptTexts ?? [])]
+    .filter(isNonEmptyString)
+    .map((prompt) => prompt.trim());
+  if (role === "user" && currentPromptTexts.includes(text)) {
+    return false;
+  }
+  const markerBody = readCodexTurnAbortMarkerBody(text);
+  return (
+    markerBody === CODEX_INTERRUPTED_USER_GUIDANCE ||
+    markerBody === CODEX_INTERRUPTED_DEVELOPER_GUIDANCE
+  );
+}
+
+function readCodexTurnAbortMarkerBody(text: string): string | undefined {
+  if (
+    !text.startsWith(CODEX_TURN_ABORT_MARKER_START) ||
+    !text.endsWith(CODEX_TURN_ABORT_MARKER_END)
+  ) {
+    return undefined;
+  }
+  return text
+    .slice(CODEX_TURN_ABORT_MARKER_START.length, -CODEX_TURN_ABORT_MARKER_END.length)
+    .trim();
+}
+
+function extractRawResponseItemText(item: JsonObject): string {
+  const content = item.content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  return content
+    .flatMap((entry) => {
+      if (!isJsonObject(entry)) {
+        return [];
+      }
+      const type = readString(entry, "type");
+      if (type !== "input_text" && type !== "text") {
+        return [];
+      }
+      const text = readString(entry, "text");
+      return text ? [text] : [];
+    })
+    .join("");
+}
+
+function readString(record: JsonObject, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBoolean(record: JsonObject, key: string): boolean | undefined {
+  return asBoolean(record[key]);
+}
+
+async function readMirroredSessionHistoryMessages(
+  scope: CodexMirroredSessionHistoryScope,
+): Promise<AgentMessage[] | undefined> {
+  const messages = await readCodexMirroredSessionHistoryMessages(scope);
+  if (!messages) {
+    embeddedAgentLog.warn("failed to read mirrored session history for codex harness hooks", {
+      agentId: scope.agentId,
+      sessionId: scope.sessionId,
+    });
+  }
+  return messages;
+}
+
+async function buildCodexWorkspaceBootstrapContext(params: {
+  params: EmbeddedRunAttemptParams;
+  resolvedWorkspace: string;
+  effectiveWorkspace: string;
+  sessionKey: string;
+  sessionAgentId: string;
+}): Promise<CodexWorkspaceBootstrapContext> {
+  try {
+    const bootstrapContext = await resolveBootstrapContextForRun({
+      workspaceDir: params.resolvedWorkspace,
+      config: params.params.config,
+      sessionKey: params.sessionKey,
+      sessionId: params.params.sessionId,
+      agentId: params.params.agentId ?? params.sessionAgentId,
+      warn: (message) => embeddedAgentLog.warn(message),
+      contextMode: params.params.bootstrapContextMode,
+      runKind: params.params.bootstrapContextRunKind,
+    });
+    const contextFiles = bootstrapContext.contextFiles.map((file) =>
+      remapCodexContextFilePath({
+        file,
+        sourceWorkspaceDir: params.resolvedWorkspace,
+        targetWorkspaceDir: params.effectiveWorkspace,
+      }),
+    );
+    const promptContextFiles = selectCodexWorkspacePromptContextFiles(contextFiles);
+    const developerInstructionFiles = shouldInjectCodexOpenClawPromptContext(params.params)
+      ? selectCodexWorkspaceInheritedDeveloperInstructionFiles(contextFiles)
+      : [];
+    const turnScopedDeveloperInstructionFiles = shouldInjectCodexOpenClawPromptContext(
+      params.params,
+    )
+      ? selectCodexWorkspaceTurnScopedDeveloperInstructionFiles(contextFiles)
+      : [];
+    const heartbeatReferenceFiles = selectCodexWorkspaceHeartbeatReferenceFiles(contextFiles);
+    return {
+      ...bootstrapContext,
+      contextFiles,
+      promptContextFiles,
+      developerInstructionFiles,
+      turnScopedDeveloperInstructionFiles,
+      heartbeatReferenceFiles,
+      promptContext: renderCodexWorkspaceBootstrapPromptContext(promptContextFiles),
+      developerInstructions:
+        renderCodexWorkspaceThreadDeveloperInstructions(developerInstructionFiles),
+      turnScopedDeveloperInstructions: renderCodexWorkspaceCollaborationDeveloperInstructions(
+        turnScopedDeveloperInstructionFiles,
+      ),
+      heartbeatCollaborationInstructions:
+        renderCodexWorkspaceHeartbeatReference(heartbeatReferenceFiles),
+    };
+  } catch (error) {
+    embeddedAgentLog.warn("failed to load codex workspace bootstrap instructions", { error });
+    return { bootstrapFiles: [], contextFiles: [] };
+  }
+}
+
+function buildCodexSystemPromptReport(params: {
+  attempt: EmbeddedRunAttemptParams;
+  sessionKey: string;
+  workspaceDir: string;
+  developerInstructions: string;
+  workspaceBootstrapContext: CodexWorkspaceBootstrapContext;
+  skillsPrompt: string;
+  tools: CodexDynamicToolSpec[];
+}): CodexSystemPromptReport {
+  const toolEntries = params.tools.map(buildCodexToolReportEntry);
+  const schemaChars = toolEntries.reduce((sum, tool) => sum + tool.schemaChars, 0);
+  const skillsPrompt = params.skillsPrompt.trim();
+  const bootstrapMaxChars = readPositiveNumber(
+    params.attempt.config?.agents?.defaults?.bootstrapMaxChars,
+  );
+  const bootstrapTotalMaxChars = readPositiveNumber(
+    params.attempt.config?.agents?.defaults?.bootstrapTotalMaxChars,
+  );
+  return {
+    source: "run",
+    generatedAt: Date.now(),
+    sessionId: params.attempt.sessionId,
+    sessionKey: params.sessionKey,
+    provider: params.attempt.provider,
+    model: params.attempt.modelId,
+    workspaceDir: params.workspaceDir,
+    ...(bootstrapMaxChars ? { bootstrapMaxChars } : {}),
+    ...(bootstrapTotalMaxChars ? { bootstrapTotalMaxChars } : {}),
+    systemPrompt: {
+      chars: params.developerInstructions.length,
+      projectContextChars: 0,
+      nonProjectContextChars: params.developerInstructions.length,
+      hash: sha256Text(params.developerInstructions),
+    },
+    injectedWorkspaceFiles: buildCodexBootstrapInjectionStats({
+      bootstrapFiles: params.workspaceBootstrapContext.bootstrapFiles,
+      injectedFiles: params.workspaceBootstrapContext.promptContextFiles ?? [],
+      developerInstructionFiles: [
+        ...(params.workspaceBootstrapContext.developerInstructionFiles ?? []),
+        ...(params.workspaceBootstrapContext.turnScopedDeveloperInstructionFiles ?? []),
+      ],
+    }),
+    skills: {
+      promptChars: skillsPrompt.length,
+      hash: sha256Text(skillsPrompt),
+      entries: buildCodexSkillReportEntries(skillsPrompt),
+    },
+    tools: {
+      listChars: 0,
+      schemaChars,
+      entries: toolEntries,
+    },
+  };
+}
+
+function buildCodexSkillReportEntries(
+  skillsPrompt: string,
+): CodexSystemPromptReport["skills"]["entries"] {
+  if (!skillsPrompt) {
+    return [];
+  }
+  return Array.from(skillsPrompt.matchAll(/<skill>[\s\S]*?<\/skill>/gi))
+    .map((match) => match[0] ?? "")
+    .map((block) => ({
+      name: block.match(/<name>\s*([^<]+?)\s*<\/name>/i)?.[1]?.trim() || "(unknown)",
+      blockChars: block.length,
+    }))
+    .filter((entry) => entry.blockChars > 0);
+}
+
+function readCodexDiagnosticToolParameters(tool: {
+  inputSchema?: unknown;
+  parameters?: unknown;
+}): unknown {
+  return tool.inputSchema ?? tool.parameters;
+}
+
+function buildCodexDiagnosticToolDefinitions(
+  tools: readonly {
+    name: string;
+    description: string;
+    inputSchema?: unknown;
+    parameters?: unknown;
+  }[],
+) {
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: readCodexDiagnosticToolParameters(tool),
+  }));
+}
+
+function buildCodexToolReportEntry(tool: CodexDynamicToolSpec): CodexToolReportEntry {
+  const summary = tool.description.trim();
+  if (tool.deferLoading === true) {
+    return {
+      name: tool.name,
+      summaryChars: summary.length,
+      summaryHash: sha256Text(summary),
+      schemaChars: 0,
+      schemaHash: stableJsonHash(null),
+      propertiesCount: null,
+    };
+  }
+  return {
+    name: tool.name,
+    summaryChars: summary.length,
+    summaryHash: sha256Text(summary),
+    ...buildCodexToolSchemaStats(tool.inputSchema),
+  };
+}
+
+function buildCodexToolSchemaStats(
+  schema: JsonValue,
+): Pick<CodexToolReportEntry, "schemaChars" | "schemaHash" | "propertiesCount"> {
+  const schemaChars = (() => {
+    try {
+      return JSON.stringify(schema).length;
+    } catch {
+      return 0;
+    }
+  })();
+  const properties =
+    isJsonObject(schema) && isJsonObject(schema.properties) ? schema.properties : null;
+  return {
+    schemaChars,
+    schemaHash: stableJsonHash(schema),
+    propertiesCount: properties ? Object.keys(properties).length : null,
+  };
+}
+
+function sha256Text(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizeForStableHash(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeForStableHash(entry));
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(record)
+        .toSorted((left, right) => left.localeCompare(right))
+        .map((key) => [key, normalizeForStableHash(record[key])]),
+    );
+  }
+  return value;
+}
+
+function stableJsonHash(value: JsonValue): string {
+  return sha256Text(JSON.stringify(normalizeForStableHash(value)) ?? "null");
+}
+
+function buildCodexBootstrapInjectionStats(params: {
+  bootstrapFiles: CodexBootstrapFile[];
+  injectedFiles: EmbeddedContextFile[];
+  developerInstructionFiles?: EmbeddedContextFile[];
+}): CodexSystemPromptReport["injectedWorkspaceFiles"] {
+  const injectedIndex = indexCodexContextFileContent(params.injectedFiles);
+  const developerInstructionIndex = indexCodexContextFileContent(
+    params.developerInstructionFiles ?? [],
+  );
+  return params.bootstrapFiles.map((file) => {
+    const fileName = readNonEmptyString(file.name);
+    const pathValue = readNonEmptyString(file.path) ?? fileName ?? "";
+    const displayName = (fileName ?? getCodexContextFileDisplayBasename(pathValue)) || pathValue;
+    const baseName = getCodexContextFileBasename(pathValue || fileName || "");
+    const rawChars = file.missing ? 0 : (file.content ?? "").trimEnd().length;
+    const injected =
+      readCodexIndexedContextFileContent(injectedIndex, pathValue, fileName) ??
+      readCodexIndexedContextFileContent(developerInstructionIndex, pathValue, fileName);
+    let injectedChars = injected?.length ?? 0;
+    let truncated = !file.missing && injectedChars < rawChars;
+    if (injected === undefined) {
+      if (CODEX_NATIVE_PROJECT_DOC_BASENAMES.has(baseName)) {
+        injectedChars = rawChars;
+        truncated = false;
+      } else if (baseName === CODEX_HEARTBEAT_CONTEXT_BASENAME) {
+        injectedChars = 0;
+        truncated = false;
+      }
+    }
+    return {
+      name: displayName,
+      path: pathValue,
+      missing: file.missing,
+      rawChars,
+      injectedChars,
+      truncated,
+    };
+  });
+}
+
+function indexCodexContextFileContent(files: EmbeddedContextFile[]): {
+  byPath: Map<string, string>;
+  byBaseName: Map<string, string>;
+} {
+  const byPath = new Map<string, string>();
+  const byBaseName = new Map<string, string>();
+  for (const file of files) {
+    const pathValue = readNonEmptyString(file.path);
+    if (!pathValue) {
+      continue;
+    }
+    if (!byPath.has(pathValue)) {
+      byPath.set(pathValue, file.content);
+    }
+    const baseName = getCodexContextFileBasename(pathValue);
+    if (baseName && !byBaseName.has(baseName)) {
+      byBaseName.set(baseName, file.content);
+    }
+  }
+  return { byPath, byBaseName };
+}
+
+function readCodexIndexedContextFileContent(
+  index: { byPath: Map<string, string>; byBaseName: Map<string, string> },
+  pathValue: string,
+  fileName: string | undefined,
+): string | undefined {
+  const pathContent = index.byPath.get(pathValue);
+  if (pathContent !== undefined) {
+    return pathContent;
+  }
+  if (fileName) {
+    const nameContent = index.byPath.get(fileName);
+    if (nameContent !== undefined) {
+      return nameContent;
+    }
+  }
+  const baseName = getCodexContextFileBasename(fileName ?? pathValue);
+  return baseName ? index.byBaseName.get(baseName) : undefined;
+}
+
+function readPositiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+const CODEX_DELIVERY_HINT_LINES = [
+  "Delivery: to send a message, use the `message` tool.",
+  "Delivery: Final assistant text is not automatically delivered in this run. Use the `message` tool to send user-visible output.",
+] as const;
+
+function splitLeadingCodexDeliveryHint(prompt: string): {
+  deliveryHint?: string;
+  prompt: string;
+} {
+  const trimmedStart = prompt.trimStart();
+  const matchedHint = CODEX_DELIVERY_HINT_LINES.find((hint) => trimmedStart.startsWith(hint));
+  if (!matchedHint) {
+    return { prompt };
+  }
+  const remainder = trimmedStart
+    .slice(matchedHint.length)
+    .replace(/^\s*\n/, "")
+    .trimStart();
+  return { deliveryHint: matchedHint, prompt: remainder };
+}
+
+function buildCodexOpenClawPromptContext(params: {
+  params: EmbeddedRunAttemptParams;
+  skillsPrompt?: string;
+  workspacePromptContext?: string;
+}): string | undefined {
+  if (!shouldInjectCodexOpenClawPromptContext(params.params)) {
+    return undefined;
+  }
+  const sections = [
+    params.skillsPrompt?.trim()
+      ? ["## OpenClaw Skills", "", params.skillsPrompt.trim()].join("\n")
+      : undefined,
+    params.workspacePromptContext?.trim()
+      ? ["## OpenClaw Workspace Context", "", params.workspacePromptContext.trim()].join("\n")
+      : undefined,
+  ].filter(isNonEmptyString);
+  if (sections.length === 0) {
+    return undefined;
+  }
+  return [
+    "OpenClaw runtime context for this turn:",
+    "Treat this OpenClaw-provided context as supporting project/user reference for the current request.",
+    "",
+    ...sections,
+  ].join("\n");
+}
+
+function shouldInjectCodexOpenClawPromptContext(params: EmbeddedRunAttemptParams): boolean {
+  // Lightweight cron runs are commonly exact commands. Keep the user input byte-for-byte
+  // to avoid changing command intent while Codex keeps its native project-doc loader.
+  return !(
+    params.bootstrapContextMode === "lightweight" && params.bootstrapContextRunKind === "cron"
+  );
+}
+
+function prependCodexOpenClawPromptContext(prompt: string, context: string | undefined): string {
+  if (!context?.trim()) {
+    return prompt;
+  }
+  const { deliveryHint, prompt: promptWithoutDeliveryHint } = splitLeadingCodexDeliveryHint(prompt);
+  const promptSection = promptWithoutDeliveryHint.startsWith(
+    "OpenClaw assembled context for this turn:",
+  )
+    ? promptWithoutDeliveryHint
+    : ["Current user request:", promptWithoutDeliveryHint].join("\n");
+  const deliverySection = deliveryHint
+    ? [
+        "OpenClaw delivery metadata:",
+        "This delivery metadata is runtime routing guidance, not the user's request.",
+        deliveryHint,
+      ].join("\n")
+    : undefined;
+  return [context.trim(), deliverySection, promptSection].filter(Boolean).join("\n\n");
+}
+
+function renderCodexWorkspaceBootstrapPromptContext(
+  contextFiles: EmbeddedContextFile[],
+): string | undefined {
+  const files = selectCodexWorkspacePromptContextFiles(contextFiles);
+  if (files.length === 0) {
+    return undefined;
+  }
+  const lines = [
+    "OpenClaw loaded these user-editable workspace files for the current turn. Codex loads AGENTS.md natively. TOOLS.md is provided as inherited Codex developer instructions. SOUL.md, IDENTITY.md, and USER.md are provided as turn-scoped collaboration instructions so native Codex subagents do not inherit them. HEARTBEAT.md is handled by heartbeat collaboration-mode guidance. Those files are not repeated here.",
+    "",
+    "# Project Context",
+    "",
+    "The following project context files have been loaded:",
+  ];
+  lines.push("");
+  for (const file of files) {
+    lines.push(`## ${file.path}`, "", file.content, "");
+  }
+  return lines.join("\n").trim();
+}
+
+function selectCodexWorkspacePromptContextFiles(
+  contextFiles: EmbeddedContextFile[],
+): EmbeddedContextFile[] {
+  return contextFiles
+    .filter((file) => {
+      const baseName = getCodexContextFileBasename(file.path);
+      return (
+        baseName &&
+        !CODEX_NATIVE_PROJECT_DOC_BASENAMES.has(baseName) &&
+        !CODEX_WORKSPACE_DEVELOPER_CONTEXT_BASENAMES.has(baseName) &&
+        baseName !== CODEX_HEARTBEAT_CONTEXT_BASENAME &&
+        !isMissingCodexBootstrapContextFile(file)
+      );
+    })
+    .toSorted(compareCodexContextFiles);
+}
+
+function selectCodexWorkspaceInheritedDeveloperInstructionFiles(
+  contextFiles: EmbeddedContextFile[],
+): EmbeddedContextFile[] {
+  return selectCodexWorkspaceDeveloperInstructionFiles(
+    contextFiles,
+    CODEX_INHERITED_WORKSPACE_DEVELOPER_CONTEXT_BASENAMES,
+  );
+}
+
+function selectCodexWorkspaceTurnScopedDeveloperInstructionFiles(
+  contextFiles: EmbeddedContextFile[],
+): EmbeddedContextFile[] {
+  return selectCodexWorkspaceDeveloperInstructionFiles(
+    contextFiles,
+    CODEX_TURN_SCOPED_WORKSPACE_DEVELOPER_CONTEXT_BASENAMES,
+  );
+}
+
+function selectCodexWorkspaceDeveloperInstructionFiles(
+  contextFiles: EmbeddedContextFile[],
+  basenames: ReadonlySet<string>,
+): EmbeddedContextFile[] {
+  return contextFiles
+    .filter((file) => {
+      const baseName = getCodexContextFileBasename(file.path);
+      return (
+        baseName &&
+        basenames.has(baseName) &&
+        !isMissingCodexBootstrapContextFile(file) &&
+        file.content.trim().length > 0
+      );
+    })
+    .toSorted(compareCodexContextFiles);
+}
+
+function renderCodexWorkspaceThreadDeveloperInstructions(
+  files: EmbeddedContextFile[],
+): string | undefined {
+  return renderCodexWorkspaceDeveloperInstructions({
+    files,
+    header: "## OpenClaw Workspace Instructions",
+    preamble:
+      "OpenClaw loaded these workspace instruction files from the active agent workspace. Internalize and follow them accordingly.",
+  });
+}
+
+function renderCodexWorkspaceCollaborationDeveloperInstructions(
+  files: EmbeddedContextFile[],
+): string | undefined {
+  return renderCodexWorkspaceDeveloperInstructions({
+    files,
+    header: "## OpenClaw Agent Soul",
+    preamble:
+      "OpenClaw loaded these workspace instruction files from the active agent workspace. They are the canonical definitions of who you are, how you think and work, and the human you work alongside. Internalize and follow them accordingly.",
+  });
+}
+
+function renderCodexWorkspaceDeveloperInstructions(params: {
+  files: EmbeddedContextFile[];
+  header: string;
+  preamble: string;
+}): string | undefined {
+  const { files, header, preamble } = params;
+  if (files.length === 0) {
+    return undefined;
+  }
+  const lines = [header, "", preamble, ""];
+  for (const file of files) {
+    lines.push(`### ${file.path}`, "", file.content, "");
+  }
+  return lines.join("\n").trim();
+}
+
+function selectCodexWorkspaceHeartbeatReferenceFiles(
+  contextFiles: EmbeddedContextFile[],
+): EmbeddedContextFile[] {
+  return contextFiles
+    .filter((file) => {
+      const baseName = getCodexContextFileBasename(file.path);
+      return (
+        baseName === CODEX_HEARTBEAT_CONTEXT_BASENAME &&
+        !isMissingCodexBootstrapContextFile(file) &&
+        file.content.trim().length > 0
+      );
+    })
+    .toSorted(compareCodexContextFiles);
+}
+
+function renderCodexWorkspaceHeartbeatReference(files: EmbeddedContextFile[]): string | undefined {
+  if (files.length === 0) {
+    return undefined;
+  }
+  const lines = [
+    "## OpenClaw Heartbeat Workspace",
+    "",
+    "HEARTBEAT.md exists in the active agent workspace. Read it before proceeding with this heartbeat, then decide what action is appropriate.",
+    "",
+  ];
+  for (const file of files) {
+    lines.push(`- ${file.path}`);
+  }
+  return lines.join("\n").trim();
+}
+
+function isMissingCodexBootstrapContextFile(file: EmbeddedContextFile): boolean {
+  return file.content.trimStart().startsWith("[MISSING] Expected at:");
+}
+
+function remapCodexContextFilePath(params: {
+  file: EmbeddedContextFile;
+  sourceWorkspaceDir: string;
+  targetWorkspaceDir: string;
+}): EmbeddedContextFile {
+  const relativePath = path.relative(params.sourceWorkspaceDir, params.file.path);
+  if (
+    !relativePath ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath) ||
+    params.sourceWorkspaceDir === params.targetWorkspaceDir
+  ) {
+    return params.file;
+  }
+  const targetUsesPosixSeparators =
+    params.targetWorkspaceDir.includes("/") && !params.targetWorkspaceDir.includes("\\");
+  const normalizedRelativePath = targetUsesPosixSeparators
+    ? relativePath.replaceAll("\\", "/")
+    : relativePath.replaceAll("/", "\\");
+  return {
+    ...params.file,
+    path: targetUsesPosixSeparators
+      ? path.posix.join(params.targetWorkspaceDir, normalizedRelativePath)
+      : path.win32.join(params.targetWorkspaceDir, normalizedRelativePath),
+  };
+}
+
+function compareCodexContextFiles(left: EmbeddedContextFile, right: EmbeddedContextFile): number {
+  const leftPath = normalizeCodexContextFilePath(left.path);
+  const rightPath = normalizeCodexContextFilePath(right.path);
+  const leftBase = getCodexContextFileBasename(left.path);
+  const rightBase = getCodexContextFileBasename(right.path);
+  const leftOrder = CODEX_BOOTSTRAP_CONTEXT_ORDER.get(leftBase) ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = CODEX_BOOTSTRAP_CONTEXT_ORDER.get(rightBase) ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+  if (leftBase !== rightBase) {
+    return leftBase.localeCompare(rightBase);
+  }
+  return leftPath.localeCompare(rightPath);
+}
+
+function normalizeCodexContextFilePath(filePath: string): string {
+  return filePath.trim().replaceAll("\\", "/").toLowerCase();
+}
+
+function getCodexContextFileDisplayBasename(filePath: string): string {
+  return filePath.trim().replaceAll("\\", "/").split("/").pop()?.trim() ?? "";
+}
+
+function getCodexContextFileBasename(filePath: string): string {
+  return normalizeCodexContextFilePath(filePath).split("/").pop() ?? "";
+}
+
+async function mirrorTranscriptBestEffort(params: {
+  params: EmbeddedRunAttemptParams;
+  agentId: string;
+  result: EmbeddedRunAttemptResult;
+  sessionKey?: string;
+  threadId: string;
+  turnId: string;
+}): Promise<void> {
+  try {
+    await mirrorCodexAppServerTranscript({
+      agentId: params.agentId,
+      sessionId: params.result.sessionIdUsed || params.params.sessionId,
+      sessionKey: params.sessionKey,
+      messages,
+      // Scope is thread-stable. Each entry in `messagesSnapshot` is tagged
+      // with a per-turn `attachCodexMirrorIdentity` value carrying its own
+      // turnId, so distinct turns produce distinct dedupe keys via the
+      // identity (not via the scope). Dropping `turnId` from the scope
+      // here is what lets a re-emitted prior-turn entry — which still
+      // carries its original `${turnId}:${kind}` identity — collide with
+      // its existing on-disk key and be a true no-op.
+      idempotencyScope: `codex-app-server:${params.threadId}`,
+      config: params.params.config,
+    });
+    for (const message of mirrorResult.userMessagesPresent) {
+      params.notifyUserMessagePersisted(message);
+    }
+  } catch (error) {
+    embeddedAgentLog.warn("failed to mirror codex app-server transcript", { error });
+  }
+}
+
+async function resolveFinalCodexMirrorMessages(params: {
+  params: EmbeddedRunAttemptParams;
+  messagesSnapshot: AgentMessage[];
+  turnId: string;
+}): Promise<AgentMessage[]> {
+  if (
+    params.params.suppressNextUserMessagePersistence ||
+    !params.params.userTurnTranscriptRecorder
+  ) {
+    return params.messagesSnapshot;
+  }
+  const resolvedPrompt = attachCodexMirrorIdentity(
+    await buildResolvedCodexUserPromptMessage(params.params),
+    `${params.turnId}:prompt`,
+  );
+  const firstUserIndex = params.messagesSnapshot.findIndex((message) => message.role === "user");
+  if (firstUserIndex === -1) {
+    return [resolvedPrompt, ...params.messagesSnapshot];
+  }
+  const messages = params.messagesSnapshot.slice();
+  messages[firstUserIndex] = resolvedPrompt;
+  return messages;
+}
+
+function createCodexAppServerUserMessagePersistenceNotifier(
+  runParams: EmbeddedRunAttemptParams,
+): (message: Extract<AgentMessage, { role: "user" }>) => void {
+  let notified = false;
+  return (message) => {
+    if (notified) {
+      return;
+    }
+    notified = true;
+    runParams.userTurnTranscriptRecorder?.markRuntimePersisted(message);
+    try {
+      runParams.onUserMessagePersisted?.(message);
+    } catch (error) {
+      embeddedAgentLog.warn("codex app-server user persistence notification failed", {
+        error: formatErrorMessage(error),
+      });
+    }
+  };
+}
+
+async function mirrorPromptAtTurnStartBestEffort(params: {
+  params: EmbeddedRunAttemptParams;
+  agentId?: string;
+  notifyUserMessagePersisted: (message: Extract<AgentMessage, { role: "user" }>) => void;
+  sessionKey?: string;
+  threadId: string;
+  turnId: string;
+}): Promise<void> {
+  if (params.params.suppressNextUserMessagePersistence) {
+    return;
+  }
+  try {
+    const mirrorPromise = (async () => {
+      const userPromptMessage = attachCodexMirrorIdentity(
+        await buildResolvedCodexUserPromptMessage(params.params),
+        `${params.turnId}:prompt`,
+      );
+      const mirrorResult = await mirrorCodexAppServerTranscript({
+        sessionFile: params.params.sessionFile,
+        agentId: params.agentId,
+        sessionKey: params.sessionKey,
+        messages: [userPromptMessage],
+        idempotencyScope: `codex-app-server:${params.threadId}`,
+        config: params.params.config,
+      });
+      for (const message of mirrorResult.userMessagesPresent) {
+        params.notifyUserMessagePersisted(message);
+      }
+    })();
+    params.params.userTurnTranscriptRecorder?.markRuntimePersistencePending(mirrorPromise);
+    await mirrorPromise;
+  } catch (error) {
+    embeddedAgentLog.warn("failed to mirror codex app-server prompt at turn start", { error });
+  }
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
@@ -2844,6 +3867,9 @@ export const testing = {
   filterCodexDynamicToolsForAllowlist,
   includeForcedCodexDynamicToolAllow,
   resolveCodexDynamicToolsLoading,
+  rotateOversizedCodexAppServerStartupBinding,
+  resolveCodexExternalSandboxPolicyForOpenClawSandbox,
+  resolveCodexAppServerForOpenClawToolPolicy,
   resolveCodexAppServerHookChannelId,
   buildCodexAppServerPromptTimeoutOutcome,
   resolveOpenClawCodingToolsSessionKeys,
