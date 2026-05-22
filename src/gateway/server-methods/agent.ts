@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import {
   listAgentIds,
   resolveDefaultAgentId,
@@ -44,14 +43,13 @@ import {
   resolveAgentIdFromSessionKey,
   resolveExplicitAgentSessionKey,
   resolveAgentMainSessionKey,
-  resolveSessionFilePath,
-  resolveSessionFilePathOptions,
   resolveSessionLifecycleTimestamps,
   resolveSessionResetPolicy,
   resolveSessionResetType,
   type SessionEntry,
-  updateSessionStore,
+  upsertSessionEntry,
 } from "../../config/sessions.js";
+import { readSqliteSessionRoutingInfo } from "../../config/sessions/session-entries.sqlite.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { formatUncaughtError, readErrorName } from "../../infra/errors.js";
@@ -142,7 +140,6 @@ import {
   canonicalizeSpawnedByForAgent,
   loadGatewaySessionRow,
   loadSessionEntry,
-  migrateAndPruneGatewaySessionStoreKey,
   resolveGatewayModelSupportsImages,
   resolveSessionModelRef,
 } from "../session-utils.js";
@@ -1332,17 +1329,30 @@ export const agentHandlers: GatewayRequestHandlers = {
       }
 
       if (requestedSessionKey) {
-        const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSessionKey, {
-          clone: false,
-        });
+        const {
+          cfg,
+          entry,
+          canonicalKey,
+          agentId: sessionAgentId,
+          databasePath,
+        } = loadSessionEntry(requestedSessionKey);
         cfgForAgent = cfg;
         const now = Date.now();
+        const routingInfo = readSqliteSessionRoutingInfo({
+          agentId: sessionAgentId,
+          sessionKey: canonicalKey,
+        });
         const resetPolicy = resolveSessionResetPolicy({
           sessionCfg: cfg.session,
-          resetType: resolveSessionResetType({ sessionKey: canonicalKey }),
+          resetType: resolveSessionResetType({
+            sessionKey: canonicalKey,
+            sessionScope: routingInfo?.sessionScope,
+            chatType: routingInfo?.chatType,
+          }),
           resetOverride: resolveChannelResetConfig({
             sessionCfg: cfg.session,
-            channel: entry?.lastChannel ?? entry?.channel ?? request.channel,
+            channel:
+              routingInfo?.channel ?? entry?.lastChannel ?? entry?.channel ?? request.channel,
           }),
         });
         const lifecycleTimestamps = entry
@@ -1355,29 +1365,16 @@ export const agentHandlers: GatewayRequestHandlers = {
         const freshness = entry
           ? evaluateSessionFreshness({
               updatedAt: entry.updatedAt,
-              ...lifecycleTimestamps,
+              ...resolveSessionLifecycleTimestamps({
+                entry,
+                agentId: resolveAgentIdFromSessionKey(canonicalKey),
+                databasePath,
+              }),
               now,
               policy: resetPolicy,
             })
           : undefined;
-        let failedSessionTranscriptMissing = false;
-        if (entry?.status === "failed" && entry.sessionId?.trim()) {
-          try {
-            const sessionPathOpts = resolveSessionFilePathOptions({
-              storePath,
-              agentId: resolveAgentIdFromSessionKey(canonicalKey),
-            });
-            failedSessionTranscriptMissing = !existsSync(
-              resolveSessionFilePath(entry.sessionId, entry, sessionPathOpts),
-            );
-          } catch {
-            failedSessionTranscriptMissing = true;
-          }
-        }
-        const canReuseSession =
-          Boolean(entry?.sessionId) &&
-          (freshness?.fresh ?? false) &&
-          !failedSessionTranscriptMissing;
+        const canReuseSession = Boolean(entry?.sessionId) && (freshness?.fresh ?? false);
         const usableRequestedSessionId =
           requestedSessionId && (!entry?.sessionId || canReuseSession)
             ? requestedSessionId
@@ -1558,7 +1555,7 @@ export const agentHandlers: GatewayRequestHandlers = {
           !isNewSession && entry !== undefined && entry.sessionStartedAt === undefined
             ? resolveSessionLifecycleTimestamps({
                 entry,
-                storePath,
+                databasePath,
                 agentId,
               }).sessionStartedAt
             : undefined;
