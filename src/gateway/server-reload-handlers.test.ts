@@ -564,10 +564,6 @@ describe("gateway restart deferral preflight", () => {
         reason: "config reload forced restart",
       });
       expect(hoisted.markRestartAbortedMainSessions).toHaveBeenCalledWith({
-        cfg: {
-          gateway: { reload: { deferralTimeoutMs: 1_000 } },
-        },
-        additionalCfgs: [{ session: { store: "/tmp/active-sessions.json" } }],
         sessionIds: new Set(["session-issue-82433"]),
         sessionKeys: new Set(["agent:main:issue-82433"]),
         reason: "config reload forced restart",

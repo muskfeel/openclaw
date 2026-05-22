@@ -567,13 +567,6 @@ describe("runGatewayLoop", () => {
       expect(gatewayLog.warn).toHaveBeenCalledWith(ACTIVE_RUN_DRAIN_TIMEOUT_LOG);
       expect(gatewayLog.warn).toHaveBeenCalledWith(DRAIN_TIMEOUT_LOG);
       expect(markRestartAbortedMainSessions).toHaveBeenCalledWith({
-        cfg: {
-          gateway: {
-            reload: {
-              deferralTimeoutMs: 90_000,
-            },
-          },
-        },
         sessionIds: new Set(["session-embedded-timeout"]),
         sessionKeys: new Set(["agent:main:embedded-timeout"]),
         reason: "gateway restart drain timeout",
@@ -668,13 +661,6 @@ describe("runGatewayLoop", () => {
       expect(waitForActiveEmbeddedRuns).not.toHaveBeenCalled();
       expect(abortEmbeddedAgentRun).toHaveBeenCalledWith(undefined, { mode: "all" });
       expect(markRestartAbortedMainSessions).toHaveBeenCalledWith({
-        cfg: {
-          gateway: {
-            reload: {
-              deferralTimeoutMs: 90_000,
-            },
-          },
-        },
         sessionIds: new Set(["session-forced-task"]),
         sessionKeys: new Set(["agent:main:forced-task"]),
         reason: "forced gateway restart",
@@ -776,13 +762,6 @@ describe("runGatewayLoop", () => {
       expect(waitForActiveEmbeddedRuns).toHaveBeenCalledWith(1_234);
       expect(abortEmbeddedAgentRun).toHaveBeenCalledWith(undefined, { mode: "all" });
       expect(markRestartAbortedMainSessions).toHaveBeenCalledWith({
-        cfg: {
-          gateway: {
-            reload: {
-              deferralTimeoutMs: 1_234,
-            },
-          },
-        },
         sessionIds: new Set(["session-issue-82433"]),
         sessionKeys: new Set(["agent:main:issue-82433"]),
         reason: "gateway restart drain timeout",

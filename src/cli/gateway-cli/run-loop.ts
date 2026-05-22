@@ -459,8 +459,7 @@ export async function runGatewayLoop(params: {
             "restart.drain",
             async () => {
               const {
-                abortEmbeddedAgentRun,
-                getRuntimeConfig,
+                abortEmbeddedPiRun,
                 getInspectableActiveTaskRestartBlockers,
                 getActiveEmbeddedRunCount,
                 getActiveTaskCount,
@@ -492,7 +491,6 @@ export async function runGatewayLoop(params: {
                 }
                 try {
                   await markRestartAbortedMainSessions({
-                    cfg: getRuntimeConfig(),
                     sessionKeys,
                     sessionIds,
                     reason,
