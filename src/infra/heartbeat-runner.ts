@@ -65,9 +65,14 @@ import {
   canonicalizeMainSessionAlias,
   resolveAgentMainSessionKey,
 } from "../config/sessions/main-session.js";
-import { resolveStorePath } from "../config/sessions/paths.js";
-import { loadSessionStore } from "../config/sessions/store-load.js";
-import { archiveRemovedSessionTranscripts, updateSessionStore } from "../config/sessions/store.js";
+import {
+  deleteSessionEntry,
+  getSessionEntry,
+  listSessionEntries,
+  patchSessionEntry,
+  upsertSessionEntry,
+} from "../config/sessions/store.js";
+import { deleteSqliteSessionTranscript } from "../config/sessions/transcript-store.sqlite.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import type { AgentDefaultsConfig } from "../config/types.agent-defaults.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -97,7 +102,6 @@ import { escapeRegExp } from "../utils.js";
 import { MAX_SAFE_TIMEOUT_DELAY_MS, resolveSafeTimeoutDelayMs } from "../utils/timer-delay.js";
 import { loadOrCreateDeviceIdentity } from "./device-identity.js";
 import { formatErrorMessage, hasErrnoCode } from "./errors.js";
-import { resolveMainScopedEventSessionKey } from "./event-session-routing.js";
 import { isWithinActiveHours, resolveActiveHoursTimezone } from "./heartbeat-active-hours.js";
 import { recordRunStart, shouldDeferWake, type DeferDecision } from "./heartbeat-cooldown.js";
 import {
@@ -529,17 +533,15 @@ function resolveHeartbeatSession(
   const mainSessionKey =
     scope === "global" ? "global" : resolveAgentMainSessionKey({ cfg, agentId: resolvedAgentId });
   const storeAgentId = scope === "global" ? resolveDefaultAgentId(cfg) : resolvedAgentId;
-  const storePath = resolveStorePath(sessionCfg?.store, {
+  const mainEntry = getSessionEntry({
     agentId: storeAgentId,
+    sessionKey: mainSessionKey,
   });
-  const store = loadSessionStore(storePath);
-  const mainEntry = store[mainSessionKey];
 
   if (scope === "global") {
     return {
+      agentId: storeAgentId,
       sessionKey: mainSessionKey,
-      storePath,
-      store,
       entry: mainEntry,
       suppressOriginatingContext: false,
     };
@@ -549,9 +551,8 @@ function resolveHeartbeatSession(
   const forced = forcedSessionKey?.trim();
   if (forced && isSubagentSessionKey(forced)) {
     return {
+      agentId: storeAgentId,
       sessionKey: mainSessionKey,
-      storePath,
-      store,
       entry: mainEntry,
       suppressOriginatingContext: true,
     };
@@ -572,17 +573,13 @@ function resolveHeartbeatSession(
       if (forcedCanonical !== "global" && !isSubagentSessionKey(forcedCanonical)) {
         const sessionAgentId = resolveAgentIdFromSessionKey(forcedCanonical);
         if (sessionAgentId === normalizeAgentId(resolvedAgentId)) {
-          const routedSessionKey =
-            resolveMainScopedEventSessionKey({
-              cfg,
-              sessionKey: forcedCanonical,
-              agentId: resolvedAgentId,
-            }) ?? forcedCanonical;
           return {
-            sessionKey: routedSessionKey,
-            storePath,
-            store,
-            entry: store[routedSessionKey],
+            agentId: storeAgentId,
+            sessionKey: forcedCanonical,
+            entry: getSessionEntry({
+              agentId: storeAgentId,
+              sessionKey: forcedCanonical,
+            }),
             suppressOriginatingContext: false,
           };
         }
@@ -593,9 +590,8 @@ function resolveHeartbeatSession(
   const trimmed = heartbeat?.session?.trim() ?? "";
   if (!trimmed || isSubagentSessionKey(trimmed)) {
     return {
+      agentId: storeAgentId,
       sessionKey: mainSessionKey,
-      storePath,
-      store,
       entry: mainEntry,
       suppressOriginatingContext: false,
     };
@@ -604,9 +600,8 @@ function resolveHeartbeatSession(
   const normalized = normalizeLowercaseStringOrEmpty(trimmed);
   if (normalized === "main" || normalized === "global") {
     return {
+      agentId: storeAgentId,
       sessionKey: mainSessionKey,
-      storePath,
-      store,
       entry: mainEntry,
       suppressOriginatingContext: false,
     };
@@ -619,9 +614,8 @@ function resolveHeartbeatSession(
   });
   if (isSubagentSessionKey(candidate)) {
     return {
+      agentId: storeAgentId,
       sessionKey: mainSessionKey,
-      storePath,
-      store,
       entry: mainEntry,
       suppressOriginatingContext: false,
     };
@@ -635,19 +629,20 @@ function resolveHeartbeatSession(
     const sessionAgentId = resolveAgentIdFromSessionKey(canonical);
     if (sessionAgentId === normalizeAgentId(resolvedAgentId)) {
       return {
+        agentId: storeAgentId,
         sessionKey: canonical,
-        storePath,
-        store,
-        entry: store[canonical],
+        entry: getSessionEntry({
+          agentId: storeAgentId,
+          sessionKey: canonical,
+        }),
         suppressOriginatingContext: false,
       };
     }
   }
 
   return {
+    agentId: storeAgentId,
     sessionKey: mainSessionKey,
-    storePath,
-    store,
     entry: mainEntry,
     suppressOriginatingContext: false,
   };
@@ -744,16 +739,15 @@ function resolveHeartbeatReasoningPayloads(
 }
 
 async function restoreHeartbeatUpdatedAt(params: {
-  storePath: string;
+  agentId: string;
   sessionKey: string;
   updatedAt?: number;
 }) {
-  const { storePath, sessionKey, updatedAt } = params;
+  const { agentId, sessionKey, updatedAt } = params;
   if (typeof updatedAt !== "number") {
     return;
   }
-  const store = loadSessionStore(storePath);
-  const entry = store[sessionKey];
+  const entry = getSessionEntry({ agentId, sessionKey });
   if (!entry) {
     return;
   }
@@ -761,16 +755,13 @@ async function restoreHeartbeatUpdatedAt(params: {
   if (entry.updatedAt === nextUpdatedAt) {
     return;
   }
-  await updateSessionStore(storePath, (nextStore) => {
-    const nextEntry = nextStore[sessionKey] ?? entry;
-    if (!nextEntry) {
-      return;
-    }
-    const resolvedUpdatedAt = Math.max(nextEntry.updatedAt ?? 0, updatedAt);
-    if (nextEntry.updatedAt === resolvedUpdatedAt) {
-      return;
-    }
-    nextStore[sessionKey] = { ...nextEntry, updatedAt: resolvedUpdatedAt };
+  upsertSessionEntry({
+    agentId,
+    sessionKey,
+    entry: {
+      ...entry,
+      updatedAt: nextUpdatedAt,
+    },
   });
 }
 
@@ -1391,7 +1382,12 @@ export async function runHeartbeatOnce(opts: {
     });
     return { status: "skipped", reason: preflight.skipReason };
   }
-  const { entry, sessionKey, storePath, suppressOriginatingContext } = preflight.session;
+  const {
+    agentId: sessionAgentId,
+    entry,
+    sessionKey,
+    suppressOriginatingContext,
+  } = preflight.session;
   const isReplyRunActive =
     opts.deps?.isReplyRunActive ?? ((key: string) => replyRunRegistry.isActive(key));
   if (isReplyRunActive(sessionKey)) {
@@ -1546,51 +1542,47 @@ export async function runHeartbeatOnce(opts: {
       configuredSessionKey: configuredSession.sessionKey,
       sessionEntry: entry,
     });
-    const isolatedStorePath = resolveStorePath(cfg.session?.store, { agentId });
     const staleIsolatedSessionKey = resolveStaleHeartbeatIsolatedSessionKey({
       sessionKey,
       isolatedSessionKey,
       isolatedBaseSessionKey,
     });
-    const removedSessionFiles = new Map<string, string | undefined>();
-    let referencedSessionIds = new Set<string>();
-    await updateSessionStore(isolatedStorePath, (store) => {
-      const cronSession = resolveCronSession({
-        cfg,
-        sessionKey: isolatedSessionKey,
-        agentId,
-        nowMs: startedAt,
-        forceNew: true,
-        store,
-      });
-      if (staleIsolatedSessionKey) {
-        const staleEntry = store[staleIsolatedSessionKey];
-        if (staleEntry?.sessionId) {
-          removedSessionFiles.set(staleEntry.sessionId, staleEntry.sessionFile);
-        }
-        delete store[staleIsolatedSessionKey];
-      }
-      store[isolatedSessionKey] = {
+    const staleEntry = staleIsolatedSessionKey
+      ? getSessionEntry({ agentId, sessionKey: staleIsolatedSessionKey })
+      : undefined;
+    const cronSession = resolveCronSession({
+      cfg,
+      sessionKey: isolatedSessionKey,
+      agentId,
+      nowMs: startedAt,
+      forceNew: true,
+    });
+    upsertSessionEntry({
+      agentId,
+      sessionKey: isolatedSessionKey,
+      entry: {
         ...cronSession.sessionEntry,
         heartbeatIsolatedBaseSessionKey: isolatedBaseSessionKey,
-      };
-      referencedSessionIds = new Set(
-        Object.values(store)
-          .map((sessionEntry) => sessionEntry?.sessionId)
-          .filter((sessionId): sessionId is string => Boolean(sessionId)),
-      );
+      },
     });
-    if (removedSessionFiles.size > 0) {
+    if (staleEntry && staleIsolatedSessionKey && staleIsolatedSessionKey !== isolatedSessionKey) {
+      deleteSessionEntry({ agentId, sessionKey: staleIsolatedSessionKey });
+    }
+    if (staleEntry?.sessionId) {
       try {
-        await archiveRemovedSessionTranscripts({
-          removedSessionFiles,
-          referencedSessionIds,
-          storePath: isolatedStorePath,
-          reason: "deleted",
-          restrictToStoreDir: true,
-        });
+        const referencedSessionIds = new Set(
+          listSessionEntries({ agentId })
+            .map((row) => row.entry.sessionId)
+            .filter((sessionId): sessionId is string => Boolean(sessionId)),
+        );
+        if (!referencedSessionIds.has(staleEntry.sessionId)) {
+          deleteSqliteSessionTranscript({
+            agentId,
+            sessionId: staleEntry.sessionId,
+          });
+        }
       } catch (err) {
-        log.warn("heartbeat: failed to archive stale isolated session transcript", {
+        log.warn("heartbeat: failed to delete stale isolated session transcript", {
           err: String(err),
           sessionKey: staleIsolatedSessionKey,
         });
@@ -1605,27 +1597,27 @@ export async function runHeartbeatOnce(opts: {
     }
     const tasks = preflight.tasks;
 
-    await updateSessionStore(storePath, (store) => {
-      const current = store[sessionKey];
+    await patchSessionEntry({
+      agentId: sessionAgentId,
+      sessionKey,
       // Initialize stub entry on first run when current doesn't exist.
-      const base = current ?? {
+      fallbackEntry: {
         // Generate valid sessionId - derive from sessionKey without colons.
         sessionId: sessionKey.replace(/:/g, "_"),
         updatedAt: startedAt,
-        createdAt: startedAt,
-        messageCount: 0,
-        lastMessageAt: startedAt,
         heartbeatTaskState: {},
-      };
-      const taskState = { ...base.heartbeatTaskState };
+      },
+      update: (current) => {
+        const taskState = { ...current.heartbeatTaskState };
 
-      for (const task of tasks) {
-        if (isTaskDue(taskState[task.name], task.interval, startedAt)) {
-          taskState[task.name] = startedAt;
+        for (const task of tasks) {
+          if (isTaskDue(taskState[task.name], task.interval, startedAt)) {
+            taskState[task.name] = startedAt;
+          }
         }
-      }
 
-      store[sessionKey] = { ...base, heartbeatTaskState: taskState };
+        return { heartbeatTaskState: taskState };
+      },
     });
   };
 
@@ -1776,7 +1768,7 @@ export async function runHeartbeatOnce(opts: {
 
     if (heartbeatToolResponse && !heartbeatToolResponse.notify) {
       await restoreHeartbeatUpdatedAt({
-        storePath,
+        agentId: sessionAgentId,
         sessionKey,
         updatedAt: previousUpdatedAt,
       });
@@ -1805,7 +1797,7 @@ export async function runHeartbeatOnce(opts: {
 
     if (!heartbeatToolResponse && (!replyPayload || !hasOutboundReplyContent(replyPayload))) {
       await restoreHeartbeatUpdatedAt({
-        storePath,
+        agentId: sessionAgentId,
         sessionKey,
         updatedAt: previousUpdatedAt,
       });
@@ -1863,7 +1855,7 @@ export async function runHeartbeatOnce(opts: {
       normalized.shouldSkip && !normalized.hasMedia && !hasRelayableExecCompletion;
     if (shouldSkipMain && reasoningPayloads.length === 0) {
       await restoreHeartbeatUpdatedAt({
-        storePath,
+        agentId: sessionAgentId,
         sessionKey,
         updatedAt: previousUpdatedAt,
       });
@@ -1910,7 +1902,7 @@ export async function runHeartbeatOnce(opts: {
 
     if (isDuplicateMain) {
       await restoreHeartbeatUpdatedAt({
-        storePath,
+        agentId: sessionAgentId,
         sessionKey,
         updatedAt: previousUpdatedAt,
       });
@@ -1960,7 +1952,7 @@ export async function runHeartbeatOnce(opts: {
     if (!visibility.showAlerts) {
       await updateTaskTimestamps();
       await restoreHeartbeatUpdatedAt({
-        storePath,
+        agentId: sessionAgentId,
         sessionKey,
         updatedAt: previousUpdatedAt,
       });
@@ -2036,16 +2028,13 @@ export async function runHeartbeatOnce(opts: {
 
     // Record last delivered heartbeat payload for dedupe.
     if (!shouldSkipMain && normalized.text.trim()) {
-      await updateSessionStore(storePath, (store) => {
-        const current = store[sessionKey];
-        if (!current) {
-          return;
-        }
-        store[sessionKey] = {
-          ...current,
+      await patchSessionEntry({
+        agentId: sessionAgentId,
+        sessionKey,
+        update: () => ({
           lastHeartbeatText: normalized.text,
           lastHeartbeatSentAt: startedAt,
-        };
+        }),
       });
     }
 

@@ -634,56 +634,18 @@ function canMemoizePluginMetadataSnapshotResult(result: {
   registrySource: PluginRegistrySnapshotSource;
   snapshot: PluginMetadataSnapshot;
 }): boolean {
-  const snapshot = result.snapshot;
-  const hasCompleteSnapshotShape =
-    Array.isArray(snapshot.plugins) &&
-    Array.isArray(snapshot.diagnostics) &&
-    Array.isArray(snapshot.registryDiagnostics) &&
-    Array.isArray(snapshot.manifestRegistry.plugins) &&
-    Array.isArray(snapshot.manifestRegistry.diagnostics) &&
-    Array.isArray(snapshot.index.plugins) &&
-    Array.isArray(snapshot.index.diagnostics);
-  const hasPluginMetadata = snapshot.plugins.length > 0 || snapshot.index.plugins.length > 0;
-  return hasCompleteSnapshotShape && hasPluginMetadata;
-}
-
-export function resolvePluginMetadataSnapshot(
-  params: ResolvePluginMetadataSnapshotParams,
-): PluginMetadataSnapshot {
-  const canUseCurrentSnapshot =
-    params.allowCurrent !== false &&
-    params.stateDir === undefined &&
-    params.preferPersisted !== false;
-  if (canUseCurrentSnapshot) {
-    const current = getCurrentPluginMetadataSnapshot({
-      config: params.config,
-      env: params.env,
-      ...(params.workspaceDir !== undefined ? { workspaceDir: params.workspaceDir } : {}),
-      ...(params.allowWorkspaceScopedCurrent === true
-        ? { allowWorkspaceScopedSnapshot: true }
-        : {}),
-    });
-    if (!current) {
-      return loadPluginMetadataSnapshot(params);
-    }
-    if (!params.index) {
-      return current;
-    }
-    if (
-      isPluginMetadataSnapshotCompatible({
-        snapshot: current,
-        config: params.config,
-        env: params.env,
-        workspaceDir:
-          params.workspaceDir ??
-          (params.allowWorkspaceScopedCurrent === true ? current.workspaceDir : undefined),
-        index: params.index,
-      })
-    ) {
-      return current;
-    }
+  if (result.snapshot.index.plugins.length === 0) {
+    return false;
   }
-  return loadPluginMetadataSnapshot(params);
+  if (result.registrySource !== "derived") {
+    return true;
+  }
+  return (
+    result.snapshot.registryDiagnostics.length > 0 &&
+    result.snapshot.registryDiagnostics.every(
+      (diagnostic) => diagnostic.code === "persisted-registry-stale-policy",
+    )
+  );
 }
 
 function loadPluginMetadataSnapshotImpl(params: LoadPluginMetadataSnapshotParams): {
@@ -735,7 +697,6 @@ function loadPluginMetadataSnapshotImpl(params: LoadPluginMetadataSnapshotParams
     registrySource: registryResult.source,
     snapshot: {
       policyHash: index.policyHash,
-      registrySource: registryResult.source,
       configFingerprint: resolvePluginMetadataControlPlaneFingerprint({
         config: params.config,
         env: params.env,

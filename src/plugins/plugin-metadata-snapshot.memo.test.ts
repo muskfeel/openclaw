@@ -281,7 +281,7 @@ describe("loadPluginMetadataSnapshot process memo", () => {
     expect(loadPluginManifestRegistryForInstalledIndex).toHaveBeenCalledTimes(2);
   });
 
-  it("does not memoize policy-stale derived snapshots", () => {
+  it("memoizes policy-stale derived snapshots used by validation callers", () => {
     const stateDir = tempStateDir();
     touchPersistedIndex(stateDir);
     loadPluginRegistrySnapshotWithMetadata.mockReturnValue({
