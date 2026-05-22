@@ -45,7 +45,6 @@ export type CompactEmbeddedAgentSessionParams = {
   agentDir?: string;
   config?: OpenClawConfig;
   skillsSnapshot?: SkillSnapshot;
-  senderIsOwner?: boolean;
   provider?: string;
   model?: string;
   /** Effective model fallback chain for this session attempt. Undefined uses config defaults. */
