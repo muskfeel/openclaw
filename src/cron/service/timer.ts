@@ -2,7 +2,7 @@ import { formatEmbeddedAgentExecutionPhase } from "../../agents/embedded-agent-r
 import { resolveFailoverReasonFromError } from "../../agents/failover-error.js";
 import { formatEmbeddedAgentExecutionPhase } from "../../agents/pi-embedded-runner/execution-phase.js";
 import { getSessionEntry, type SessionEntry } from "../../config/sessions.js";
-import type { CronConfig, CronRetryOn } from "../../config/types.cron.js";
+import type { CronConfig } from "../../config/types.cron.js";
 import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
 import {
   HEARTBEAT_SKIP_CRON_IN_PROGRESS,
