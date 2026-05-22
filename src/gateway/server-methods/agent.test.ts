@@ -594,6 +594,8 @@ describe("gateway agent handler", () => {
       endedAt: now - 1_000,
       runtimeMs: 1_000,
       abortedLastRun: true,
+      responseUsage: "full",
+      elevatedLevel: "safe",
     };
     mockMainSessionEntry(missingTranscriptEntry);
 
@@ -608,6 +610,8 @@ describe("gateway agent handler", () => {
     expect(capturedEntry?.runtimeMs).toBeUndefined();
     expect(capturedEntry?.abortedLastRun).toBeUndefined();
     expect(capturedEntry?.sessionFile).toBeUndefined();
+    expect(capturedEntry?.responseUsage).toBe("full");
+    expect(capturedEntry?.elevatedLevel).toBe("safe");
   });
 
   it("rotates a failed session when its default transcript is missing", async () => {
@@ -642,7 +646,8 @@ describe("gateway agent handler", () => {
     vi.setSystemTime(now);
 
     await withTempDir({ prefix: "openclaw-gateway-failed-default-session-file-" }, async (root) => {
-      const sessionsDir = `${root}/sessions`;
+      const sessionsDir = `${root}/agents/main/sessions`;
+      const databasePath = `${root}/agents/main/agent/openclaw-agent.sqlite`;
       await fs.mkdir(sessionsDir, { recursive: true });
       await fs.writeFile(`${sessionsDir}/failed-present-default-session-id.jsonl`, "", "utf8");
       const failedEntryWithDefaultTranscript = {
@@ -654,7 +659,7 @@ describe("gateway agent handler", () => {
       };
       mocks.loadSessionEntry.mockReturnValue({
         cfg: {},
-        storePath: `${sessionsDir}/sessions.json`,
+        databasePath,
         entry: failedEntryWithDefaultTranscript,
         canonicalKey: "agent:main:main",
       });
@@ -678,7 +683,8 @@ describe("gateway agent handler", () => {
     vi.setSystemTime(now);
 
     await withTempDir({ prefix: "openclaw-gateway-failed-session-file-" }, async (root) => {
-      const sessionsDir = `${root}/sessions`;
+      const sessionsDir = `${root}/agents/main/sessions`;
+      const databasePath = `${root}/agents/main/agent/openclaw-agent.sqlite`;
       await fs.mkdir(sessionsDir, { recursive: true });
       await fs.writeFile(`${sessionsDir}/relative-present.jsonl`, "", "utf8");
       const failedEntryWithResolvedTranscript = {
@@ -691,7 +697,7 @@ describe("gateway agent handler", () => {
       };
       mocks.loadSessionEntry.mockReturnValue({
         cfg: {},
-        storePath: `${sessionsDir}/sessions.json`,
+        databasePath,
         entry: failedEntryWithResolvedTranscript,
         canonicalKey: "agent:main:main",
       });

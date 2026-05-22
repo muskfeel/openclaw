@@ -227,6 +227,7 @@ describe("sessions", () => {
       channel: "telegram",
       to: "12345",
       accountId: "default",
+      chatType: "direct",
     });
     expect(store[mainSessionKey]?.responseUsage).toBe("on");
     expect(store[mainSessionKey]?.queueDebounceMs).toBe(1234);
@@ -264,6 +265,7 @@ describe("sessions", () => {
       channel: "telegram",
       to: "222",
       accountId: "primary",
+      chatType: "direct",
     });
   });
 
@@ -299,6 +301,7 @@ describe("sessions", () => {
       channel: "telegram",
       to: "222",
       accountId: "default",
+      chatType: "direct",
     });
     expect(store[mainSessionKey]?.lastThreadId).toBeUndefined();
   });
@@ -540,6 +543,7 @@ describe("sessions", () => {
       channel: "demo chat",
       to: "+1555",
       accountId: "acct-1",
+      chatType: "direct",
     });
   });
 
@@ -590,7 +594,7 @@ describe("sessions", () => {
     const entry = store[mainSessionKey] ?? {};
     expect(entry.channel).toBe("slack");
     expect(entry.provider).toBeUndefined();
-    expect(entry.lastChannel).toBe("telegram");
+    expect(entry.lastChannel).toBe("slack");
   });
 
   it("patchSessionEntry merges concurrent patches", async () => {

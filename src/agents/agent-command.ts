@@ -361,14 +361,6 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
       );
     }
   }
-  if (agentIdOverride && opts.sessionKey) {
-    const sessionAgentId = resolveAgentIdFromSessionKey(opts.sessionKey);
-    if (sessionAgentId !== agentIdOverride) {
-      throw new Error(
-        `Agent id "${agentIdOverrideRaw}" does not match session key agent "${sessionAgentId}".`,
-      );
-    }
-  }
   const agentCfg = cfg.agents?.defaults;
 
   const verboseOverride = normalizeVerboseLevel(opts.verbose);
@@ -407,12 +399,19 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     sessionKey,
     sessionEntry: sessionEntryRaw,
     sessionStore,
+    agentId: resolvedSessionAgentId,
     isNewSession,
     persistedThinking,
     persistedVerbose,
   } = sessionResolution;
+  if (agentIdOverride && resolvedSessionAgentId !== agentIdOverride) {
+    throw new Error(
+      `Agent id "${agentIdOverrideRaw}" does not match session key agent "${resolvedSessionAgentId}".`,
+    );
+  }
   const sessionAgentId =
     agentIdOverride ??
+    resolvedSessionAgentId ??
     resolveSessionAgentId({
       sessionKey: sessionKey ?? opts.sessionKey?.trim(),
       config: cfg,

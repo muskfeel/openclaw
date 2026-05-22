@@ -5,6 +5,7 @@ import {
 import { isParentOwnedBackgroundAcpSession } from "../../acp/session-interaction-mode.js";
 import {
   resolveAgentConfig,
+  resolveAgentEffectiveModelPrimary,
   resolveAgentWorkspaceDir,
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
@@ -16,6 +17,11 @@ import {
   resolveSubagentToolPolicyForSession,
 } from "../../agents/agent-tools.policy.js";
 import { selectAgentHarness } from "../../agents/harness/selection.js";
+import {
+  buildModelAliasIndex,
+  resolveDefaultModelForAgent,
+  resolveModelRefFromString,
+} from "../../agents/model-selection.js";
 import {
   isToolAllowedByPolicies,
   resolveEffectiveToolPolicy,
@@ -33,6 +39,7 @@ import {
   touchConversationBindingRecord,
 } from "../../bindings/records.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
+import { resolveChannelModelOverride } from "../../channels/model-overrides.js";
 import { shouldSuppressLocalExecApprovalPrompt } from "../../channels/plugins/exec-approval-local.js";
 import { applyMergePatch } from "../../config/merge-patch.js";
 import { resolveGroupSessionKey } from "../../config/sessions/group.js";
@@ -363,14 +370,53 @@ const resolveHarnessSourceVisibleRepliesDefault = (params: {
     return undefined;
   }
   try {
+    const channelModelOverride = resolveChannelModelOverride({
+      cfg: params.cfg,
+      channel:
+        normalizeOptionalString(params.entry?.channel) ??
+        normalizeOptionalString(params.ctx.OriginatingChannel) ??
+        normalizeOptionalString(params.ctx.Surface) ??
+        normalizeOptionalString(params.ctx.Provider),
+      groupId: params.entry?.groupId,
+      groupChatType: params.entry?.chatType ?? params.ctx.ChatType,
+      groupChannel: params.entry?.groupChannel ?? params.ctx.GroupChannel,
+      groupSubject: params.entry?.subject ?? params.ctx.GroupSubject,
+      parentConversationId: params.ctx.ThreadParentId,
+    });
+    const defaultModelRef = resolveDefaultModelForAgent({
+      cfg: params.cfg,
+      agentId: params.sessionAgentId,
+    });
+    const configuredAgentModel = resolveAgentEffectiveModelPrimary(
+      params.cfg,
+      params.sessionAgentId,
+    );
+    const channelOverrideModel = normalizeOptionalString(channelModelOverride?.model);
+    const channelOverrideRef = channelOverrideModel
+      ? resolveModelRefFromString({
+          cfg: params.cfg,
+          raw: channelOverrideModel,
+          defaultProvider: defaultModelRef.provider,
+          aliasIndex: buildModelAliasIndex({
+            cfg: params.cfg,
+            defaultProvider: defaultModelRef.provider,
+          }),
+        })?.ref
+      : undefined;
+    const configuredDefaultProvider =
+      configuredAgentModel !== undefined ? defaultModelRef.provider : undefined;
     const provider =
+      normalizeOptionalString(channelOverrideRef?.provider) ??
+      normalizeOptionalString(configuredDefaultProvider) ??
       normalizeOptionalString(params.entry?.modelProvider) ??
       normalizeOptionalString(params.ctx.Provider) ??
       normalizeOptionalString(params.ctx.Surface) ??
       "";
     const harness = selectAgentHarness({
       provider,
-      modelId: normalizeOptionalString(params.entry?.model),
+      modelId:
+        normalizeOptionalString(channelOverrideRef?.model) ??
+        normalizeOptionalString(params.entry?.model),
       config: params.cfg,
       agentId: params.sessionAgentId,
       sessionKey: params.sessionKey,
@@ -574,16 +620,32 @@ export async function dispatchReplyFromConfig(
     : initialSessionRowEntry;
   const sessionAgentId = resolveSessionAgentId({ sessionKey: acpDispatchSessionKey, config: cfg });
   const sessionAgentCfg = resolveAgentConfig(cfg, sessionAgentId);
+  const fallbackVerboseLevel =
+    normalizeVerboseLevel(
+      sessionRowEntry.entry?.verboseLevel ??
+        sessionAgentCfg?.verboseDefault ??
+        cfg.agents?.defaults?.verboseDefault ??
+        "",
+    ) ?? "off";
   const shouldEmitVerboseProgress = createShouldEmitVerboseProgress({
     sessionKey: acpDispatchSessionKey,
-    fallbackLevel:
-      normalizeVerboseLevel(
-        sessionRowEntry.entry?.verboseLevel ??
-          sessionAgentCfg?.verboseDefault ??
-          cfg.agents?.defaults?.verboseDefault ??
-          "",
-      ) ?? "off",
+    fallbackLevel: fallbackVerboseLevel,
   });
+  const shouldEmitFullVerboseProgress = () => {
+    if (acpDispatchSessionKey) {
+      try {
+        const agentId = resolveSessionAgentId({ sessionKey: acpDispatchSessionKey, config: {} });
+        const entry = getSessionEntry({ agentId, sessionKey: acpDispatchSessionKey });
+        const currentLevel = normalizeVerboseLevel(entry?.verboseLevel ?? "");
+        if (currentLevel) {
+          return currentLevel === "full";
+        }
+      } catch {
+        // Ignore transient store read failures and fall back to the current dispatch snapshot.
+      }
+    }
+    return fallbackVerboseLevel === "full";
+  };
   const replyRoute = resolveEffectiveReplyRoute({ ctx, entry: sessionRowEntry.entry });
   // Restore route thread context only from the active turn, thread-scoped key,
   // or typed SQLite conversation metadata. Do not read thread ids from the
@@ -1170,10 +1232,12 @@ export async function dispatchReplyFromConfig(
       !sendPolicyDenied &&
       shouldEmitVerboseProgress() &&
       shouldSendVerboseProgressMessages;
+    let finalDeliveryStarted = false;
     const sendFinalPayload = async (
       payload: ReplyPayload,
       options: { abortSignal?: AbortSignal } = {},
     ): Promise<{ queuedFinal: boolean; routedFinalCount: number }> => {
+      finalDeliveryStarted = true;
       const sourceReplyTranscriptMirror =
         getReplyPayloadMetadata(payload)?.sourceReplyTranscriptMirror;
       if (hasOutboundReplyContent(payload, { trimText: true })) {
@@ -1555,6 +1619,9 @@ export async function dispatchReplyFromConfig(
         {
           ...params.replyOptions,
           sourceReplyDeliveryMode,
+          suppressToolErrorWarnings:
+            params.replyOptions?.suppressToolErrorWarnings ??
+            (shouldEmitVerboseProgress() && !shouldEmitFullVerboseProgress() ? true : undefined),
           typingPolicy: typing.typingPolicy,
           suppressTyping: typing.suppressTyping,
           onPartialReply: wrapProgressCallback(params.replyOptions?.onPartialReply),
@@ -1586,6 +1653,10 @@ export async function dispatchReplyFromConfig(
               if (!suppressAutomaticSourceDelivery) {
                 await onToolResultFromReplyOptions?.(payload);
               }
+              const payloadParts = resolveSendableOutboundReplyParts(payload);
+              if (finalDeliveryStarted && !payloadParts.hasMedia) {
+                return;
+              }
               if (shouldSuppressProgressDelivery()) {
                 return;
               }
@@ -1604,8 +1675,16 @@ export async function dispatchReplyFromConfig(
               if (!deliveryPayload) {
                 return;
               }
+              const deliveryPayloadParts = resolveSendableOutboundReplyParts(deliveryPayload);
+              if (
+                sourceReplyDeliveryMode === "message_tool_only" &&
+                deliveryPayload.isError === true &&
+                !deliveryPayloadParts.hasMedia &&
+                !shouldEmitFullVerboseProgress()
+              ) {
+                return;
+              }
               if (shouldSuppressDefaultToolProgressMessages()) {
-                const hasMedia = resolveSendableOutboundReplyParts(deliveryPayload).hasMedia;
                 const execApproval =
                   deliveryPayload.channelData &&
                   typeof deliveryPayload.channelData === "object" &&
@@ -1614,7 +1693,11 @@ export async function dispatchReplyFromConfig(
                     : undefined;
                 const hasExecApproval =
                   execApproval && typeof execApproval === "object" && !Array.isArray(execApproval);
-                if (!hasMedia && !hasExecApproval && deliveryPayload.isError !== true) {
+                if (
+                  !deliveryPayloadParts.hasMedia &&
+                  !hasExecApproval &&
+                  deliveryPayload.isError !== true
+                ) {
                   return;
                 }
               }
@@ -1848,6 +1931,7 @@ export async function dispatchReplyFromConfig(
               } else {
                 markInboundDedupeReplayUnsafe();
                 dispatcher.sendBlockReply(normalizedPayload);
+                await dispatcher.waitForIdle();
               }
             };
             return run();
