@@ -291,6 +291,607 @@ function emitCodexAppServerEvent(
   }
 }
 
+function collectTerminalAssistantText(result: EmbeddedRunAttemptResult): string {
+  return result.assistantTexts.join("\n\n").trim();
+}
+
+function hasCodexAppServerPotentialSideEffectEvidence(result: EmbeddedRunAttemptResult): boolean {
+  return result.replayMetadata.hadPotentialSideEffects;
+}
+
+function buildCodexAppServerPromptTimeoutOutcome(params: {
+  result: EmbeddedRunAttemptResult;
+  turnCompletionIdleTimedOut: boolean;
+}): EmbeddedRunAttemptResult["promptTimeoutOutcome"] {
+  const completionIdleTimeoutHadPotentialSideEffects = hasCodexAppServerPotentialSideEffectEvidence(
+    params.result,
+  );
+  if (
+    !params.turnCompletionIdleTimedOut ||
+    (params.result.itemLifecycle.completedCount === 0 &&
+      !completionIdleTimeoutHadPotentialSideEffects)
+  ) {
+    return undefined;
+  }
+  return {
+    message: completionIdleTimeoutHadPotentialSideEffects
+      ? CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_SIDE_EFFECT_USER_MESSAGE
+      : CODEX_APP_SERVER_MISSING_TERMINAL_EVENT_USER_MESSAGE,
+    ...(completionIdleTimeoutHadPotentialSideEffects
+      ? {
+          replayInvalid: true,
+          livenessState: "abandoned" as const,
+        }
+      : {}),
+  };
+}
+
+function resolveCodexAppServerReplayBlockedReason(
+  result: EmbeddedRunAttemptResult,
+):
+  | NonNullable<EmbeddedRunAttemptResult["codexAppServerFailure"]>["replayBlockedReason"]
+  | undefined {
+  if (result.replayMetadata.hadPotentialSideEffects) {
+    return "potential_side_effect";
+  }
+  if (result.assistantTexts.some((text) => text.trim().length > 0)) {
+    return "assistant_output";
+  }
+  if (
+    result.toolMetas.length > 0 ||
+    result.clientToolCalls ||
+    result.lastToolError ||
+    result.didSendDeterministicApprovalPrompt
+  ) {
+    return "tool_activity";
+  }
+  if (result.itemLifecycle.startedCount > 0 || result.itemLifecycle.activeCount > 0) {
+    return "active_item";
+  }
+  return undefined;
+}
+
+type CodexSteeringQueueOptions = {
+  debounceMs?: number;
+};
+
+type DynamicToolTimeoutDetails = {
+  responseMessage: string;
+  consoleMessage: string;
+  meta: Record<string, unknown>;
+};
+
+function normalizeLogField(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value
+    .replaceAll(String.fromCharCode(27), " ")
+    .replaceAll("\r", " ")
+    .replaceAll("\n", " ")
+    .replaceAll("\t", " ")
+    .trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return normalized.length > LOG_FIELD_MAX_LENGTH
+    ? `${normalized.slice(0, LOG_FIELD_MAX_LENGTH - 3)}...`
+    : normalized;
+}
+
+function readNumericTimeoutMs(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.floor(parsed));
+    }
+  }
+  return undefined;
+}
+
+function formatDynamicToolTimeoutDetails(params: {
+  call: CodexDynamicToolCallParams;
+  timeoutMs: number;
+}): DynamicToolTimeoutDetails {
+  const tool = normalizeLogField(params.call.tool) ?? "unknown";
+  const baseMeta: Record<string, unknown> = {
+    tool: params.call.tool,
+    toolCallId: params.call.callId,
+    threadId: params.call.threadId,
+    turnId: params.call.turnId,
+    timeoutMs: params.timeoutMs,
+    timeoutKind: "codex_dynamic_tool_rpc",
+  };
+
+  if (tool !== "process" || !isJsonObject(params.call.arguments)) {
+    return {
+      responseMessage: `OpenClaw dynamic tool call timed out after ${params.timeoutMs}ms while running tool ${tool}.`,
+      consoleMessage: `codex dynamic tool timeout: tool=${tool} toolTimeoutMs=${params.timeoutMs}; per-tool-call watchdog, not session idle`,
+      meta: baseMeta,
+    };
+  }
+
+  const action = normalizeLogField(params.call.arguments.action);
+  const sessionId = normalizeLogField(params.call.arguments.sessionId);
+  const requestedTimeoutMs = readNumericTimeoutMs(params.call.arguments.timeout);
+  const actionPart = action ? ` action=${action}` : "";
+  const sessionPart = sessionId ? ` sessionId=${sessionId}` : "";
+  const requestedPart =
+    requestedTimeoutMs === undefined ? "" : ` requestedWaitMs=${requestedTimeoutMs}`;
+  const retryHint =
+    action === "poll"
+      ? "; repeated lines usually mean process-poll retry churn, not model progress"
+      : "";
+  const responseTarget =
+    action || sessionId
+      ? ` while waiting for process${actionPart}${sessionPart}`
+      : " while waiting for the process tool";
+
+  return {
+    responseMessage: `OpenClaw dynamic tool call timed out after ${params.timeoutMs}ms${responseTarget}. This is a tool RPC timeout, not a session idle timeout.`,
+    consoleMessage: `codex process tool timeout:${actionPart}${sessionPart} toolTimeoutMs=${params.timeoutMs}${requestedPart}; per-tool-call watchdog, not session idle${retryHint}`,
+    meta: {
+      ...baseMeta,
+      processAction: action,
+      processSessionId: sessionId,
+      processRequestedTimeoutMs: requestedTimeoutMs,
+    },
+  };
+}
+
+function createCodexSteeringQueue(params: {
+  client: CodexAppServerClient;
+  threadId: string;
+  turnId: string;
+  answerPendingUserInput: (text: string) => boolean;
+  signal: AbortSignal;
+}) {
+  type PendingSteerText = {
+    text: string;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  };
+  let batchedTexts: PendingSteerText[] = [];
+  let batchTimer: NodeJS.Timeout | undefined;
+  let sendChain: Promise<void> = Promise.resolve();
+
+  const clearBatchTimer = () => {
+    if (batchTimer) {
+      clearTimeout(batchTimer);
+      batchTimer = undefined;
+    }
+  };
+
+  const sendTexts = async (texts: string[]) => {
+    if (texts.length === 0) {
+      return;
+    }
+    if (params.signal.aborted) {
+      throw new Error("codex app-server steering queue aborted");
+    }
+    await params.client.request("turn/steer", {
+      threadId: params.threadId,
+      expectedTurnId: params.turnId,
+      input: texts.map(toCodexTextInput),
+    });
+  };
+
+  const enqueueSend = (texts: string[]) => {
+    const send = sendChain.then(() => sendTexts(texts));
+    sendChain = send.catch((error: unknown) => {
+      embeddedAgentLog.debug("codex app-server queued steer failed", { error });
+    });
+    return send;
+  };
+
+  const flushBatch = () => {
+    clearBatchTimer();
+    const items = batchedTexts;
+    batchedTexts = [];
+    const send = enqueueSend(items.map((item) => item.text));
+    void send.then(
+      () => {
+        for (const item of items) {
+          item.resolve();
+        }
+      },
+      (error: unknown) => {
+        for (const item of items) {
+          item.reject(error);
+        }
+      },
+    );
+    return send;
+  };
+
+  return {
+    async queue(text: string, options?: CodexSteeringQueueOptions) {
+      if (params.answerPendingUserInput(text)) {
+        return;
+      }
+      return await new Promise<void>((resolve, reject) => {
+        batchedTexts.push({ text, resolve, reject });
+        clearBatchTimer();
+        const debounceMs = normalizeCodexSteerDebounceMs(options?.debounceMs);
+        batchTimer = setTimeout(() => {
+          batchTimer = undefined;
+          void flushBatch().catch(() => undefined);
+        }, debounceMs);
+      });
+    },
+    async flushPending() {
+      await flushBatch().catch(() => undefined);
+    },
+    cancel() {
+      clearBatchTimer();
+      const items = batchedTexts;
+      batchedTexts = [];
+      for (const item of items) {
+        item.reject(new Error("codex app-server steering queue cancelled"));
+      }
+    },
+  };
+}
+
+function normalizeCodexSteerDebounceMs(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : CODEX_STEER_ALL_DEBOUNCE_MS;
+}
+
+function toCodexTextInput(text: string): CodexUserInput {
+  return { type: "text", text, text_elements: [] };
+}
+
+type OpenClawSandboxContext = Awaited<ReturnType<typeof resolveSandboxContext>>;
+
+function resolveCodexAppServerForOpenClawToolPolicy(params: {
+  appServer: CodexAppServerRuntimeOptions;
+  pluginConfig: CodexPluginConfig;
+  env: NodeJS.ProcessEnv;
+  shouldPromote: boolean;
+  canUseUntrustedApprovalPolicy: boolean;
+}): CodexAppServerRuntimeOptions {
+  if (
+    !params.shouldPromote ||
+    !params.canUseUntrustedApprovalPolicy ||
+    params.appServer.approvalPolicy !== "never"
+  ) {
+    return params.appServer;
+  }
+  const explicitMode =
+    params.pluginConfig.appServer?.mode !== undefined ||
+    isCodexAppServerPolicyMode(params.env.OPENCLAW_CODEX_APP_SERVER_MODE);
+  const explicitApprovalPolicy =
+    params.pluginConfig.appServer?.approvalPolicy !== undefined ||
+    isCodexAppServerApprovalPolicy(params.env.OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY);
+  if (explicitMode || explicitApprovalPolicy) {
+    return params.appServer;
+  }
+  return {
+    ...params.appServer,
+    approvalPolicy: "untrusted",
+  };
+}
+
+function isCodexAppServerPolicyMode(value: unknown): boolean {
+  return value === "guardian" || value === "yolo";
+}
+
+function isCodexAppServerApprovalPolicy(value: unknown): boolean {
+  return (
+    value === "never" || value === "on-request" || value === "on-failure" || value === "untrusted"
+  );
+}
+
+// Codex owns proactive auto-compaction and derives its limit from the active model context
+// window. OpenClaw only clears a bound native thread as a recovery fuse when Codex does
+// not report that window, so the fallback stays well above normal compaction pressure.
+const CODEX_APP_SERVER_NATIVE_THREAD_FALLBACK_MAX_TOKENS = 300_000;
+const CODEX_APP_SERVER_BYTE_UNITS: Record<string, number> = {
+  b: 1,
+  k: 1024,
+  kb: 1024,
+  kib: 1024,
+  m: 1024 * 1024,
+  mb: 1024 * 1024,
+  mib: 1024 * 1024,
+  g: 1024 * 1024 * 1024,
+  gb: 1024 * 1024 * 1024,
+  gib: 1024 * 1024 * 1024,
+  t: 1024 * 1024 * 1024 * 1024,
+  tb: 1024 * 1024 * 1024 * 1024,
+  tib: 1024 * 1024 * 1024 * 1024,
+};
+
+function parseCodexAppServerByteLimit(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)\s*([a-z]+)?$/i);
+  if (!match) {
+    return undefined;
+  }
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return undefined;
+  }
+  const unit = (match[2] ?? "b").toLowerCase();
+  const multiplier = CODEX_APP_SERVER_BYTE_UNITS[unit];
+  if (multiplier === undefined) {
+    return undefined;
+  }
+  return Math.max(1, Math.round(amount * multiplier));
+}
+
+async function listCodexAppServerRolloutFilesForThread(
+  agentDir: string,
+  threadId: string,
+  codexHome?: string,
+): Promise<Array<{ path: string; bytes: number }>> {
+  const resolvedAgentDir = path.resolve(agentDir);
+  const resolvedCodexHome = codexHome?.trim()
+    ? path.resolve(codexHome)
+    : resolveCodexAppServerHomeDir(resolvedAgentDir);
+  const roots = [
+    path.join(resolvedCodexHome, "sessions"),
+    path.join(resolveCodexAppServerHomeDir(resolvedAgentDir), "sessions"),
+    path.join(resolvedAgentDir, "agent", "codex-home", "sessions"),
+    path.join(path.dirname(resolvedAgentDir), "codex-home", "sessions"),
+  ];
+  const files: Array<{ path: string; bytes: number }> = [];
+  const visited = new Set<string>();
+  for (const root of roots) {
+    if (visited.has(root)) {
+      continue;
+    }
+    visited.add(root);
+    const stack = [root];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      if (!dir) {
+        continue;
+      }
+      let entries: Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(file);
+          continue;
+        }
+        if (!entry.isFile() || !entry.name.endsWith(".jsonl") || !entry.name.includes(threadId)) {
+          continue;
+        }
+        try {
+          files.push({ path: file, bytes: (await fs.stat(file)).size });
+        } catch {
+          // Ignore rollout files that disappeared while the guard was scanning.
+        }
+      }
+    }
+  }
+  return files;
+}
+
+async function readCodexSessionRecordForSessionFile(
+  sessionFile: string,
+): Promise<(Record<string, unknown> & { sessionKey: string }) | undefined> {
+  const sessionsFile = path.join(path.dirname(sessionFile), "sessions.json");
+  let store: JsonValue | undefined;
+  try {
+    store = JSON.parse(await fs.readFile(sessionsFile, "utf8")) as JsonValue;
+  } catch {
+    return undefined;
+  }
+  if (!isJsonObject(store)) {
+    return undefined;
+  }
+  const resolvedSessionFile = path.resolve(sessionFile);
+  for (const [sessionKey, record] of Object.entries(store)) {
+    if (!isJsonObject(record) || typeof record.sessionFile !== "string") {
+      continue;
+    }
+    if (path.resolve(record.sessionFile) !== resolvedSessionFile) {
+      continue;
+    }
+    return { sessionKey, ...record };
+  }
+  return undefined;
+}
+
+type CodexAppServerRolloutTokenSnapshot = {
+  totalTokens?: number;
+  modelContextWindow?: number;
+};
+
+async function readCodexAppServerRolloutTokenSnapshot(
+  file: string,
+): Promise<CodexAppServerRolloutTokenSnapshot | undefined> {
+  let handle: Awaited<ReturnType<typeof fs.open>>;
+  try {
+    handle = await fs.open(file, "r");
+  } catch {
+    return undefined;
+  }
+  let snapshot: CodexAppServerRolloutTokenSnapshot | undefined;
+  try {
+    for await (const line of handle.readLines()) {
+      const lineSnapshot = readCodexAppServerRolloutTokenSnapshotLine(line);
+      if (lineSnapshot !== undefined) {
+        snapshot ??= {};
+        if (lineSnapshot.totalTokens !== undefined) {
+          snapshot.totalTokens = lineSnapshot.totalTokens;
+        }
+        if (lineSnapshot.modelContextWindow !== undefined) {
+          snapshot.modelContextWindow = lineSnapshot.modelContextWindow;
+        }
+      }
+    }
+  } finally {
+    await handle.close();
+  }
+  return snapshot;
+}
+
+function readCodexAppServerRolloutTokenSnapshotLine(
+  line: string,
+): CodexAppServerRolloutTokenSnapshot | undefined {
+  if (!line.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(line) as JsonValue;
+    const payload = isJsonObject(parsed) ? parsed.payload : undefined;
+    const info =
+      isJsonObject(payload) && payload.type === "token_count" && isJsonObject(payload.info)
+        ? payload.info
+        : undefined;
+    if (!info) {
+      return undefined;
+    }
+    const usage = isJsonObject(info.last_token_usage)
+      ? info.last_token_usage
+      : isJsonObject(info.total_token_usage)
+        ? info.total_token_usage
+        : undefined;
+    const value = usage?.total_tokens ?? usage?.totalTokens;
+    const totalTokens = typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    const windowValue = info.model_context_window ?? info.modelContextWindow;
+    const modelContextWindow =
+      typeof windowValue === "number" && Number.isFinite(windowValue) && windowValue > 0
+        ? Math.floor(windowValue)
+        : undefined;
+    const snapshot: CodexAppServerRolloutTokenSnapshot = {};
+    if (totalTokens !== undefined) {
+      snapshot.totalTokens = totalTokens;
+    }
+    if (modelContextWindow !== undefined) {
+      snapshot.modelContextWindow = modelContextWindow;
+    }
+    return snapshot.totalTokens !== undefined || snapshot.modelContextWindow !== undefined
+      ? snapshot
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveCodexAppServerNativeThreadTokenFuse(
+  modelContextWindow: number | undefined,
+): number {
+  return modelContextWindow ?? CODEX_APP_SERVER_NATIVE_THREAD_FALLBACK_MAX_TOKENS;
+}
+
+function utf8JsonByteLength(value: unknown): number | undefined {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function maxFiniteNumber(values: Array<number | undefined>): number | undefined {
+  const nums = values.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  if (nums.length === 0) {
+    return undefined;
+  }
+  return Math.max(...nums);
+}
+
+function hasContextEngineThreadBootstrapProjection(binding: CodexAppServerThreadBinding): boolean {
+  return binding.contextEngine?.projection?.mode === "thread_bootstrap";
+}
+
+async function rotateOversizedCodexAppServerStartupBinding(params: {
+  binding: CodexAppServerThreadBinding | undefined;
+  bindingIdentity: Parameters<typeof clearCodexAppServerBinding>[0];
+  sessionFile?: string;
+  agentDir: string;
+  codexHome?: string;
+  config: EmbeddedRunAttemptParams["config"] | undefined;
+  contextEngineActive?: boolean;
+}): Promise<CodexAppServerThreadBinding | undefined> {
+  const binding = params.binding;
+  if (!binding?.threadId) {
+    return binding;
+  }
+  if (params.config?.agents?.defaults?.compaction?.rotateAfterCompaction !== true) {
+    return binding;
+  }
+  const sessionRecord = params.sessionFile
+    ? await readCodexSessionRecordForSessionFile(params.sessionFile)
+    : undefined;
+  const maxBytes = parseCodexAppServerByteLimit(
+    params.config?.agents?.defaults?.compaction?.maxActiveTranscriptBytes,
+  );
+  const rolloutFiles = await listCodexAppServerRolloutFilesForThread(
+    params.agentDir,
+    binding.threadId,
+    params.codexHome,
+  );
+  if (maxBytes !== undefined) {
+    const oversizedFiles = rolloutFiles.filter((file) => file.bytes >= maxBytes);
+    if (oversizedFiles.length > 0) {
+      embeddedAgentLog.warn(
+        "codex app-server native transcript exceeded active byte limit; starting a fresh thread",
+        {
+          threadId: binding.threadId,
+          maxBytes,
+          files: oversizedFiles.map((file) => ({ path: file.path, bytes: file.bytes })),
+        },
+      );
+      await clearCodexAppServerBinding(params.bindingIdentity);
+      return undefined;
+    }
+  }
+  const nativeTokenSnapshots = await Promise.all(
+    rolloutFiles.map(async (file) => readCodexAppServerRolloutTokenSnapshot(file.path)),
+  );
+  const nativeTokens = maxFiniteNumber(
+    nativeTokenSnapshots.map((snapshot) => snapshot?.totalTokens),
+  );
+  const nativeModelContextWindow = maxFiniteNumber(
+    nativeTokenSnapshots.map((snapshot) => snapshot?.modelContextWindow),
+  );
+  const maxTokens = resolveCodexAppServerNativeThreadTokenFuse(nativeModelContextWindow);
+  const sessionTokens =
+    sessionRecord?.totalTokensFresh !== false &&
+    typeof sessionRecord?.totalTokens === "number" &&
+    Number.isFinite(sessionRecord.totalTokens)
+      ? sessionRecord.totalTokens
+      : undefined;
+  const tokenCount = maxFiniteNumber([sessionTokens, nativeTokens]);
+  if (tokenCount !== undefined && tokenCount >= maxTokens) {
+    embeddedAgentLog.warn(
+      "codex app-server native transcript exceeded active token limit; starting a fresh thread",
+      {
+        threadId: binding.threadId,
+        maxTokens,
+        sessionKey: sessionRecord?.sessionKey,
+        sessionTokens,
+        nativeTokens,
+        nativeModelContextWindow,
+      },
+    );
+    await clearCodexAppServerBinding(params.bindingIdentity);
+    return undefined;
+  }
+  return binding;
+}
+
 type CodexAgentEndHookParams = Parameters<typeof runAgentHarnessAgentEndHook>[0];
 
 function shouldAwaitCodexAgentEndHook(params: EmbeddedRunAttemptParams): boolean {
@@ -414,12 +1015,15 @@ export async function runCodexAppServerAttempt(
     agentId: params.agentId,
   });
   const agentDir = params.agentDir ?? resolveAgentDir(params.config ?? {}, sessionAgentId);
-  preDynamicStartupStages.mark("session-agent");
-  let startupBinding = await readCodexAppServerBinding(params.sessionFile);
-  preDynamicStartupStages.mark("read-binding");
+  const startupBindingIdentity = {
+    sessionKey: sandboxSessionKey,
+    sessionId: params.sessionId,
+  };
+  let startupBinding = await readCodexAppServerBinding(startupBindingIdentity);
   const startupBindingAuthProfileId = startupBinding?.authProfileId;
   startupBinding = await rotateOversizedCodexAppServerStartupBinding({
     binding: startupBinding,
+    bindingIdentity: startupBindingIdentity,
     sessionFile: params.sessionFile,
     agentDir,
     codexHome: appServer.start.env?.CODEX_HOME,
@@ -577,10 +1181,6 @@ export async function runCodexAppServerAttempt(
       channelId: hookChannelId,
     },
   });
-  const hadTranscript = hasSqliteSessionTranscriptEvents({
-    agentId: sessionAgentId,
-    sessionId: activeSessionId,
-  });
   const hookContextWindowFields = {
     ...(params.contextWindowInfo?.tokens
       ? { contextTokenBudget: params.contextWindowInfo.tokens }
@@ -630,18 +1230,21 @@ export async function runCodexAppServerAttempt(
     });
   if (activeContextEngine) {
     await bootstrapHarnessContextEngine({
-      hadSessionFile,
+      hadTranscript,
       contextEngine: activeContextEngine,
       sessionId: activeSessionId,
-      sessionKey: contextSessionKey,
-      sessionFile: activeSessionFile,
+      sessionKey: sandboxSessionKey,
+      transcriptScope: { agentId: sessionAgentId, sessionId: activeSessionId },
       runtimeContext: buildActiveContextEngineRuntimeContext(),
       runMaintenance: runHarnessContextEngineMaintenance,
       config: params.config,
       warn: (message) => embeddedAgentLog.warn(message),
     });
     historyMessages =
-      (await readMirroredSessionHistoryMessages(activeSessionFile)) ?? historyMessages;
+      (await readMirroredSessionHistoryMessages({
+        agentId: sessionAgentId,
+        sessionId: activeSessionId,
+      })) ?? historyMessages;
   }
   const memoryToolNames = getCodexWorkspaceMemoryToolNames(toolBridge.availableSpecs);
   const workspaceBootstrapContext = await buildCodexWorkspaceBootstrapContext({
