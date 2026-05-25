@@ -8,6 +8,7 @@ import {
   readPersistedInstalledPluginIndexSync,
 } from "./installed-plugin-index-persisted-read.js";
 import { type InstalledPluginIndexStoreOptions } from "./installed-plugin-index-store-options.js";
+import { resolveInstalledPluginIndexStorePath } from "./installed-plugin-index-store-path.js";
 
 function cloneInstallRecords(
   records: Record<string, PluginInstallRecord> | undefined,

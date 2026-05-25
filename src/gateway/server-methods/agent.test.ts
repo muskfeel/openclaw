@@ -1355,7 +1355,7 @@ describe("gateway agent handler", () => {
   it("keeps backend internal session-effect runs out of visible gateway state", async () => {
     primeMainAgentRun({ cfg: mocks.loadConfigReturn });
     mocks.agentCommand.mockClear();
-    mocks.updateSessionStore.mockClear();
+    mocks.applySessionEntryWrite.mockClear();
     mocks.registerAgentRunContext.mockClear();
     const context = makeContext();
 
@@ -1381,7 +1381,7 @@ describe("gateway agent handler", () => {
     }>();
     expect(callArgs.sessionEffects).toBe("internal");
     expect(callArgs.suppressPromptPersistence).toBe(true);
-    expect(mocks.updateSessionStore).not.toHaveBeenCalled();
+    expect(mocks.applySessionEntryWrite).not.toHaveBeenCalled();
     expect(context.addChatRun).not.toHaveBeenCalled();
     expect(mocks.registerAgentRunContext).toHaveBeenCalledWith("test-backend-internal-effects", {
       isControlUiVisible: false,

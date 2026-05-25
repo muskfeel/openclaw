@@ -48,6 +48,9 @@ type PersistedRegistryMemoState = {
   contextHash: string;
   fastHash: string;
   fingerprint: unknown;
+  refreshOnWatchedFilesChange?: boolean;
+  watchedFilesHash: string;
+  watchedFiles: readonly string[];
 };
 
 const MAX_PLUGIN_METADATA_SNAPSHOT_MEMOS = 8;
@@ -94,6 +97,14 @@ function fileFingerprint(filePath: string): unknown {
   } catch {
     return [filePath, "missing"];
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function readJsonObject(filePath: string): Record<string, unknown> | undefined {
@@ -340,7 +351,8 @@ function resolvePersistedRegistryMemoStateForLookup(
       registryState &&
       registryState.contextHash === contextHash &&
       registryState.fastHash === fastHash &&
-      hashWatchedFiles(registryState.watchedFiles) === registryState.watchedFilesHash
+      (!registryState.refreshOnWatchedFilesChange ||
+        hashWatchedFiles(registryState.watchedFiles) === registryState.watchedFilesHash)
     ) {
       return registryState;
     }
@@ -611,14 +623,17 @@ export function loadPluginMetadataSnapshot(
   if (canMemoizePluginMetadataSnapshotResult(result)) {
     const cachedRegistryState =
       result.registrySource === "derived"
-        ? resolvePersistedRegistryMemoState({
-            env,
-            index: snapshot.index,
-            ...(params.stateDir ? { stateDir: resolveUserPath(params.stateDir, env) } : {}),
-            ...(params.preferPersisted !== undefined
-              ? { preferPersisted: params.preferPersisted }
-              : {}),
-          })
+        ? {
+            ...resolvePersistedRegistryMemoState({
+              env,
+              index: result.snapshot.index,
+              ...(params.stateDir ? { stateDir: resolveUserPath(params.stateDir, env) } : {}),
+              ...(params.preferPersisted !== undefined
+                ? { preferPersisted: params.preferPersisted }
+                : {}),
+            }),
+            refreshOnWatchedFilesChange: true,
+          }
         : registryState;
     rememberPluginMetadataSnapshotMemo({
       key: computePluginMetadataSnapshotMemoKey({ params, registryState: cachedRegistryState }),
