@@ -1347,6 +1347,127 @@ export function enforceChatHistoryFinalBudget(params: { messages: unknown[]; max
   return { messages: [], placeholderCount: 0 };
 }
 
+type SourceReplyTranscriptScope = {
+  agentId: string;
+  path?: string;
+  sessionId: string;
+};
+
+async function readTranscriptBranchEntries(scope: SourceReplyTranscriptScope) {
+  try {
+    return (await readTranscriptStateForSession(scope)).getBranch();
+  } catch {
+    return [];
+  }
+}
+
+async function findAssistantTranscriptMessageByIdempotencyKey(
+  params: SourceReplyTranscriptScope & { idempotencyKey: string },
+): Promise<{ messageId: string; message: Record<string, unknown> } | null> {
+  const trimmedIdempotencyKey = params.idempotencyKey.trim();
+  if (!trimmedIdempotencyKey) {
+    return null;
+  }
+  const target = (await readTranscriptBranchEntries(params)).toReversed().find((entry) => {
+    if (entry.type !== "message") {
+      return false;
+    }
+    const message = entry.message as unknown as Record<string, unknown> | undefined;
+    return message?.role === "assistant" && message.idempotencyKey === trimmedIdempotencyKey;
+  });
+  const message =
+    target?.type === "message" ? (target.message as unknown as Record<string, unknown>) : null;
+  if (!target?.id || !message) {
+    return null;
+  }
+  return { messageId: target.id, message };
+}
+
+async function findSourceReplyTranscriptMirrorByIdempotencyKey(
+  params: SourceReplyTranscriptScope & { idempotencyKey: string },
+): Promise<{ messageId: string; message: Record<string, unknown> } | null> {
+  const found = await findAssistantTranscriptMessageByIdempotencyKey(params);
+  if (found?.message.provider !== "openclaw" || found.message.model !== "delivery-mirror") {
+    return null;
+  }
+  return found;
+}
+
+function extractAssistantTranscriptText(message: Record<string, unknown>): string | undefined {
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  const text = content
+    .map((block) =>
+      block &&
+      typeof block === "object" &&
+      (block as { type?: unknown }).type === "text" &&
+      typeof (block as { text?: unknown }).text === "string"
+        ? ((block as { text: string }).text.trim() ?? "")
+        : "",
+    )
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return text || undefined;
+}
+
+async function findSourceReplyTranscriptMirrorByMetadata(
+  params: SourceReplyTranscriptScope & {
+    idempotencyKey: string;
+    metadata: NonNullable<
+      ReturnType<typeof getReplyPayloadMetadata>
+    >["sourceReplyTranscriptMirror"];
+  },
+): Promise<{ messageId: string; message: Record<string, unknown> } | null> {
+  const byIdempotencyKey = await findSourceReplyTranscriptMirrorByIdempotencyKey(params);
+  if (byIdempotencyKey) {
+    return byIdempotencyKey;
+  }
+  const expectedText = resolveMirroredTranscriptText({
+    text: params.metadata?.text,
+    mediaUrls: params.metadata?.mediaUrls,
+  });
+  if (!expectedText) {
+    return null;
+  }
+  const target = (await readTranscriptBranchEntries(params)).toReversed().find((entry) => {
+    if (entry.type !== "message") {
+      return false;
+    }
+    const message = entry.message as unknown as Record<string, unknown> | undefined;
+    return (
+      message?.role === "assistant" &&
+      message.provider === "openclaw" &&
+      message.model === "delivery-mirror" &&
+      extractAssistantTranscriptText(message) === expectedText
+    );
+  });
+  const message =
+    target?.type === "message" ? (target.message as unknown as Record<string, unknown>) : null;
+  if (!target?.id || !message) {
+    return null;
+  }
+  return { messageId: target.id, message };
+}
+
+async function canRewriteSourceReplyMirrors(
+  params: SourceReplyTranscriptScope & {
+    allowedSourceReplyMirrorIds: ReadonlySet<string>;
+    rewriteTargetIds: ReadonlySet<string>;
+  },
+): Promise<boolean> {
+  const branch = await readTranscriptBranchEntries(params);
+  const firstRewriteEntryIndex = branch.findIndex((entry) => params.rewriteTargetIds.has(entry.id));
+  return (
+    firstRewriteEntryIndex >= 0 &&
+    branch
+      .slice(firstRewriteEntryIndex)
+      .every((entry) => !entry.id || params.allowedSourceReplyMirrorIds.has(entry.id))
+  );
+}
+
 async function appendAssistantTranscriptMessage(params: {
   message: string;
   label?: string;

@@ -298,29 +298,24 @@ export async function advanceIMessageCatchupCursor(
     return false;
   }
 
-  const filePath = resolveCursorFilePath(accountId);
-  return await enqueueCursorWrite(filePath, () =>
-    withFileLock(filePath, CATCHUP_CURSOR_LOCK_OPTIONS, async () => {
-      const cursor = await loadIMessageCatchupCursorFromPath(filePath);
-      if (cursor && next.lastSeenRowid <= cursor.lastSeenRowid) {
-        return false;
-      }
+  const cursor = await loadIMessageCatchupCursor(accountId);
+  if (cursor && next.lastSeenRowid <= cursor.lastSeenRowid) {
+    return false;
+  }
 
-      const blockingFailure = Object.values(cursor?.failureRetries ?? {}).some(
-        (count) => count < config.maxFailureRetries,
-      );
-      if (blockingFailure) {
-        return false;
-      }
-
-      await saveIMessageCatchupCursorToPath(filePath, {
-        lastSeenMs: Math.max(cursor?.lastSeenMs ?? next.lastSeenMs, next.lastSeenMs),
-        lastSeenRowid: next.lastSeenRowid,
-        failureRetries: cursor?.failureRetries,
-      });
-      return true;
-    }),
+  const blockingFailure = Object.values(cursor?.failureRetries ?? {}).some(
+    (count) => count < config.maxFailureRetries,
   );
+  if (blockingFailure) {
+    return false;
+  }
+
+  await saveIMessageCatchupCursor(accountId, {
+    lastSeenMs: Math.max(cursor?.lastSeenMs ?? next.lastSeenMs, next.lastSeenMs),
+    lastSeenRowid: next.lastSeenRowid,
+    failureRetries: cursor?.failureRetries,
+  });
+  return true;
 }
 
 /**
