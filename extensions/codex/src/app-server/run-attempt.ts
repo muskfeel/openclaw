@@ -2750,8 +2750,11 @@ export async function runCodexAppServerAttempt(
     if (activeContextEngine) {
       const activeContextEnginePluginId = resolveContextEngineOwnerPluginId(activeContextEngine);
       const finalMessages =
-        (await readMirroredSessionHistoryMessages(activeTranscriptScope())) ??
-        historyMessages.concat(result.messagesSnapshot);
+        (await readMirroredSessionHistoryMessages({
+          agentId: sessionAgentId,
+          sessionId: activeSessionId,
+          path: params.path,
+        })) ?? historyMessages.concat(result.messagesSnapshot);
       await finalizeHarnessContextEngineTurn({
         contextEngine: activeContextEngine,
         promptError: Boolean(finalPromptError),
@@ -3261,9 +3264,11 @@ function readBoolean(record: JsonObject, key: string): boolean | undefined {
   return asBoolean(record[key]);
 }
 
-async function readMirroredSessionHistoryMessages(
-  scope: CodexMirroredSessionHistoryScope,
-): Promise<AgentMessage[] | undefined> {
+async function readMirroredSessionHistoryMessages(scope: {
+  agentId: string;
+  path?: string;
+  sessionId: string;
+}): Promise<AgentMessage[] | undefined> {
   const messages = await readCodexMirroredSessionHistoryMessages(scope);
   if (!messages) {
     embeddedAgentLog.warn("failed to read mirrored session history for codex harness hooks", {
@@ -3865,7 +3870,8 @@ async function mirrorTranscriptBestEffort(params: {
   try {
     await mirrorCodexAppServerTranscript({
       agentId: params.agentId,
-      sessionId: params.result.sessionIdUsed || params.params.sessionId,
+      path: params.params.path,
+      sessionId: params.params.sessionId,
       sessionKey: params.sessionKey,
       messages,
       // Scope is thread-stable. Each entry in `messagesSnapshot` is tagged
@@ -3942,25 +3948,20 @@ async function mirrorPromptAtTurnStartBestEffort(params: {
     return;
   }
   try {
-    const mirrorPromise = (async () => {
-      const userPromptMessage = attachCodexMirrorIdentity(
-        await buildResolvedCodexUserPromptMessage(params.params),
-        `${params.turnId}:prompt`,
-      );
-      const mirrorResult = await mirrorCodexAppServerTranscript({
-        sessionFile: params.params.sessionFile,
-        agentId: params.agentId,
-        sessionKey: params.sessionKey,
-        messages: [userPromptMessage],
-        idempotencyScope: `codex-app-server:${params.threadId}`,
-        config: params.params.config,
-      });
-      for (const message of mirrorResult.userMessagesPresent) {
-        params.notifyUserMessagePersisted(message);
-      }
-    })();
-    params.params.userTurnTranscriptRecorder?.markRuntimePersistencePending(mirrorPromise);
-    await mirrorPromise;
+    await mirrorCodexAppServerTranscript({
+      agentId: params.agentId,
+      path: params.params.path,
+      sessionId: params.params.sessionId,
+      sessionKey: params.sessionKey,
+      messages: [
+        attachCodexMirrorIdentity(
+          buildCodexUserPromptMessage(params.params),
+          `${params.turnId}:prompt`,
+        ),
+      ],
+      idempotencyScope: `codex-app-server:${params.threadId}`,
+      config: params.params.config,
+    });
   } catch (error) {
     embeddedAgentLog.warn("failed to mirror codex app-server prompt at turn start", { error });
   }
