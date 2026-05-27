@@ -497,15 +497,15 @@ describe("cron service ops seam coverage", () => {
   });
 
   it("seeds active manual cron task progress for status surfaces", async () => {
-    const { storePath } = await makeStorePath();
+    const { storeKey, stateDir } = await makeStoreKey();
     const now = Date.parse("2026-03-23T12:00:00.000Z");
-    const restoreStateDir = withStateDirForStorePath(storePath);
+    const restoreStateDir = withStateDir(stateDir);
 
     try {
-      await writeDueIsolatedJobSnapshot(storePath, now);
+      await writeDueIsolatedJobSnapshot(storeKey, now);
       let resolveRun: ((value: { status: "ok"; summary: string }) => void) | undefined;
       const state = createCronServiceState({
-        storePath,
+        storeKey,
         cronEnabled: true,
         log: logger,
         nowMs: () => now,

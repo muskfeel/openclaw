@@ -169,7 +169,7 @@ describe("cron service timer seam coverage", () => {
   });
 
   it("seeds active scheduled cron task progress for status surfaces", async () => {
-    const { storePath } = await makeStorePath();
+    const { storeKey } = await makeStoreKey();
     const now = Date.parse("2026-03-23T12:00:00.000Z");
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeat = vi.fn();
@@ -182,12 +182,12 @@ describe("cron service timer seam coverage", () => {
     );
 
     await writeCronStoreSnapshot({
-      storePath,
+      storeKey,
       jobs: [createDueIsolatedAgentJob({ now })],
     });
 
     const state = createCronServiceState({
-      storePath,
+      storeKey,
       cronEnabled: true,
       log: logger,
       nowMs: () => now,

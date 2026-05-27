@@ -398,7 +398,7 @@ describe("CronService failure alerts", () => {
   });
 
   it("surfaces classified causes before raw errors in failure alerts", async () => {
-    const store = await makeStorePath();
+    const { storeKey } = await makeStoreKey();
     const sendCronFailureAlert = vi.fn(async () => undefined);
     const runIsolatedAgentJob = vi.fn(async () => ({
       status: "error" as const,
@@ -406,7 +406,7 @@ describe("CronService failure alerts", () => {
     }));
 
     const cron = createFailureAlertCron({
-      storePath: store.storePath,
+      storeKey,
       cronConfig: {
         failureAlert: {
           enabled: true,
@@ -438,11 +438,10 @@ describe("CronService failure alerts", () => {
     );
 
     cron.stop();
-    await store.cleanup();
   });
 
   it("uses provider context when surfacing failure alert causes", async () => {
-    const store = await makeStorePath();
+    const { storeKey } = await makeStoreKey();
     const sendCronFailureAlert = vi.fn(async () => undefined);
     const runIsolatedAgentJob = vi.fn(async () => ({
       status: "error" as const,
@@ -451,7 +450,7 @@ describe("CronService failure alerts", () => {
     }));
 
     const cron = createFailureAlertCron({
-      storePath: store.storePath,
+      storeKey,
       cronConfig: {
         failureAlert: {
           enabled: true,
@@ -483,11 +482,10 @@ describe("CronService failure alerts", () => {
     );
 
     cron.stop();
-    await store.cleanup();
   });
 
   it("keeps skipped alert text unchanged when the skip reason looks classifiable", async () => {
-    const store = await makeStorePath();
+    const { storeKey } = await makeStoreKey();
     const sendCronFailureAlert = vi.fn(async () => undefined);
     const runIsolatedAgentJob = vi.fn(async () => ({
       status: "skipped" as const,
@@ -495,7 +493,7 @@ describe("CronService failure alerts", () => {
     }));
 
     const cron = createFailureAlertCron({
-      storePath: store.storePath,
+      storeKey,
       cronConfig: {
         failureAlert: {
           enabled: true,
@@ -526,7 +524,6 @@ describe("CronService failure alerts", () => {
     );
 
     cron.stop();
-    await store.cleanup();
   });
 
   it("tracks skipped runs without alerting or affecting error backoff when includeSkipped is off", async () => {

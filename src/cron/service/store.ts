@@ -43,7 +43,6 @@ export async function ensureLoaded(
     version: 1,
     jobs,
   };
-  state.preservedInvalidPersistedJobs = preservedInvalidPersistedJobs;
   state.storeLoadedAtMs = state.deps.nowMs();
 
   if (!opts?.skipRecompute) {
