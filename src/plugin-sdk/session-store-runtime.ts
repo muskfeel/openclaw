@@ -127,23 +127,6 @@ function resolveSessionRowOptionsFromStorePath(
   });
 }
 
-function readLegacySessionStoreJson(storePath: string): Record<string, SessionEntry> | null {
-  try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(storePath, "utf8"));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    return parsed as Record<string, SessionEntry>;
-  } catch {
-    return null;
-  }
-}
-
-function writeLegacySessionStoreJson(storePath: string, store: Record<string, SessionEntry>): void {
-  fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`);
-}
-
 function resolveSessionRowOptions(params: {
   agentId?: string;
   sessionKey?: string;
@@ -164,6 +147,18 @@ function resolveSessionRowOptions(params: {
     (params.sessionKey ? resolveAgentIdFromSessionKey(params.sessionKey) : undefined) ??
     DEFAULT_AGENT_ID;
   return optionsWithEnv(normalizeAgentId(agentId), params.env);
+}
+
+function readLegacySessionStoreJson(storePath: string): Record<string, SessionEntry> | null {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed as Record<string, SessionEntry>;
+  } catch {
+    return null;
+  }
 }
 
 export function clearSessionStoreCacheForTest(): void {
@@ -283,11 +278,8 @@ export function loadSessionStore(
   storePath: string,
   _opts?: { skipCache?: boolean },
 ): Record<string, SessionEntry> {
-  const parsed = parseSessionStorePath(storePath);
-  if (!parsed) {
-    return readLegacySessionStoreJson(storePath) ?? {};
-  }
-  const sqliteStore = loadSqliteSessionEntries(resolveSessionRowOptionsFromStorePath(storePath));
+  const options = resolveSessionRowOptionsFromStorePath(storePath);
+  const sqliteStore = loadSqliteSessionEntries(options);
   if (Object.keys(sqliteStore).length > 0) {
     return sqliteStore;
   }
@@ -300,10 +292,6 @@ export async function saveSessionStore(
   _opts?: SaveSessionStoreOptions,
 ): Promise<void> {
   normalizeSessionEntries(store);
-  if (!parseSessionStorePath(storePath)) {
-    writeLegacySessionStoreJson(storePath, store);
-    return;
-  }
   const options = resolveSessionRowOptionsFromStorePath(storePath);
   const deleteScope = new Set(Object.keys(loadSqliteSessionEntries(options)));
   await saveSessionStoreRows(options, store, deleteScope);
@@ -331,19 +319,16 @@ export async function updateSessionStore<T>(
   mutator: (store: Record<string, SessionEntry>) => Promise<T> | T,
   _opts?: SaveSessionStoreOptions,
 ): Promise<T> {
-  const parsed = parseSessionStorePath(storePath);
-  const options = parsed ? resolveSessionRowOptionsFromStorePath(storePath) : undefined;
-  const sqliteStore = options ? loadSqliteSessionEntries(options) : {};
-  const legacyStore = readLegacySessionStoreJson(storePath);
-  const store = Object.keys(sqliteStore).length > 0 ? sqliteStore : (legacyStore ?? sqliteStore);
+  const options = resolveSessionRowOptionsFromStorePath(storePath);
+  const sqliteStore = loadSqliteSessionEntries(options);
+  const store =
+    Object.keys(sqliteStore).length > 0
+      ? sqliteStore
+      : (readLegacySessionStoreJson(storePath) ?? sqliteStore);
   const deleteScope = new Set(Object.keys(store));
   const result = await mutator(store);
   normalizeSessionEntries(store);
-  if (options) {
-    await saveSessionStoreRows(options, store, deleteScope);
-  } else {
-    writeLegacySessionStoreJson(storePath, store);
-  }
+  await saveSessionStoreRows(options, store, deleteScope);
   return result;
 }
 

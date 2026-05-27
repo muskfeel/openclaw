@@ -5,9 +5,10 @@
 
 import type { ColumnType } from "kysely";
 
-export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
-  ? ColumnType<S, I | undefined, U>
-  : ColumnType<T, T | undefined, T>;
+export type Generated<T> =
+  T extends ColumnType<infer S, infer I, infer U>
+    ? ColumnType<S, I | undefined, U>
+    : ColumnType<T, T | undefined, T>;
 
 export interface AcpReplayEvents {
   at: number;
@@ -615,6 +616,8 @@ export interface NodePairingPaired {
   approved_at_ms: number;
   bins_json: string | null;
   caps_json: string | null;
+  client_id: string | null;
+  client_mode: string | null;
   commands_json: string | null;
   core_version: string | null;
   created_at_ms: number;
@@ -635,6 +638,8 @@ export interface NodePairingPaired {
 
 export interface NodePairingPending {
   caps_json: string | null;
+  client_id: string | null;
+  client_mode: string | null;
   commands_json: string | null;
   core_version: string | null;
   device_family: string | null;

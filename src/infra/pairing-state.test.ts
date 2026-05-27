@@ -129,4 +129,65 @@ describe("pairing state helpers", () => {
       });
     });
   });
+
+  it("round-trips node client metadata through sqlite rows", async () => {
+    await withTempDir("openclaw-pairing-state-", async (baseDir) => {
+      writePairingStateRecord({
+        baseDir,
+        subdir: "nodes",
+        key: "pending",
+        value: {
+          "req-node": {
+            requestId: "req-node",
+            nodeId: "node-1",
+            clientId: "openclaw-macos",
+            clientMode: "gateway",
+            ts: 1,
+          },
+        },
+      });
+
+      expect(
+        readPairingStateRecord<{ clientId?: string; clientMode?: string }>({
+          baseDir,
+          subdir: "nodes",
+          key: "pending",
+        }),
+      ).toEqual({
+        "req-node": expect.objectContaining({
+          clientId: "openclaw-macos",
+          clientMode: "gateway",
+        }),
+      });
+
+      writePairingStateRecord({
+        baseDir,
+        subdir: "nodes",
+        key: "paired",
+        value: {
+          "node-1": {
+            nodeId: "node-1",
+            token: "token-1",
+            clientId: "openclaw-macos",
+            clientMode: "gateway",
+            createdAtMs: 1,
+            approvedAtMs: 2,
+          },
+        },
+      });
+
+      expect(
+        readPairingStateRecord<{ clientId?: string; clientMode?: string }>({
+          baseDir,
+          subdir: "nodes",
+          key: "paired",
+        }),
+      ).toEqual({
+        "node-1": expect.objectContaining({
+          clientId: "openclaw-macos",
+          clientMode: "gateway",
+        }),
+      });
+    });
+  });
 });

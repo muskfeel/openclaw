@@ -640,7 +640,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
   });
 
   it("persists estimated context budget status without marking stale usage fresh", async () => {
-    await withTempSessionStore(async ({ storePath }) => {
+    await withMockSessionRows(async ({ agentId }) => {
       const cfg = {} as OpenClawConfig;
       const sessionKey = "agent:main:explicit:test-context-budget-status";
       const sessionId = "test-context-budget-status-session";
@@ -652,7 +652,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
           totalTokensFresh: true,
         },
       };
-      await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2));
+      await replaceMockSessionEntries(agentId, sessionStore);
 
       const result: EmbeddedAgentRunResult = {
         meta: {
@@ -684,11 +684,10 @@ describe("updateSessionEntryAfterAgentRun", () => {
         },
       };
 
-      await updateSessionStoreAfterAgentRun({
+      await updateSessionEntryAfterAgentRun({
         cfg,
         sessionId,
         sessionKey,
-        storePath,
         sessionStore,
         defaultProvider: "minimax",
         defaultModel: "MiniMax-M2.7",
@@ -703,13 +702,13 @@ describe("updateSessionEntryAfterAgentRun", () => {
         contextTokenBudget: 32_000,
       });
 
-      const persisted = loadSessionStore(storePath);
+      const persisted = readMockSessionEntries(agentId);
       expect(persisted[sessionKey]?.contextBudgetStatus?.estimatedPromptTokens).toBe(18_000);
     });
   });
 
   it("clears stale estimated context budget status when a runtime refresh has no current estimate", async () => {
-    await withTempSessionStore(async ({ storePath }) => {
+    await withMockSessionRows(async ({ agentId }) => {
       const cfg = {} as OpenClawConfig;
       const sessionKey = "agent:main:explicit:test-clear-context-budget-status";
       const sessionId = "test-clear-context-budget-status-session";
@@ -740,7 +739,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
           },
         },
       };
-      await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2));
+      await replaceMockSessionEntries(agentId, sessionStore);
 
       const result: EmbeddedAgentRunResult = {
         meta: {
@@ -753,11 +752,10 @@ describe("updateSessionEntryAfterAgentRun", () => {
         },
       };
 
-      await updateSessionStoreAfterAgentRun({
+      await updateSessionEntryAfterAgentRun({
         cfg,
         sessionId,
         sessionKey,
-        storePath,
         sessionStore,
         defaultProvider: "minimax",
         defaultModel: "MiniMax-M2.7",
@@ -768,7 +766,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
       expect(sessionStore[sessionKey]?.model).toBe("MiniMax-M2.7");
       expect(sessionStore[sessionKey]?.contextBudgetStatus).toBeUndefined();
 
-      const persisted = loadSessionStore(storePath);
+      const persisted = readMockSessionEntries(agentId);
       expect(persisted[sessionKey]?.contextBudgetStatus).toBeUndefined();
     });
   });
@@ -1236,7 +1234,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
   });
 
   it("preserves user-facing run accounting while allowing session touch metadata", async () => {
-    await withTempSessionStore(async ({ storePath }) => {
+    await withMockSessionRows(async ({ agentId }) => {
       const cfg = {
         agents: {
           defaults: {
@@ -1247,30 +1245,7 @@ describe("updateSessionEntryAfterAgentRun", () => {
         },
       } as OpenClawConfig;
       const sessionKey = "agent:main:explicit:test-preserve-user-facing-run-state";
-      const sessionId = "test-preserve-user-facing-run-state-session";
-      const sessionStore: Record<string, SessionEntry> = {
-        [sessionKey]: {
-          sessionId,
-          updatedAt: 1,
-          lastInteractionAt: 10,
-          modelProvider: "anthropic",
-          model: "claude-opus-4-6",
-          contextTokens: 1_000_000,
-          inputTokens: 11,
-          outputTokens: 22,
-          totalTokens: 333,
-          totalTokensFresh: true,
-          cacheRead: 4,
-          cacheWrite: 5,
-          estimatedCostUsd: 0.25,
-          abortedLastRun: false,
-          cliSessionBindings: {
-            "claude-cli": { sessionId: "visible-cli-session" },
-          },
-          compactionCount: 7,
-        },
-      };
-      await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2));
+      const sessionId = "fresh-visible-session-id";
       const freshVisibleEntry: SessionEntry = {
         sessionId: "fresh-visible-session-id",
         updatedAt: 2,
@@ -1292,7 +1267,10 @@ describe("updateSessionEntryAfterAgentRun", () => {
         },
         compactionCount: 9,
       };
-      await fs.writeFile(storePath, JSON.stringify({ [sessionKey]: freshVisibleEntry }, null, 2));
+      const sessionStore: Record<string, SessionEntry> = {
+        [sessionKey]: freshVisibleEntry,
+      };
+      await replaceMockSessionEntries(agentId, sessionStore);
 
       const result: EmbeddedAgentRunResult = {
         meta: {
@@ -1317,11 +1295,10 @@ describe("updateSessionEntryAfterAgentRun", () => {
         },
       };
 
-      await updateSessionStoreAfterAgentRun({
+      await updateSessionEntryAfterAgentRun({
         cfg,
         sessionId,
         sessionKey,
-        storePath,
         sessionStore,
         defaultProvider: "claude-cli",
         defaultModel: "claude-sonnet-4-6",

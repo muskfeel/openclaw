@@ -110,9 +110,30 @@ function ensureOpenClawStatePermissions(pathname: string, env: NodeJS.ProcessEnv
   }
 }
 
+function tableHasColumn(db: DatabaseSync, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: unknown }>;
+  return rows.some((row) => row.name === columnName);
+}
+
+function ensureColumn(db: DatabaseSync, tableName: string, columnSql: string): void {
+  const columnName = columnSql.trim().split(/\s+/, 1)[0];
+  if (!columnName || tableHasColumn(db, tableName, columnName)) {
+    return;
+  }
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnSql};`);
+}
+
+function ensureAdditiveStateColumns(db: DatabaseSync): void {
+  ensureColumn(db, "node_pairing_pending", "client_id TEXT");
+  ensureColumn(db, "node_pairing_pending", "client_mode TEXT");
+  ensureColumn(db, "node_pairing_paired", "client_id TEXT");
+  ensureColumn(db, "node_pairing_paired", "client_mode TEXT");
+}
+
 function ensureSchema(db: DatabaseSync, pathname: string): void {
   assertSupportedSchemaVersion(db, pathname);
   db.exec(OPENCLAW_STATE_SCHEMA_SQL);
+  ensureAdditiveStateColumns(db);
   db.exec(`PRAGMA user_version = ${OPENCLAW_STATE_SCHEMA_VERSION};`);
   const now = Date.now();
   const kysely = getNodeSqliteKysely<OpenClawStateMetadataDatabase>(db);
