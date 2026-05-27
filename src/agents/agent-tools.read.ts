@@ -16,7 +16,7 @@ import type { VirtualAgentFs } from "./filesystem/agent-filesystem.js";
 import type { ImageSanitizationLimits } from "./image-sanitization.js";
 import { toRelativeWorkspacePath } from "./path-policy.js";
 import { createEditTool, createReadTool, createWriteTool } from "./pi-coding-agent-contract.js";
-import { wrapEditToolWithRecovery } from "./pi-tools.host-edit.js";
+import { wrapEditToolWithRecovery, wrapWriteToolWithRecovery } from "./pi-tools.host-edit.js";
 import {
   REQUIRED_PARAM_GROUPS,
   assertRequiredParams,
