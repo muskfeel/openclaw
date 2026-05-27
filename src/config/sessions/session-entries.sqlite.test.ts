@@ -87,6 +87,19 @@ describe("SQLite session row backend", () => {
     });
   });
 
+  it("lists default-agent entries when called without options", () => {
+    const stateDir = createTempDir();
+    process.env.OPENCLAW_STATE_DIR = stateDir;
+    const entry: SessionEntry = {
+      sessionId: "default-session",
+      updatedAt: 123,
+    };
+
+    upsertSessionEntry({ agentId: "main", sessionKey: "discord:u1", entry });
+
+    expect(listSessionEntries()).toEqual([{ sessionKey: "discord:u1", entry }]);
+  });
+
   it("routes the production session row API through SQLite", () => {
     const stateDir = createTempDir();
     const env = { OPENCLAW_STATE_DIR: stateDir };

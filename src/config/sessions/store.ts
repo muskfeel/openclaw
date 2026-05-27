@@ -119,9 +119,13 @@ export function getSessionEntry(
 }
 
 export function listSessionEntries(
-  options: SessionEntryRowOptions,
+  options: Partial<SessionEntryRowOptions> = {},
 ): Array<{ sessionKey: string; entry: SessionEntry }> {
-  return listSqliteSessionEntries(options);
+  return listSqliteSessionEntries({
+    agentId: normalizeAgentId(options.agentId ?? DEFAULT_AGENT_ID),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.path ? { path: options.path } : {}),
+  });
 }
 
 export function loadSessionStore(
