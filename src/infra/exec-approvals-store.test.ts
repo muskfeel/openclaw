@@ -28,6 +28,7 @@ let readExecApprovalsSnapshot: ExecApprovalsModule["readExecApprovalsSnapshot"];
 let recordAllowlistMatchesUse: ExecApprovalsModule["recordAllowlistMatchesUse"];
 let recordAllowlistUse: ExecApprovalsModule["recordAllowlistUse"];
 let requestExecApprovalViaSocket: ExecApprovalsModule["requestExecApprovalViaSocket"];
+let resolveExecApprovals: ExecApprovalsModule["resolveExecApprovals"];
 let resolveExecApprovalsStoreLocationForDisplay: ExecApprovalsModule["resolveExecApprovalsStoreLocationForDisplay"];
 let resolveExecApprovalsSocketPath: ExecApprovalsModule["resolveExecApprovalsSocketPath"];
 let saveExecApprovals: ExecApprovalsModule["saveExecApprovals"];
@@ -50,6 +51,7 @@ beforeAll(async () => {
     recordAllowlistMatchesUse,
     recordAllowlistUse,
     requestExecApprovalViaSocket,
+    resolveExecApprovals,
     resolveExecApprovalsStoreLocationForDisplay,
     resolveExecApprovalsSocketPath,
     saveExecApprovals,
@@ -182,6 +184,26 @@ describe("exec approvals store helpers", () => {
     expect(sqlite.exists).toBe(true);
     expect(sqlite.file.defaults?.security).toBe("deny");
     expect(sqlite.raw).toContain('"security": "deny"');
+  });
+
+  it("resolves saved SQLite approvals before the legacy no-persistence fast path", () => {
+    createHomeDir();
+
+    saveExecApprovals({
+      version: 1,
+      defaults: { security: "deny", ask: "always" },
+      agents: {
+        main: { security: "allowlist", ask: "on-miss" },
+      },
+    });
+
+    const resolved = resolveExecApprovals("main");
+
+    expect(resolved.defaults.security).toBe("deny");
+    expect(resolved.defaults.ask).toBe("always");
+    expect(resolved.agent.security).toBe("allowlist");
+    expect(resolved.agent.ask).toBe("on-miss");
+    expect(resolved.path).toBe(resolveExecApprovalsStoreLocationForDisplay());
   });
 
   it("ensures approvals in SQLite with default socket path and generated token", () => {

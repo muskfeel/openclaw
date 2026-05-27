@@ -791,9 +791,21 @@ export function resolveExecApprovals(
 ): ExecApprovalsResolved {
   const filePath = resolveLegacyExecApprovalsPath();
   if (!overrides?.requireSocket) {
-    const file = readExecApprovalsForNoPersistence(filePath);
-    const resolved = resolveExecApprovalsFromFile({
-      file,
+    const sqliteRaw = readExecApprovalsRawFromSqlite();
+    if (sqliteRaw !== null) {
+      const file = parseExecApprovalsRaw(sqliteRaw);
+      return resolveExecApprovalsDocument({
+        document: file,
+        agentId,
+        overrides,
+        path: resolveExecApprovalsStoreLocationForDisplay(),
+        socketPath: expandHomePrefix(file.socket?.path ?? resolveExecApprovalsSocketPath()),
+        token: file.socket?.token ?? "",
+      });
+    }
+    const legacyFile = readExecApprovalsForNoPersistence(filePath);
+    const resolved = resolveExecApprovalsDocument({
+      document: legacyFile,
       agentId,
       overrides,
       path: filePath,
@@ -803,7 +815,7 @@ export function resolveExecApprovals(
     if (
       resolved.agent.security === "full" &&
       resolved.agent.ask === "off" &&
-      !file.socket?.token?.trim()
+      !legacyFile.socket?.token?.trim()
     ) {
       return resolved;
     }

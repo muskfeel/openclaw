@@ -6,11 +6,7 @@ import {
 } from "../../state/openclaw-state-db.js";
 import { cloneAuthProfileStore } from "./clone.js";
 import { AUTH_STORE_VERSION } from "./constants.js";
-import {
-  listRuntimeExternalAuthProfiles,
-  overlayExternalAuthProfiles,
-  shouldPersistExternalAuthProfile,
-} from "./external-auth.js";
+import { listRuntimeExternalAuthProfiles, overlayExternalAuthProfiles } from "./external-auth.js";
 import type { ExternalCliAuthDiscovery } from "./external-cli-discovery.js";
 import {
   isSafeToAdoptMainStoreOAuthIdentity,
@@ -721,7 +717,7 @@ export function ensureAuthProfileStore(
   },
 ): AuthProfileStore {
   const externalCli = resolveExternalCliOverlayOptions(options);
-  const runtimeStore = resolveRuntimeAuthProfileStore(agentDir, options);
+  const runtimeStore = resolveRuntimeAuthProfileStore(agentDir);
   const store = overlayExternalAuthProfiles(
     ensureAuthProfileStoreWithoutExternalProfiles(agentDir, options),
     {
@@ -749,7 +745,7 @@ export function ensureAuthProfileStoreWithoutExternalProfiles(
     ...options,
     resolveLegacyOAuthSidecars: options?.resolveLegacyOAuthSidecars ?? true,
   };
-  const runtimeStore = resolveRuntimeAuthProfileStore(agentDir, effectiveOptions);
+  const runtimeStore = resolveRuntimeAuthProfileStore(agentDir);
   if (runtimeStore) {
     return buildAuthProfileStoreWithoutExternalProfiles({
       store: runtimeStore,
