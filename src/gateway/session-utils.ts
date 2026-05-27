@@ -1791,6 +1791,8 @@ type SessionEntrySelection = {
   entries: SessionEntryPair[];
   totalCount: number;
   limitApplied?: number;
+  offsetApplied: number;
+  nextOffset: number | null;
 };
 
 function compareSessionEntryPairsByUpdatedAt(a: SessionEntryPair, b: SessionEntryPair): number {
@@ -1805,6 +1807,13 @@ function resolveSessionsListLimit(
     return defaultLimit;
   }
   return Math.max(1, Math.floor(opts.limit));
+}
+
+function resolveSessionsListOffset(opts: import("./protocol/index.js").SessionsListParams): number {
+  if (typeof opts.offset !== "number" || !Number.isFinite(opts.offset)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(opts.offset));
 }
 
 function selectNewestLimitedEntries(
@@ -1831,12 +1840,14 @@ function selectNewestLimitedEntries(
 function sortAndLimitSessionEntries(
   entries: SessionEntryPair[],
   limit: number | undefined,
+  offset: number,
 ): SessionEntryPair[] {
-  if (limit !== undefined && limit <= SESSIONS_LIST_TOP_N_LIMIT) {
-    return selectNewestLimitedEntries(entries, limit);
+  const end = limit === undefined ? undefined : offset + limit;
+  if (end !== undefined && end <= SESSIONS_LIST_TOP_N_LIMIT) {
+    return selectNewestLimitedEntries(entries, end).slice(offset);
   }
   const sorted = entries.toSorted(compareSessionEntryPairsByUpdatedAt);
-  return limit === undefined ? sorted : sorted.slice(0, limit);
+  return sorted.slice(offset, end);
 }
 
 function filterSessionEntries(params: {
@@ -1957,11 +1968,15 @@ function selectSessionEntries(params: {
 }): SessionEntrySelection {
   const filtered = filterSessionEntries(params);
   const limit = resolveSessionsListLimit(params.opts, params.defaultLimit);
-  const entries = sortAndLimitSessionEntries(filtered, limit);
+  const offset = resolveSessionsListOffset(params.opts);
+  const entries = sortAndLimitSessionEntries(filtered, limit, offset);
+  const nextOffset = offset + entries.length;
   return {
     entries,
     totalCount: filtered.length,
     limitApplied: limit,
+    offsetApplied: offset,
+    nextOffset: nextOffset < filtered.length ? nextOffset : null,
   };
 }
 
@@ -2030,7 +2045,7 @@ export function listSessionsFromStore(params: {
         : undefined,
     defaultLimit: SESSIONS_LIST_DEFAULT_LIMIT,
   });
-  const { entries, totalCount, limitApplied } = selection;
+  const { entries, totalCount, limitApplied, offsetApplied, nextOffset } = selection;
 
   const sessions = entries.map(([key, entry], index) => {
     const includeTranscriptFields = index < sessionListTranscriptFieldRows;
@@ -2068,7 +2083,9 @@ export function listSessionsFromStore(params: {
     count: sessions.length,
     totalCount,
     limitApplied,
-    hasMore: sessions.length < totalCount,
+    offset: offsetApplied,
+    nextOffset,
+    hasMore: nextOffset !== null,
     defaults: getSessionDefaults(cfg, params.modelCatalog, { allowPluginNormalization: false }),
     sessions,
   };
@@ -2118,7 +2135,7 @@ export async function listSessionsFromStoreAsync(params: {
         : undefined,
     defaultLimit: SESSIONS_LIST_DEFAULT_LIMIT,
   });
-  const { entries, totalCount, limitApplied } = selection;
+  const { entries, totalCount, limitApplied, offsetApplied, nextOffset } = selection;
 
   const sessions: GatewaySessionRow[] = [];
   for (let i = 0; i < entries.length; i++) {
@@ -2183,7 +2200,9 @@ export async function listSessionsFromStoreAsync(params: {
     count: sessions.length,
     totalCount,
     limitApplied,
-    hasMore: sessions.length < totalCount,
+    offset: offsetApplied,
+    nextOffset,
+    hasMore: nextOffset !== null,
     defaults: getSessionDefaults(cfg, params.modelCatalog, { allowPluginNormalization: false }),
     sessions,
   };
