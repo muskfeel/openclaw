@@ -120,19 +120,44 @@ class DeviceAuthStoreTest {
   fun loadEntryDoesNotResurrectLegacyRoleAfterSQLiteRowsExist() {
     val app = RuntimeEnvironment.getApplication()
     val prefs = legacyPrefs(app)
+    val store = DeviceAuthStore(app, legacyPrefsOverride = prefs)
+
+    store.saveToken("device-1", "operator", "operator-token", scopes = listOf("operator.write"))
     prefs.putString("gateway.deviceToken.device-1.admin", " stale-admin-token ")
     prefs.putString(
       "gateway.deviceTokenMeta.device-1.admin",
       """{"scopes":["admin"],"updatedAtMs":1700000000000}""",
     )
-    val store = DeviceAuthStore(app, legacyPrefsOverride = prefs)
 
-    store.saveToken("device-1", "operator", "operator-token", scopes = listOf("operator.write"))
+    store.saveToken("device-1", "operator", "operator-token-2", scopes = listOf("operator.write"))
 
     assertNull(store.loadEntry("device-1", "admin"))
     assertNull(OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "admin"))
     assertNull(prefs.getString("gateway.deviceToken.device-1.admin"))
     assertNull(prefs.getString("gateway.deviceTokenMeta.device-1.admin"))
+  }
+
+  @Test
+  fun saveTokenMigratesSameDeviceLegacyRolesBeforeFirstSqliteWrite() {
+    val app = RuntimeEnvironment.getApplication()
+    val prefs = legacyPrefs(app)
+    prefs.putString("gateway.deviceToken.device-1.operator", " old-operator-token ")
+    prefs.putString("gateway.deviceToken.device-1.node", " node-token ")
+    prefs.putString(
+      "gateway.deviceTokenMeta.device-1.node",
+      """{"scopes":["node.connect"],"updatedAtMs":1700000000001}""",
+    )
+    val store = DeviceAuthStore(app, legacyPrefsOverride = prefs)
+
+    store.saveToken("device-1", "operator", "operator-token", scopes = listOf("operator.write"))
+
+    assertEquals("operator-token", store.loadEntry("device-1", "operator")?.token)
+    assertEquals("node-token", store.loadEntry("device-1", "node")?.token)
+    assertEquals(
+      "__openclaw_secure_prefs__",
+      OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "node")?.token,
+    )
+    assertNull(prefs.getString("gateway.deviceTokenMeta.device-1.node"))
   }
 
   @Test

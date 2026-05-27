@@ -173,10 +173,40 @@ struct DeviceIdentityStoreTests {
         }
     }
 
+    @Test("migrates same-device legacy auth roles before the first SQLite save")
+    func migratesSameDeviceLegacyAuthRolesBeforeFirstSQLiteSave() throws {
+        try Self.withTempStateDir { stateDir in
+            let legacyURL = Self.legacyAuthURL(stateDir: stateDir)
+            try Self.writeLegacyAuthSidecar(
+                legacyURL,
+                deviceId: "device-1",
+                tokens: [
+                    "gateway": ("gateway-token", ["read"]),
+                    "operator": ("old-operator-token", ["operator.read"]),
+                ])
+
+            _ = DeviceAuthStore.storeToken(
+                deviceId: "device-1",
+                role: "operator",
+                token: "operator-token",
+                scopes: ["operator.write"])
+
+            #expect(DeviceAuthStore.loadToken(deviceId: "device-1", role: "gateway")?.token == "gateway-token")
+            #expect(DeviceAuthStore.loadToken(deviceId: "device-1", role: "operator")?.token == "operator-token")
+            #expect(!FileManager.default.fileExists(atPath: legacyURL.path))
+        }
+    }
+
     @Test("does not resurrect legacy device auth role after SQLite rows exist")
     func doesNotResurrectLegacyDeviceAuthRoleAfterSQLiteRowsExist() throws {
         try Self.withTempStateDir { stateDir in
             let legacyURL = Self.legacyAuthURL(stateDir: stateDir)
+            _ = DeviceAuthStore.storeToken(
+                deviceId: "device-1",
+                role: "operator",
+                token: "operator-token",
+                scopes: ["operator"])
+
             try Self.writeLegacyAuthSidecar(
                 legacyURL,
                 deviceId: "device-1",
@@ -187,7 +217,7 @@ struct DeviceIdentityStoreTests {
             _ = DeviceAuthStore.storeToken(
                 deviceId: "device-1",
                 role: "operator",
-                token: "operator-token",
+                token: "operator-token-2",
                 scopes: ["operator"])
 
             #expect(DeviceAuthStore.loadToken(deviceId: "device-1", role: "admin") == nil)
@@ -356,6 +386,35 @@ struct DeviceIdentityStoreTests {
                     "updatedAtMs": 1_700_000_000_000,
                 ],
             ],
+        ] as [String: Any]
+        let data = try JSONSerialization.data(withJSONObject: legacy, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: legacyURL)
+    }
+
+    private static func writeLegacyAuthSidecar(
+        _ legacyURL: URL,
+        deviceId: String,
+        tokens: [String: (token: String, scopes: [String])]) throws
+    {
+        try FileManager.default.createDirectory(
+            at: legacyURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true)
+        let tokenEntries = tokens.map { role, value in
+            (
+                role,
+                [
+                    "token": value.token,
+                    "role": role,
+                    "scopes": value.scopes,
+                    "updatedAtMs": 1_700_000_000_000,
+                ] as [String: Any]
+            )
+        }
+        let tokenObject = Dictionary(uniqueKeysWithValues: tokenEntries)
+        let legacy = [
+            "version": 1,
+            "deviceId": deviceId,
+            "tokens": tokenObject,
         ] as [String: Any]
         let data = try JSONSerialization.data(withJSONObject: legacy, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: legacyURL)

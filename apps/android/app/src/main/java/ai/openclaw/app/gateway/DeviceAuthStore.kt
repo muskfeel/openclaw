@@ -159,6 +159,7 @@ class DeviceAuthStore private constructor(
     val normalizedRole = normalizeRole(role)
     val normalizedScopes = normalizeScopes(scopes)
     val latestDeviceId = stateStore.readLatestDeviceAuthDeviceId()
+    val shouldSeedSameDeviceLegacyRoles = latestDeviceId == null
     val sqliteDeviceChanged = latestDeviceId != null && latestDeviceId != normalizedDevice
     val shouldDropLegacyAuth =
       sqliteDeviceChanged ||
@@ -170,6 +171,9 @@ class DeviceAuthStore private constructor(
     }
     if (shouldDropLegacyAuth) {
       removeForeignLegacyEntries(normalizedDevice)
+    }
+    if (shouldSeedSameDeviceLegacyRoles) {
+      migrateLegacyEntriesForDevice(normalizedDevice)
     }
     legacyPrefs.putString(tokenKey(normalizedDevice, normalizedRole), token.trim())
     removeLegacyMetadata(normalizedDevice, normalizedRole)

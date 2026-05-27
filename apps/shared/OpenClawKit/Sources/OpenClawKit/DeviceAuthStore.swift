@@ -44,6 +44,8 @@ public enum DeviceAuthStore {
             scopes: normalizeScopes(scopes),
             updatedAtMs: Int(Date().timeIntervalSince1970 * 1000))
         let currentDeviceId = OpenClawSQLiteStateStore.readLatestDeviceAuthDeviceId()
+        let legacyStoreToImport =
+            currentDeviceId == nil ? self.readLegacyStore().flatMap { $0.deviceId == deviceId ? $0 : nil } : nil
         let sqliteDeviceChanged = currentDeviceId != nil && currentDeviceId != deviceId
         let shouldDropLegacyStore =
             sqliteDeviceChanged || self.readLegacyStore().map { $0.deviceId != deviceId } == true
@@ -51,8 +53,15 @@ public enum DeviceAuthStore {
             if sqliteDeviceChanged {
                 try OpenClawSQLiteStateStore.deleteAllDeviceAuthTokens()
             }
+            if let legacyStoreToImport {
+                for legacyEntry in legacyStoreToImport.tokens.values {
+                    let normalized = self.normalizedLegacyEntry(legacyEntry)
+                    try OpenClawSQLiteStateStore.upsertDeviceAuthToken(
+                        self.row(deviceId: deviceId, entry: normalized))
+                }
+            }
             try OpenClawSQLiteStateStore.upsertDeviceAuthToken(self.row(deviceId: deviceId, entry: entry))
-            if shouldDropLegacyStore {
+            if shouldDropLegacyStore || legacyStoreToImport != nil {
                 self.removeLegacyStore()
             } else {
                 self.removeLegacyToken(deviceId: deviceId, role: normalizedRole)
