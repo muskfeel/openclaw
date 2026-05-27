@@ -6,7 +6,6 @@ import {
   getActiveDiagnosticsTimelineSpan,
   measureDiagnosticsTimelineSpanSync,
 } from "../infra/diagnostics-timeline.js";
-import { isRecord } from "../shared/record-coerce.js";
 import { resolveUserPath } from "../utils.js";
 import { resolveCompatibilityHostVersion } from "../version.js";
 import { getCurrentPluginMetadataSnapshot } from "./current-plugin-metadata-snapshot.js";
@@ -130,6 +129,162 @@ function stableMemoValue(value: unknown): unknown {
   );
 }
 
+function isPathInsideOrEqual(childPath: string, parentPath: string): boolean {
+  const relative = path.relative(parentPath, childPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function tryRealpath(filePath: string): string | null {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function resolvePluginFilePath(
+  pluginDir: string,
+  filePath: string | undefined,
+  options: { allowSymlinkOutsideRoot?: boolean } = {},
+):
+  | { status: "ok"; path: string }
+  | { status: "outside-root"; path: string }
+  | { status: "missing-root"; path: string } {
+  if (!filePath) {
+    return { status: "missing-root", path: "" };
+  }
+  const rootDir = path.resolve(pluginDir);
+  const resolved = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(rootDir, filePath);
+  if (!isPathInsideOrEqual(resolved, rootDir)) {
+    return { status: "outside-root", path: resolved };
+  }
+  const rootRealPath = tryRealpath(rootDir);
+  const targetRealPath = tryRealpath(resolved);
+  if (
+    rootRealPath &&
+    targetRealPath &&
+    !isPathInsideOrEqual(targetRealPath, rootRealPath) &&
+    !options.allowSymlinkOutsideRoot
+  ) {
+    return { status: "outside-root", path: resolved };
+  }
+  return { status: "ok", path: resolved };
+}
+
+function persistedPluginFileFingerprint(
+  rootDir: string | undefined,
+  filePath: string | undefined,
+  options: { allowSymlinkOutsideRoot?: boolean; watchedFiles?: Set<string> } = {},
+): unknown {
+  if (!filePath) {
+    return null;
+  }
+  if (!rootDir) {
+    return [filePath, "missing-root"];
+  }
+  const resolved = resolvePluginFilePath(rootDir, filePath, {
+    allowSymlinkOutsideRoot: options.allowSymlinkOutsideRoot,
+  });
+  if (resolved.status !== "ok") {
+    return [filePath, resolved.status];
+  }
+  options.watchedFiles?.add(resolved.path);
+  return fileFingerprint(resolved.path);
+}
+
+function watchedFileFingerprint(filePath: string | undefined, watchedFiles: Set<string>): unknown {
+  if (!filePath) {
+    return null;
+  }
+  watchedFiles.add(filePath);
+  return fileFingerprint(filePath);
+}
+
+function resolveInstallRecordPath(value: unknown, env: NodeJS.ProcessEnv): string | undefined {
+  const normalized = normalizeString(value);
+  return normalized ? resolveUserPath(normalized, env) : undefined;
+}
+
+function installRecordPathFingerprints(
+  env: NodeJS.ProcessEnv,
+  records: unknown,
+  watchedFiles: Set<string>,
+): readonly unknown[] {
+  if (!isRecord(records)) {
+    return [];
+  }
+  return Object.entries(records)
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([pluginId, rawRecord]) => {
+      if (!isRecord(rawRecord)) {
+        return [pluginId, rawRecord];
+      }
+      const installPath = normalizeString(rawRecord.installPath);
+      const sourcePath = normalizeString(rawRecord.sourcePath);
+      const resolvedInstallPath = resolveInstallRecordPath(rawRecord.installPath, env);
+      const resolvedSourcePath = resolveInstallRecordPath(rawRecord.sourcePath, env);
+      return [
+        pluginId,
+        installPath,
+        sourcePath,
+        watchedFileFingerprint(
+          resolvedInstallPath ? path.join(resolvedInstallPath, "package.json") : undefined,
+          watchedFiles,
+        ),
+        watchedFileFingerprint(
+          resolvedInstallPath ? path.join(resolvedInstallPath, "openclaw.plugin.json") : undefined,
+          watchedFiles,
+        ),
+        watchedFileFingerprint(resolvedSourcePath, watchedFiles),
+        watchedFileFingerprint(
+          resolvedSourcePath ? path.join(resolvedSourcePath, "package.json") : undefined,
+          watchedFiles,
+        ),
+        watchedFileFingerprint(
+          resolvedSourcePath ? path.join(resolvedSourcePath, "openclaw.plugin.json") : undefined,
+          watchedFiles,
+        ),
+      ];
+    });
+}
+
+function managedNpmDependencyMetadataFingerprints(
+  npmRoot: string,
+  watchedFiles: Set<string>,
+): readonly unknown[] {
+  const rootManifest = readJsonObject(path.join(npmRoot, "package.json"));
+  const dependencies = isRecord(rootManifest?.dependencies) ? rootManifest.dependencies : {};
+  const nodeModulesRoot = path.join(npmRoot, "node_modules");
+  return Object.entries(dependencies)
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([packageName, rawSpec]) => {
+      const dependencySpec = normalizeString(rawSpec);
+      if (!dependencySpec) {
+        return [packageName, rawSpec];
+      }
+      const packageDir = path.resolve(nodeModulesRoot, packageName);
+      if (!isPathInsideOrEqual(packageDir, path.resolve(nodeModulesRoot))) {
+        return [packageName, dependencySpec, "outside-node-modules"];
+      }
+      return [
+        packageName,
+        dependencySpec,
+        watchedFileFingerprint(path.join(packageDir, "package.json"), watchedFiles),
+        watchedFileFingerprint(path.join(packageDir, "openclaw.plugin.json"), watchedFiles),
+      ];
+    });
+}
+
+function resolveRecordPackageJsonPath(record: Record<string, unknown>): string | undefined {
+  const packageJson = record.packageJson;
+  if (!isRecord(packageJson)) {
+    return undefined;
+  }
+  return normalizeString(packageJson.path);
+}
+
 function pickMemoRelevantEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return Object.fromEntries(
     MEMO_RELEVANT_ENV_KEYS.flatMap((key) => {
@@ -225,6 +380,10 @@ function resolvePersistedRegistryMemoContextHash(params: {
   });
 }
 
+function hashWatchedFiles(watchedFiles: readonly string[]): string {
+  return hashJson(watchedFiles.map((filePath) => fileFingerprint(filePath)));
+}
+
 function resolvePersistedRegistryMemoState(params: {
   env: NodeJS.ProcessEnv;
   index?: InstalledPluginIndex;
@@ -242,6 +401,8 @@ function resolvePersistedRegistryMemoState(params: {
       contextHash,
       fastHash,
       fingerprint: fastFingerprint,
+      watchedFiles: [],
+      watchedFilesHash: hashJson([]),
     };
   }
   const npmRoot = params.stateDir
@@ -327,7 +488,13 @@ function resolvePersistedRegistryMemoState(params: {
     fingerprint: {
       ...fastFingerprint,
       indexHash: hashJson(stableMemoValue(index) ?? null),
+      installRecords: hashJson(stableMemoValue(installRecords)),
+      managedNpmDependencies: managedNpmDependencyFiles,
+      plugins: watchedPlugins,
+      diagnostics: watchedDiagnostics,
     },
+    watchedFiles: watchedFilesList,
+    watchedFilesHash: hashWatchedFiles(watchedFilesList),
   };
 }
 
@@ -369,6 +536,8 @@ function resolveProvidedIndexMemoState(index: InstalledPluginIndex): PersistedRe
     contextHash: fingerprintHash,
     fastHash: fingerprintHash,
     fingerprint,
+    watchedFiles: [],
+    watchedFilesHash: hashJson([]),
   };
 }
 
@@ -623,17 +792,14 @@ export function loadPluginMetadataSnapshot(
   if (canMemoizePluginMetadataSnapshotResult(result)) {
     const cachedRegistryState =
       result.registrySource === "derived"
-        ? {
-            ...resolvePersistedRegistryMemoState({
-              env,
-              index: result.snapshot.index,
-              ...(params.stateDir ? { stateDir: resolveUserPath(params.stateDir, env) } : {}),
-              ...(params.preferPersisted !== undefined
-                ? { preferPersisted: params.preferPersisted }
-                : {}),
-            }),
-            refreshOnWatchedFilesChange: true,
-          }
+        ? resolvePersistedRegistryMemoState({
+            env,
+            index: snapshot.index,
+            ...(params.stateDir ? { stateDir: resolveUserPath(params.stateDir, env) } : {}),
+            ...(params.preferPersisted !== undefined
+              ? { preferPersisted: params.preferPersisted }
+              : {}),
+          })
         : registryState;
     rememberPluginMetadataSnapshotMemo({
       key: computePluginMetadataSnapshotMemoKey({ params, registryState: cachedRegistryState }),
@@ -644,22 +810,38 @@ export function loadPluginMetadataSnapshot(
   return snapshot;
 }
 
+export function resolvePluginMetadataSnapshot(
+  params: ResolvePluginMetadataSnapshotParams = {},
+): PluginMetadataSnapshot {
+  if (params.allowCurrent !== false) {
+    const current = getCurrentPluginMetadataSnapshot({
+      config: params.config,
+      env: params.env,
+      workspaceDir: params.workspaceDir,
+      allowWorkspaceScopedSnapshot: params.allowWorkspaceScopedCurrent,
+    });
+    if (current) {
+      return current;
+    }
+  }
+  return loadPluginMetadataSnapshot(params);
+}
+
 function canMemoizePluginMetadataSnapshotResult(result: {
   registrySource: PluginRegistrySnapshotSource;
   snapshot: PluginMetadataSnapshot;
 }): boolean {
-  if (result.snapshot.index.plugins.length === 0) {
-    return false;
-  }
-  if (result.registrySource !== "derived") {
-    return true;
-  }
-  return (
-    result.snapshot.registryDiagnostics.length > 0 &&
-    result.snapshot.registryDiagnostics.every(
-      (diagnostic) => diagnostic.code === "persisted-registry-stale-policy",
-    )
-  );
+  const snapshot = result.snapshot;
+  const hasCompleteSnapshotShape =
+    Array.isArray(snapshot.plugins) &&
+    Array.isArray(snapshot.diagnostics) &&
+    Array.isArray(snapshot.registryDiagnostics) &&
+    Array.isArray(snapshot.manifestRegistry.plugins) &&
+    Array.isArray(snapshot.manifestRegistry.diagnostics) &&
+    Array.isArray(snapshot.index.plugins) &&
+    Array.isArray(snapshot.index.diagnostics);
+  const hasPluginMetadata = snapshot.plugins.length > 0 || snapshot.index.plugins.length > 0;
+  return hasCompleteSnapshotShape && hasPluginMetadata;
 }
 
 function loadPluginMetadataSnapshotImpl(params: LoadPluginMetadataSnapshotParams): {

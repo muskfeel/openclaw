@@ -208,6 +208,7 @@ export const AgentParamsSchema = Type.Object(
     sourceReplyDeliveryMode: Type.Optional(
       Type.Union([Type.Literal("automatic"), Type.Literal("message_tool_only")]),
     ),
+    disableMessageTool: Type.Optional(Type.Boolean()),
     initialVfsEntries: Type.Optional(Type.Array(AgentInitialVfsEntrySchema)),
     voiceWakeTrigger: Type.Optional(Type.String()),
     idempotencyKey: NonEmptyString,

@@ -16,7 +16,9 @@ import { readSessionMessagesAsync } from "../gateway/session-transcript-readers.
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { CommandLane } from "../process/lanes.js";
 import { isAcpSessionKey, isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
+import { normalizeOptionalString } from "../shared/string-coerce.js";
 import { listOpenClawRegisteredAgentDatabases } from "../state/openclaw-agent-db.js";
+import { deliveryContextFromSession } from "../utils/delivery-context.shared.js";
 
 const log = createSubsystemLogger("main-session-restart-recovery");
 
@@ -127,6 +129,7 @@ export async function markRestartAbortedMainSessions(params: {
     for (const { sessionKey, entry } of listSessionEntries({
       agentId: agentDatabase.agentId,
       env,
+      path: agentDatabase.path,
     })) {
       if (!entry || entry.status !== "running") {
         continue;
@@ -145,6 +148,7 @@ export async function markRestartAbortedMainSessions(params: {
       upsertSessionEntry({
         agentId: agentDatabase.agentId,
         env,
+        path: agentDatabase.path,
         sessionKey,
         entry: {
           ...entry,
@@ -168,6 +172,7 @@ export async function markRestartAbortedMainSessions(params: {
 
 async function markSessionFailed(params: {
   agentId: string;
+  databasePath: string;
   env?: NodeJS.ProcessEnv;
   sessionKey: string;
   reason: string;
@@ -175,6 +180,7 @@ async function markSessionFailed(params: {
   const entry = getSessionEntry({
     agentId: params.agentId,
     env: params.env,
+    path: params.databasePath,
     sessionKey: params.sessionKey,
   });
   if (!entry || entry.status !== "running") {
@@ -184,6 +190,7 @@ async function markSessionFailed(params: {
   upsertSessionEntry({
     agentId: params.agentId,
     env: params.env,
+    path: params.databasePath,
     sessionKey: params.sessionKey,
     entry: {
       ...entry,
@@ -256,6 +263,7 @@ async function sendUnresumableSessionNotice(params: {
 
 async function resumeMainSession(params: {
   agentId: string;
+  databasePath: string;
   env?: NodeJS.ProcessEnv;
   sessionKey: string;
   pendingFinalDeliveryText?: string | null;
@@ -279,6 +287,7 @@ async function resumeMainSession(params: {
     const entry = getSessionEntry({
       agentId: params.agentId,
       env: params.env,
+      path: params.databasePath,
       sessionKey: params.sessionKey,
     });
     if (entry) {
@@ -307,6 +316,7 @@ async function resumeMainSession(params: {
       upsertSessionEntry({
         agentId: params.agentId,
         env: params.env,
+        path: params.databasePath,
         sessionKey: params.sessionKey,
         entry: next,
       });
@@ -325,15 +335,22 @@ async function resumeMainSession(params: {
 
 async function recoverStore(params: {
   agentId: string;
+  databasePath: string;
   env?: NodeJS.ProcessEnv;
   resumedSessionKeys: Set<string>;
 }): Promise<{ recovered: number; failed: number; skipped: number }> {
   const result = { recovered: 0, failed: 0, skipped: 0 };
   let rows: Array<{ sessionKey: string; entry: SessionEntry }>;
   try {
-    rows = listSessionEntries({ agentId: params.agentId, env: params.env });
+    rows = listSessionEntries({
+      agentId: params.agentId,
+      env: params.env,
+      path: params.databasePath,
+    });
   } catch (err) {
-    log.warn(`failed to load session rows for agent ${params.agentId}: ${String(err)}`);
+    log.warn(
+      `failed to load session rows for agent ${params.agentId} at ${params.databasePath}: ${String(err)}`,
+    );
     result.failed++;
     return result;
   }
@@ -358,6 +375,7 @@ async function recoverStore(params: {
       messages = await readSessionMessagesAsync(
         {
           agentId: resolveAgentIdFromSessionKey(sessionKey),
+          path: params.databasePath,
           sessionId: entry.sessionId,
         },
         {
@@ -381,6 +399,7 @@ async function recoverStore(params: {
       });
       await markSessionFailed({
         agentId: params.agentId,
+        databasePath: params.databasePath,
         env: params.env,
         sessionKey,
         reason: resumeBlockReason,
@@ -391,6 +410,7 @@ async function recoverStore(params: {
 
     const resumed = await resumeMainSession({
       agentId: params.agentId,
+      databasePath: params.databasePath,
       env: params.env,
       sessionKey,
       pendingFinalDeliveryText: entry.pendingFinalDeliveryText,
@@ -424,6 +444,7 @@ export async function recoverRestartAbortedMainSessions(
   for (const agentDatabase of agentDatabases) {
     const storeResult = await recoverStore({
       agentId: agentDatabase.agentId,
+      databasePath: agentDatabase.path,
       env,
       resumedSessionKeys,
     });

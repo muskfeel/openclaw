@@ -534,19 +534,9 @@ export async function upsertInferredCommitments(params: {
       store.commitments.push(record);
       created.push(record);
     }
-    const record = candidateToRecord({
-      item: params.item,
-      candidate: entry.candidate,
-      nowMs,
-      earliestMs: entry.earliestMs,
-      latestMs: entry.latestMs,
-      timezone: entry.timezone,
-    });
-    store.commitments.push(record);
-    created.push(record);
-  }
-  await saveCommitmentStore(store);
-  return created;
+    await saveCommitmentStore(store);
+    return created;
+  });
 }
 
 function countSentCommitmentsForSession(params: {

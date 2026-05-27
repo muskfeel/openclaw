@@ -68,6 +68,10 @@ export async function cleanupEmbeddedAttemptResources(params: {
   runId?: string;
   sessionId?: string;
 }): Promise<void> {
+  let cleanupError: unknown;
+  const recordCleanupError = (err: unknown) => {
+    cleanupError ??= err;
+  };
   try {
     params.removeToolResultContextGuard?.();
   } catch {
@@ -88,22 +92,25 @@ export async function cleanupEmbeddedAttemptResources(params: {
       sessionManager: params.sessionManager as ToolResultFlushManager | null | undefined,
       ...(params.aborted ? { timeoutMs: 0 } : {}),
     });
-  } catch {
-    /* best-effort */
+  } catch (err) {
+    recordCleanupError(err);
   }
   try {
     params.session?.dispose();
-  } catch {
-    /* best-effort */
+  } catch (err) {
+    recordCleanupError(err);
   }
   try {
     await params.bundleMcpRuntime?.dispose();
-  } catch {
-    /* best-effort */
+  } catch (err) {
+    recordCleanupError(err);
   }
   try {
     await params.bundleLspRuntime?.dispose();
-  } catch {
-    /* best-effort */
+  } catch (err) {
+    recordCleanupError(err);
+  }
+  if (cleanupError) {
+    throw cleanupError;
   }
 }

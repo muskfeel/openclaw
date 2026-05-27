@@ -46,10 +46,6 @@ function expectedFingerprint(message: MirroredAgentMessage): string {
 }
 
 const tempDirs: string[] = [];
-type TestTranscriptScope = {
-  agentId: string;
-  sessionId: string;
-};
 
 afterEach(async () => {
   resetGlobalHookRunner();
@@ -61,7 +57,7 @@ afterEach(async () => {
   }
 });
 
-async function createTempTranscriptScope(sessionId = "session"): Promise<TestTranscriptScope> {
+async function createTempSessionFile(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-codex-transcript-"));
   tempDirs.push(dir);
   return path.join(dir, "main.sqlite");
@@ -72,22 +68,6 @@ async function makeRoot(prefix: string): Promise<string> {
   tempDirs.push(root);
   vi.stubEnv("OPENCLAW_STATE_DIR", root);
   return root;
-}
-
-function transcriptTarget(scope: TestTranscriptScope) {
-  return { agentId: scope.agentId, sessionId: scope.sessionId };
-}
-
-function readTranscriptEvents(scope: TestTranscriptScope) {
-  return loadSqliteSessionTranscriptEvents({
-    agentId: scope.agentId,
-    sessionId: scope.sessionId,
-  }).map((entry) => entry.event);
-}
-
-function readTranscriptRaw(scope: TestTranscriptScope) {
-  const lines = readTranscriptEvents(scope).map((event) => JSON.stringify(event));
-  return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
 function parseJsonLines<T>(raw: string): T[] {
@@ -110,6 +90,18 @@ function readTranscriptRaw(sqlitePath: string, sessionId: string): string {
   return loadTranscriptEvents(sqlitePath, sessionId)
     .map((entry) => JSON.stringify(entry))
     .join("\n");
+}
+
+function readFileMessages(raw: string): Array<{ role?: string; text?: string }> {
+  return parseJsonLines<{
+    type?: string;
+    message?: { role?: string; content?: Array<{ text?: string }> };
+  }>(raw)
+    .filter((record) => record.type === "message")
+    .map((record) => ({
+      role: record.message?.role,
+      text: record.message?.content?.[0]?.text,
+    }));
 }
 
 describe("mirrorCodexAppServerTranscript", () => {

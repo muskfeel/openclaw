@@ -1229,16 +1229,8 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
   it("preserves provider prompt errors when cleanup reacquire detects session takeover", async () => {
     const providerError = new Error("provider rejected request: HTTP 400");
-    let acquireCount = 0;
-    let cleanupReacquireSessionFile: string | undefined;
-    hoisted.acquireSessionWriteLockMock.mockImplementation(async (params) => {
-      acquireCount += 1;
-      if (acquireCount === 3) {
-        cleanupReacquireSessionFile = params.sessionFile;
-        await fs.appendFile(params.sessionFile, '{"type":"message","id":"takeover"}\n', "utf8");
-      }
-      return { release: async () => {} };
-    });
+    const cleanupError = new EmbeddedAttemptSessionTakeoverError("/tmp/session.jsonl");
+    hoisted.flushPendingToolResultsAfterIdleMock.mockRejectedValue(cleanupError);
 
     const error = await createContextEngineAttemptRunner({
       contextEngine: createContextEngineBootstrapAndAssemble(),
@@ -1253,26 +1245,13 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
     expect((error as Error).name).toBe("EmbeddedAttemptSessionTakeoverError");
     expect((error as Error).message).toBe(providerError.message);
     expect((error as Error).cause).toBeInstanceOf(EmbeddedAttemptSessionTakeoverError);
-    if (!cleanupReacquireSessionFile) {
-      throw new Error("expected cleanup lock reacquire");
-    }
-    expect(((error as Error).cause as Error).message).toContain(cleanupReacquireSessionFile);
+    expect((error as Error).cause).toBe(cleanupError);
     expect((error as { promptError?: unknown }).promptError).toBe(providerError);
-    expect(hoisted.flushPendingToolResultsAfterIdleMock).not.toHaveBeenCalled();
   });
 
   it("keeps cleanup session takeover fatal when no provider prompt error exists", async () => {
-    let releasingCleanupLock = false;
-    hoisted.flushPendingToolResultsAfterIdleMock.mockImplementation(async () => {
-      releasingCleanupLock = true;
-    });
-    hoisted.acquireSessionWriteLockMock.mockImplementation(async (params) => ({
-      release: async () => {
-        if (releasingCleanupLock) {
-          throw new EmbeddedAttemptSessionTakeoverError(params.sessionFile);
-        }
-      },
-    }));
+    const cleanupError = new EmbeddedAttemptSessionTakeoverError("/tmp/session.jsonl");
+    hoisted.flushPendingToolResultsAfterIdleMock.mockRejectedValue(cleanupError);
 
     await expect(
       createContextEngineAttemptRunner({
@@ -1283,7 +1262,7 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
           session.messages = [...session.messages, doneMessage];
         },
       }),
-    ).rejects.toBeInstanceOf(EmbeddedAttemptSessionTakeoverError);
+    ).rejects.toBe(cleanupError);
   });
 
   it("uses assembled context as the default precheck authority", async () => {
@@ -1845,17 +1824,20 @@ describe("runEmbeddedAttempt context engine sessionKey forwarding", () => {
 
   it("runs teardown cleanup even when pending tool flush throws", async () => {
     const disposeMock = vi.fn();
+    const flushError = new Error("flush failed");
     const flushMock = vi.fn(async () => {
-      throw new Error("flush failed");
+      throw flushError;
     });
 
-    await cleanupEmbeddedAttemptResources({
-      removeToolResultContextGuard: () => {},
-      flushPendingToolResultsAfterIdle: flushMock,
-      session: { agent: {}, dispose: disposeMock },
-      sessionManager: hoisted.sessionManager,
-      bundleLspRuntime: undefined,
-    });
+    await expect(
+      cleanupEmbeddedAttemptResources({
+        removeToolResultContextGuard: () => {},
+        flushPendingToolResultsAfterIdle: flushMock,
+        session: { agent: {}, dispose: disposeMock },
+        sessionManager: hoisted.sessionManager,
+        bundleLspRuntime: undefined,
+      }),
+    ).rejects.toBe(flushError);
 
     expect(flushMock).toHaveBeenCalledTimes(1);
     expect(disposeMock).toHaveBeenCalledTimes(1);

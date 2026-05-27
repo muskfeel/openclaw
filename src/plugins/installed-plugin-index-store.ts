@@ -1,5 +1,6 @@
 import { resolveCompatibilityHostVersion } from "../version.js";
 import { normalizePluginsConfig, resolveEffectiveEnableState } from "./config-state.js";
+import { clearCurrentPluginMetadataSnapshotState } from "./current-plugin-metadata-state.js";
 import { isPluginEnabledByDefaultForPlatform } from "./default-enablement.js";
 import { buildInstalledPluginIndex } from "./installed-plugin-index-build.js";
 import { hashJson } from "./installed-plugin-index-hash.js";

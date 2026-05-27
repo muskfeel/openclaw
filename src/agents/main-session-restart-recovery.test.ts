@@ -33,21 +33,36 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-async function writeSessionEntries(entries: Record<string, SessionEntry>): Promise<void> {
+async function writeSessionEntries(
+  entries: Record<string, SessionEntry>,
+  databasePath?: string,
+): Promise<void> {
   for (const [sessionKey, entry] of Object.entries(entries)) {
-    upsertSessionEntry({ agentId: "main", sessionKey, entry });
+    upsertSessionEntry({
+      agentId: "main",
+      ...(databasePath ? { path: databasePath } : {}),
+      sessionKey,
+      entry,
+    });
   }
 }
 
-function readSessionEntries(): Record<string, SessionEntry> {
+function readSessionEntries(databasePath?: string): Record<string, SessionEntry> {
   return Object.fromEntries(
-    listSessionEntries({ agentId: "main" }).map(({ sessionKey, entry }) => [sessionKey, entry]),
+    listSessionEntries({ agentId: "main", ...(databasePath ? { path: databasePath } : {}) }).map(
+      ({ sessionKey, entry }) => [sessionKey, entry],
+    ),
   );
 }
 
-async function writeTranscript(sessionId: string, messages: unknown[]): Promise<void> {
+async function writeTranscript(
+  sessionId: string,
+  messages: unknown[],
+  databasePath?: string,
+): Promise<void> {
   replaceSqliteSessionTranscriptEvents({
     agentId: "main",
+    ...(databasePath ? { path: databasePath } : {}),
     sessionId,
     events: [
       {
@@ -242,6 +257,35 @@ describe("main-session-restart-recovery", () => {
     expect(callGateway).not.toHaveBeenCalled();
   });
 
+  it("recovers sessions from their registered agent database path", async () => {
+    const databasePath = path.join(tmpDir, "custom", "openclaw-agent.sqlite");
+    await writeSessionEntries(
+      {
+        "agent:main:main": {
+          sessionId: "custom-main-session",
+          updatedAt: Date.now() - 10_000,
+          status: "running",
+          abortedLastRun: true,
+        },
+      },
+      databasePath,
+    );
+    await writeTranscript(
+      "custom-main-session",
+      [
+        { role: "user", content: "continue this custom database turn" },
+        { role: "toolResult", content: "ready" },
+      ],
+      databasePath,
+    );
+
+    const result = await recoverRestartAbortedMainSessions({ stateDir: tmpDir });
+
+    expect(result).toEqual({ recovered: 1, failed: 0, skipped: 0 });
+    const store = readSessionEntries(databasePath);
+    expect(store["agent:main:main"]?.abortedLastRun).toBe(false);
+  });
+
   it("fails marked sessions whose transcript tail cannot be resumed", async () => {
     await writeSessionEntries({
       "agent:main:main": {
@@ -266,8 +310,7 @@ describe("main-session-restart-recovery", () => {
   });
 
   it("sends a visible notice before failing an unresumable chat-bound main session", async () => {
-    const sessionsDir = await makeSessionsDir();
-    await writeStore(sessionsDir, {
+    await writeSessionEntries({
       "agent:main:demo-channel:room-1": {
         sessionId: "main-session",
         updatedAt: Date.now() - 10_000,
@@ -281,7 +324,7 @@ describe("main-session-restart-recovery", () => {
         },
       },
     });
-    await writeTranscript(sessionsDir, "main-session", [
+    await writeTranscript("main-session", [
       { role: "user", content: "do the thing" },
       { role: "assistant", content: "partial answer" },
     ]);
@@ -310,7 +353,7 @@ describe("main-session-restart-recovery", () => {
       "couldn't safely resume",
     );
 
-    const store = loadSessionStore(path.join(sessionsDir, "sessions.json"));
+    const store = readSessionEntries();
     expect(store["agent:main:demo-channel:room-1"]?.status).toBe("failed");
     expect(store["agent:main:demo-channel:room-1"]?.abortedLastRun).toBe(true);
   });

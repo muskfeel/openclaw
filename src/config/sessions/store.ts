@@ -352,7 +352,12 @@ export async function updateLastRoute(params: {
     explicitThreadFromDeliveryContext ??
     (threadId != null && threadId !== "" ? threadId : undefined);
   const explicitRouteProvided = Boolean(
-    explicitContext?.channel || explicitContext?.to || inlineContext?.channel || inlineContext?.to,
+    routeContext?.channel ||
+    routeContext?.to ||
+    explicitContext?.channel ||
+    explicitContext?.to ||
+    inlineContext?.channel ||
+    inlineContext?.to,
   );
   const clearThreadFromFallback = explicitRouteProvided && explicitThreadValue == null;
   return await patchSessionEntry({

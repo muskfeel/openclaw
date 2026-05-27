@@ -45,6 +45,7 @@ import { requireNodeSqlite } from "../../infra/node-sqlite.js";
 import { normalizeConversationRef } from "../../infra/outbound/session-binding-normalization.js";
 import type { SessionBindingRecord } from "../../infra/outbound/session-binding.types.js";
 import { isWithinDir } from "../../infra/path-safety.js";
+import { createPluginStateKeyedStore } from "../../plugin-state/plugin-state-store.js";
 import {
   buildAgentMainSessionKey,
   DEFAULT_AGENT_ID,
@@ -380,6 +381,37 @@ function buildLegacyMigrationPreview(plan: ChannelDoctorLegacyStateMigrationPlan
     : `- ${plan.label}: ${plan.sourcePath} → SQLite`;
 }
 
+async function runLegacyPluginStateImportPlan(
+  plan: Extract<ChannelDoctorLegacyStateMigrationPlan, { kind: "plugin-state-import" }>,
+  env: NodeJS.ProcessEnv,
+): Promise<{ changes: string[]; warnings: string[] }> {
+  const entries = await plan.readEntries();
+  const store = createPluginStateKeyedStore(plan.pluginId, {
+    namespace: plan.namespace,
+    maxEntries: plan.maxEntries,
+    env,
+  });
+  let imported = 0;
+  for (const entry of entries) {
+    const key = plan.scopeKey ? `${plan.scopeKey}:${entry.key}` : entry.key;
+    if (await store.registerIfAbsent(key, entry.value)) {
+      imported += 1;
+    }
+  }
+  const changes: string[] = [];
+  if (imported > 0) {
+    changes.push(
+      `Migrated ${imported} ${plan.label} entr${imported === 1 ? "y" : "ies"} → plugin state`,
+    );
+  }
+  if (plan.cleanupSource === "rename") {
+    const archivedPath = `${plan.sourcePath}.migrated`;
+    fs.renameSync(plan.sourcePath, archivedPath);
+    changes.push(`Archived ${plan.label} legacy source → ${archivedPath}`);
+  }
+  return { changes, warnings: [] };
+}
+
 async function runLegacyMigrationPlans(
   detected: LegacyStateDetection,
   plans: ChannelDoctorLegacyStateMigrationPlan[],
@@ -387,10 +419,20 @@ async function runLegacyMigrationPlans(
   const changes: string[] = [];
   const warnings: string[] = [];
   for (const plan of plans) {
-    if (plan.kind !== "custom" && fileExists(plan.targetPath)) {
+    if (
+      plan.kind !== "custom" &&
+      plan.kind !== "plugin-state-import" &&
+      fileExists(plan.targetPath)
+    ) {
       continue;
     }
     try {
+      if (plan.kind === "plugin-state-import") {
+        const result = await runLegacyPluginStateImportPlan(plan, detected.env);
+        changes.push(...result.changes);
+        warnings.push(...result.warnings);
+        continue;
+      }
       if (plan.kind === "custom") {
         const result = await plan.apply({
           cfg: detected.cfg,

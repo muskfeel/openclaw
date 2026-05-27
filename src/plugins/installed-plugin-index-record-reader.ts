@@ -18,6 +18,10 @@ function cloneInstallRecords(
 
 const BLOCKED_RECORD_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isSafeRecordKey(key: string): boolean {
   return !BLOCKED_RECORD_KEYS.has(key);
 }

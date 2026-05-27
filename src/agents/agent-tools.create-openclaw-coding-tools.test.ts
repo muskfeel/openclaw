@@ -14,10 +14,11 @@ import {
   resetGlobalHookRunner,
 } from "../plugins/hook-runner-global.js";
 import { createMockPluginRegistry } from "../plugins/hooks.test-helpers.js";
+import { closeOpenClawAgentDatabasesForTest } from "../state/openclaw-agent-db.js";
 import "./test-helpers/fast-bash-tools.js";
 import "./test-helpers/fast-coding-tools.js";
 import "./test-helpers/fast-openclaw-tools.js";
-import { closeOpenClawAgentDatabasesForTest } from "../state/openclaw-agent-db.js";
+import type { AuthProfileStore } from "./auth-profiles/types.js";
 import type { VirtualAgentFs, VirtualAgentFsEntry } from "./filesystem/agent-filesystem.js";
 import * as openClawPluginTools from "./openclaw-plugin-tools.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
@@ -253,7 +254,29 @@ describe("createOpenClawCodingTools", () => {
     );
   });
 
-  it("adds Tool Search control tools when explicitly requested", () => {
+  it("passes workspace context to wrapped tool hooks", async () => {
+    const beforeToolCall = vi.fn();
+    initializeGlobalHookRunner(
+      createMockPluginRegistry([{ hookName: "before_tool_call", handler: beforeToolCall }]),
+    );
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-hook-workspace-"));
+    const tools = createOpenClawCodingTools({ workspaceDir: tmpDir, modelProvider: "openai" });
+    const applyPatchTool = requireTool(tools, "apply_patch");
+    await requireToolExecute(applyPatchTool)("tool-hook-workspace", {
+      input: ["*** Begin Patch", "*** Add File: hook-context.txt", "+ok", "*** End Patch"].join(
+        "\n",
+      ),
+    });
+
+    expect(beforeToolCall).toHaveBeenCalledTimes(1);
+    expect(beforeToolCall.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        derivedPaths: [path.join(tmpDir, "hook-context.txt")],
+      }),
+    );
+  });
+
+  it("adds PI Tool Search control tools when explicitly requested", () => {
     const tools = createOpenClawCodingTools({
       includeToolSearchControls: true,
       config: {

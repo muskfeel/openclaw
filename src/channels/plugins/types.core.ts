@@ -172,6 +172,21 @@ export type ChannelDoctorLegacyStateMigrationFilePlan = {
   targetPath: string;
 };
 
+export type ChannelDoctorLegacyPluginStateImportPlan = {
+  kind: "plugin-state-import";
+  label: string;
+  sourcePath: string;
+  targetPath: string;
+  pluginId: string;
+  namespace: string;
+  maxEntries: number;
+  scopeKey: string;
+  cleanupSource?: "rename";
+  readEntries: () =>
+    | Array<{ key: string; value: unknown }>
+    | Promise<Array<{ key: string; value: unknown }>>;
+};
+
 export type ChannelDoctorLegacyStateMigrationCustomPlan = {
   kind: "custom";
   label: string;
@@ -188,6 +203,7 @@ export type ChannelDoctorLegacyStateMigrationCustomPlan = {
 
 export type ChannelDoctorLegacyStateMigrationPlan =
   | ChannelDoctorLegacyStateMigrationFilePlan
+  | ChannelDoctorLegacyPluginStateImportPlan
   | ChannelDoctorLegacyStateMigrationCustomPlan;
 
 /** User-facing metadata used in docs, pickers, and setup surfaces. */

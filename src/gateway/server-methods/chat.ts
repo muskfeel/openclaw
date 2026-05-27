@@ -24,6 +24,7 @@ import {
   type SqliteSessionDeliveryContext,
   type SqliteSessionRoutingInfo,
 } from "../../config/sessions/session-entries.sqlite.js";
+import { resolveMirroredTranscriptText } from "../../config/sessions/transcript-mirror.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
   measureDiagnosticsTimelineSpan,
@@ -3226,18 +3227,19 @@ export const chatHandlers: GatewayRequestHandlers = {
                     accountId,
                     payloads: sourceReplyPayloads,
                   });
-                  const { storePath: latestStorePath, entry: latestEntry } =
+                  const { databasePath: latestDatabasePath, entry: latestEntry } =
                     loadSessionEntry(sessionKey);
                   const sessionId = latestEntry?.sessionId ?? backingSessionId ?? clientRunId;
-                  const resolvedTranscriptPath = resolveTranscriptPath({
-                    sessionId,
-                    storePath: latestStorePath,
-                    sessionFile: latestEntry?.sessionFile ?? entry?.sessionFile,
+                  const sourceReplyTranscriptScope = {
                     agentId,
-                  });
+                    path: latestDatabasePath,
+                    sessionId,
+                  };
                   const mediaLocalRoots = appendLocalMediaParentRoots(
                     getAgentScopedMediaLocalRoots(cfg, agentId),
-                    resolvedTranscriptPath ? [resolvedTranscriptPath] : undefined,
+                    [latestDatabasePath, latestEntry?.sessionFile].filter(
+                      (source): source is string => typeof source === "string" && source.length > 0,
+                    ),
                   );
                   const buildReplyAssistantContent = async (
                     payloads: typeof finalPayloads,
@@ -3373,20 +3375,12 @@ export const chatHandlers: GatewayRequestHandlers = {
                       params.request.state.backedManagedOutgoingContent = true;
                     };
 
-                    if (resolvedTranscriptPath && sourceReplyPersistenceRequests.length > 0) {
+                    if (sourceReplyPersistenceRequests.length > 0) {
                       const allowedSourceReplyMirrorIds = new Set<string>();
-                      for (const [
-                        replyIndex,
-                        sourceReplyPayload,
-                      ] of sourceReplyPayloads.entries()) {
-                        if (!sourceReplyContentStates[replyIndex]) {
-                          continue;
-                        }
-                        const mirrorIdempotencyKey =
-                          getReplyPayloadMetadata(sourceReplyPayload)?.sourceReplyTranscriptMirror
-                            ?.idempotencyKey;
+                      for (const sourceReplyPayload of sourceReplyPayloads) {
                         const mirrorMetadata =
                           getReplyPayloadMetadata(sourceReplyPayload)?.sourceReplyTranscriptMirror;
+                        const mirrorIdempotencyKey = mirrorMetadata?.idempotencyKey;
                         if (
                           typeof mirrorIdempotencyKey !== "string" ||
                           mirrorIdempotencyKey.trim().length === 0 ||
@@ -3395,7 +3389,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                           continue;
                         }
                         const target = await findSourceReplyTranscriptMirrorByMetadata({
-                          transcriptPath: resolvedTranscriptPath,
+                          ...sourceReplyTranscriptScope,
                           idempotencyKey: mirrorIdempotencyKey,
                           metadata: mirrorMetadata,
                         });
@@ -3410,7 +3404,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                       }> = [];
                       for (const request of sourceReplyPersistenceRequests) {
                         const target = await findSourceReplyTranscriptMirrorByMetadata({
-                          transcriptPath: resolvedTranscriptPath,
+                          ...sourceReplyTranscriptScope,
                           idempotencyKey: request.idempotencyKey,
                           metadata: request.metadata,
                         });
@@ -3423,25 +3417,14 @@ export const chatHandlers: GatewayRequestHandlers = {
                         const rewriteTargetIds = new Set(
                           rewriteTargets.map((target) => target.messageId),
                         );
-                        const rewriteIndex =
-                          await readSessionTranscriptIndex(resolvedTranscriptPath);
-                        const firstRewriteEntryIndex =
-                          rewriteIndex?.entries.findIndex(
-                            (entry) =>
-                              typeof entry.id === "string" && rewriteTargetIds.has(entry.id),
-                          ) ?? -1;
-                        const canRewriteSourceReplyMirrors =
-                          firstRewriteEntryIndex >= 0 &&
-                          rewriteIndex?.entries
-                            .slice(firstRewriteEntryIndex)
-                            .every(
-                              (entry) =>
-                                typeof entry.id !== "string" ||
-                                allowedSourceReplyMirrorIds.has(entry.id),
-                            ) === true;
-                        if (canRewriteSourceReplyMirrors) {
-                          const result = await rewriteTranscriptEntriesInSessionFile({
-                            sessionFile: resolvedTranscriptPath,
+                        const canRewrite = await canRewriteSourceReplyMirrors({
+                          ...sourceReplyTranscriptScope,
+                          allowedSourceReplyMirrorIds,
+                          rewriteTargetIds,
+                        });
+                        if (canRewrite) {
+                          const result = await rewriteTranscriptEntriesInSqliteTranscript({
+                            ...sourceReplyTranscriptScope,
                             sessionKey,
                             config: cfg,
                             request: {
@@ -3459,10 +3442,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                           if (result.changed) {
                             for (const target of rewriteTargets) {
                               const rewritten =
-                                await findSourceReplyTranscriptMirrorByIdempotencyKey(
-                                  resolvedTranscriptPath,
-                                  target.request.idempotencyKey,
-                                );
+                                await findSourceReplyTranscriptMirrorByIdempotencyKey({
+                                  ...sourceReplyTranscriptScope,
+                                  idempotencyKey: target.request.idempotencyKey,
+                                });
                               await attachSourceReplyManagedImages({
                                 messageId: rewritten?.messageId,
                                 request: target.request,

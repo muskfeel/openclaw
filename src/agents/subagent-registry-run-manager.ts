@@ -524,7 +524,10 @@ export function createSubagentRunManager(params: {
       archiveAtMs,
       cleanupHandled: false,
       wakeOnDescendantSettle: undefined,
-    };
+      attachmentsDir: registerParams.attachmentsDir,
+      attachmentsRootDir: registerParams.attachmentsRootDir,
+      retainAttachmentsOnKeep: registerParams.retainAttachmentsOnKeep,
+    });
     params.runs.set(runId, entry);
     try {
       params.persistOrThrow();

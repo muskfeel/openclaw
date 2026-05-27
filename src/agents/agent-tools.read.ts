@@ -1273,6 +1273,21 @@ function createWorkspaceScratchOverlayEditOperations(
   } as const;
 }
 
+async function toCanonicalRelativeWorkspacePath(
+  root: string,
+  absolutePath: string,
+): Promise<string> {
+  const lexicalRelative = toRelativeWorkspacePath(root, absolutePath);
+  const lexicalPath = path.resolve(root, lexicalRelative);
+  const parentPath = path.dirname(lexicalPath);
+  const [rootReal, canonicalParentPath] = await Promise.all([
+    fs.realpath(root),
+    canonicalPathFromExistingAncestor(parentPath),
+  ]);
+  const canonicalPath = path.join(canonicalParentPath, path.basename(lexicalPath));
+  return toRelativeWorkspacePath(rootReal, canonicalPath);
+}
+
 function createFsAccessError(code: string, filePath: string): NodeJS.ErrnoException {
   const error = new Error(`Sandbox FS error (${code}): ${filePath}`) as NodeJS.ErrnoException;
   error.code = code;

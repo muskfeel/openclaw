@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelCatalogEntry } from "../../agents/model-catalog.types.js";
 import { CURRENT_SESSION_VERSION } from "../../agents/transcript/session-transcript-contract.js";
+import { readTranscriptStateForSession } from "../../agents/transcript/transcript-state.js";
+import { setReplyPayloadMetadata } from "../../auto-reply/reply-payload.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import { appendSessionTranscriptMessage } from "../../config/sessions/transcript-append.js";
 import { resolveMirroredTranscriptText } from "../../config/sessions/transcript-mirror.js";
@@ -19,7 +21,6 @@ import {
 } from "../protocol/client-info.js";
 import { ErrorCodes } from "../protocol/index.js";
 import { CHAT_SEND_SESSION_KEY_MAX_LENGTH } from "../protocol/schema/primitives.js";
-import { readSessionTranscriptIndex } from "../session-transcript-index.fs.js";
 import type { GatewayRequestContext } from "./types.js";
 
 const mockState = vi.hoisted(() => ({
@@ -64,6 +65,7 @@ const mockState = vi.hoisted(() => ({
   runtimeUserMessagePersistencePending: null as Promise<void> | null,
   onAfterAgentRunStart: null as (() => void) | null,
   agentRunId: "run-agent-1",
+  databasePath: undefined as string | undefined,
   sessionEntry: {} as Record<string, unknown>,
   lastDispatchCtx: undefined as MsgContext | undefined,
   lastDispatchImages: undefined as Array<{ mimeType: string; data: string }> | undefined,
@@ -117,6 +119,7 @@ const cleanupDirs: string[] = [];
 function readTranscriptEvents(): Array<Record<string, unknown>> {
   return loadSqliteSessionTranscriptEvents({
     agentId: "main",
+    ...(mockState.databasePath ? { path: mockState.databasePath } : {}),
     sessionId: mockState.sessionId,
   }).map((entry) => entry.event as Record<string, unknown>);
 }
@@ -164,6 +167,7 @@ vi.mock("../session-utils.js", async () => {
         sessionId: mockState.sessionId,
         ...mockState.sessionEntry,
       },
+      databasePath: mockState.databasePath,
       canonicalKey:
         typeof mockState.sessionEntry.canonicalKey === "string"
           ? mockState.sessionEntry.canonicalKey
@@ -440,9 +444,15 @@ function createTranscriptFixture(prefix: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   cleanupDirs.push(dir);
   vi.stubEnv("OPENCLAW_STATE_DIR", dir);
+  mockState.databasePath = path.join(dir, "agents", "main", "agent", "openclaw-agent.sqlite");
+  mockState.sessionEntry = {
+    ...mockState.sessionEntry,
+    sessionFile: path.join(dir, `${mockState.sessionId}.jsonl`),
+  };
   closeOpenClawStateDatabaseForTest();
   replaceSqliteSessionTranscriptEvents({
     agentId: "main",
+    path: mockState.databasePath,
     sessionId: mockState.sessionId,
     events: [
       {
@@ -464,7 +474,9 @@ async function appendSourceReplyMirrorEntry(params: {
   model?: string;
 }) {
   await appendSessionTranscriptMessage({
-    transcriptPath: mockState.transcriptPath,
+    agentId: "main",
+    ...(mockState.databasePath ? { path: mockState.databasePath } : {}),
+    sessionId: mockState.sessionId,
     now: 0,
     message: {
       role: "assistant",
@@ -494,17 +506,20 @@ async function appendSourceReplyMirrorEntry(params: {
 }
 
 async function readActiveAssistantTranscriptMessages(): Promise<Array<Record<string, unknown>>> {
-  const index = await readSessionTranscriptIndex(mockState.transcriptPath);
-  return (
-    index?.entries
-      .map((entry) => entry.record.message)
-      .filter(
-        (message): message is Record<string, unknown> =>
-          typeof message === "object" &&
-          message !== null &&
-          (message as { role?: unknown }).role === "assistant",
-      ) ?? []
-  );
+  const state = await readTranscriptStateForSession({
+    agentId: "main",
+    ...(mockState.databasePath ? { path: mockState.databasePath } : {}),
+    sessionId: mockState.sessionId,
+  });
+  return state
+    .getBranch()
+    .map((entry) => (entry.type === "message" ? entry.message : undefined))
+    .filter(
+      (message): message is Record<string, unknown> =>
+        typeof message === "object" &&
+        message !== null &&
+        (message as { role?: unknown }).role === "assistant",
+    );
 }
 
 function extractFirstTextBlock(payload: unknown): string | undefined {
@@ -801,6 +816,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     mockState.runtimeUserMessagePersistencePending = null;
     mockState.onAfterAgentRunStart = null;
     mockState.agentRunId = "run-agent-1";
+    mockState.databasePath = undefined;
     mockState.sessionEntry = {};
     mockState.lastDispatchCtx = undefined;
     mockState.lastDispatchImages = undefined;
@@ -1283,6 +1299,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     mockState.savedMediaResults = [{ path: savedImagePath, contentType: "image/png" }];
     const mirrorIdempotencyKey = "idem-agent-source-reply-deduped:internal-source-reply:0";
     await appendSourceReplyMirrorEntry({
+      idempotencyKey: mirrorIdempotencyKey,
       text: resolveMirroredTranscriptText({ mediaUrls: [mediaUrl] }) ?? "media",
     });
     mockState.triggerAgentRunStart = true;

@@ -1000,6 +1000,7 @@ export function createOpenClawCodingTools(options?: {
             disableMessageTool: options?.disableMessageTool,
             requesterAgentIdOverride: agentId,
             allowGatewaySubagentBinding: options?.allowGatewaySubagentBinding,
+            authProfileStore: options?.authProfileStore,
           },
           resolvedConfig: options?.config,
         });
@@ -1207,10 +1208,16 @@ export function createOpenClawCodingTools(options?: {
       sessionId: options?.sessionId,
       runId: options?.runId,
       channelId: options?.hookChannelId ?? options?.currentChannelId,
+      cwd: sandboxRoot ?? workspaceRoot,
+      workspaceDir: workspaceRoot,
+      ...(sandboxRoot && sandboxFsBridge
+        ? { sandbox: { root: sandboxRoot, bridge: sandboxFsBridge } }
+        : {}),
       ...(options?.trace ? { trace: options.trace } : {}),
       loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
       onToolOutcome: options?.onToolOutcome,
       artifactStore: options?.artifactStore,
+      skillsSnapshot: options?.skillsSnapshot,
     }),
   );
   options?.recordToolPrepStage?.("tool-hooks");

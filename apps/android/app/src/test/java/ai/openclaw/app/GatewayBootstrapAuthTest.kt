@@ -130,9 +130,10 @@ class GatewayBootstrapAuthTest {
         android.content.Context.MODE_PRIVATE,
       )
     val prefs = SecurePrefs(app, securePrefsOverride = securePrefs)
-    val runtime = NodeRuntime(app, prefs)
+    val authStore = DeviceAuthStore(app, legacyPrefsOverride = prefs)
+    val runtime = NodeRuntime(app, prefs, deviceAuthStore = authStore)
     val deviceId = DeviceIdentityStore(app).loadOrCreate().deviceId
-    DeviceAuthStore(prefs).saveToken(deviceId, "operator", "bootstrap-operator-token")
+    authStore.saveToken(deviceId, "operator", "bootstrap-operator-token")
 
     writeField(runtime, "operatorStatusText", "Connecting…")
     invokeMaybeStartOperatorSessionAfterNodeConnect(

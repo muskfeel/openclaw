@@ -3,6 +3,12 @@ import os from "node:os";
 import { Type } from "typebox";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
+import { isRecord } from "../shared/record-coerce.js";
+import {
+  normalizeStringEntries,
+  uniqueStrings,
+  uniqueValues,
+} from "../shared/string-normalization.js";
 import type {
   AgentMessage,
   AgentToolResult,

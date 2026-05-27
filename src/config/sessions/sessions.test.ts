@@ -367,6 +367,40 @@ describe("SQLite session row patch retries", () => {
     });
   });
 
+  it("clears stale thread ids when updating with a route-only target", async () => {
+    const key = "agent:main:route-only";
+    const { agentId } = await makeTmpStore({
+      [key]: {
+        sessionId: "s-route-only",
+        updatedAt: Date.now(),
+        deliveryContext: {
+          channel: "discord",
+          to: "channel:old",
+          accountId: "default",
+          threadId: "thread-old",
+        },
+      },
+    });
+
+    await updateLastRoute({
+      agentId,
+      sessionKey: key,
+      route: {
+        channel: "discord",
+        target: {
+          to: "channel:new",
+        },
+      },
+    });
+
+    expect(readSessionEntries(agentId)[key]?.deliveryContext).toStrictEqual({
+      channel: "discord",
+      to: "channel:new",
+      accountId: "default",
+      chatType: "direct",
+    });
+  });
+
   it("strips malformed pending final-delivery fields on write", async () => {
     const { agentId } = await makeTmpStore({
       "agent:main:bad-pending": {

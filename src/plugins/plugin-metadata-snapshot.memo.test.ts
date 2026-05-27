@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearCurrentPluginMetadataSnapshot } from "./current-plugin-metadata-snapshot.js";
 import { writePersistedInstalledPluginIndexSync } from "./installed-plugin-index-store.js";
 import type {
   InstalledPluginIndex,
@@ -37,6 +38,12 @@ vi.mock("./manifest-registry-installed.js", async (importOriginal) => {
 });
 
 const tempDirs: string[] = [];
+
+function firstPlugin(snapshot: ReturnType<typeof loadPluginMetadataSnapshot>) {
+  const plugin = snapshot.plugins[0];
+  expect(plugin).toBeDefined();
+  return plugin!;
+}
 
 function tempStateDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-metadata-memo-"));

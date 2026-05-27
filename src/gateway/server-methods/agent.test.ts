@@ -23,6 +23,7 @@ import { expectSubagentFollowupReactivation } from "./subagent-followup.test-hel
 import type { GatewayRequestContext } from "./types.js";
 
 const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
+const MOCK_SESSION_DATABASE_PATH = "/tmp/openclaw-agent-test/openclaw-agent.sqlite";
 
 const mocks = vi.hoisted(() => ({
   loadSessionEntry: vi.fn(),
@@ -301,6 +302,7 @@ function mockMainSessionEntry(entry: Record<string, unknown>, cfg: Record<string
       ...entry,
     },
     canonicalKey: "agent:main:main",
+    databasePath: MOCK_SESSION_DATABASE_PATH,
   });
 }
 
@@ -1628,6 +1630,21 @@ describe("gateway agent handler", () => {
     expect(call.cleanupBundleMcpOnRunEnd).toBe(true);
   });
 
+  it("forwards disableMessageTool from agent RPC into the runner", async () => {
+    primeMainAgentRun();
+    mocks.agentCommand.mockClear();
+
+    await invokeAgent({
+      message: "disable message tool probe",
+      sessionKey: "agent:main:subagent:disable-message-tool-probe",
+      idempotencyKey: "test-idem-agent-disable-message-tool",
+      disableMessageTool: true,
+    });
+
+    const call = await waitForAgentCommandCall();
+    expect(call.disableMessageTool).toBe(true);
+  });
+
   it.each(
     (["channel", "replyChannel"] as const).flatMap((field) =>
       (["heartbeat", "cron", "webhook", "voice"] as const).map(
@@ -2706,7 +2723,7 @@ describe("gateway agent handler", () => {
           sessionKey: "agent:main:main",
           sessionId: "stale-session-id",
           reason: "daily",
-          storePath: "/tmp/sessions.json",
+          storePath: MOCK_SESSION_DATABASE_PATH,
           nextSessionId: call.sessionId,
           nextSessionKey: "agent:main:main",
         },
@@ -2718,7 +2735,7 @@ describe("gateway agent handler", () => {
           sessionKey: "agent:main:main",
           sessionId: call.sessionId,
           resumedFrom: "stale-session-id",
-          storePath: "/tmp/sessions.json",
+          storePath: MOCK_SESSION_DATABASE_PATH,
         },
       );
       expect(broadcastToConnIds.mock.calls.map((call) => call[1]?.reason)).toEqual([
@@ -2753,7 +2770,7 @@ describe("gateway agent handler", () => {
         },
       );
       const loaded = mocks.loadSessionEntry();
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [loaded.canonicalKey]: structuredClone(loaded.entry),
         };
@@ -2826,7 +2843,7 @@ describe("gateway agent handler", () => {
         },
       );
       const loaded = mocks.loadSessionEntry();
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [loaded.canonicalKey]: structuredClone(loaded.entry),
         };
@@ -2890,7 +2907,7 @@ describe("gateway agent handler", () => {
       });
       const loaded = mocks.loadSessionEntry();
       let capturedEntry: Record<string, unknown> | undefined;
-      mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+      mocks.applySessionEntryWrite.mockImplementation(async (_path, updater) => {
         const store: Record<string, unknown> = {
           [loaded.canonicalKey]: structuredClone(loaded.entry),
         };
@@ -2937,7 +2954,7 @@ describe("gateway agent handler", () => {
           sessionKey: "agent:main:main",
           sessionId: "current-session-id",
           reason: "new",
-          storePath: "/tmp/sessions.json",
+          storePath: MOCK_SESSION_DATABASE_PATH,
           nextSessionId: "caller-selected-session-id",
           nextSessionKey: "agent:main:main",
         },
@@ -2949,7 +2966,7 @@ describe("gateway agent handler", () => {
           sessionKey: "agent:main:main",
           sessionId: "caller-selected-session-id",
           resumedFrom: "current-session-id",
-          storePath: "/tmp/sessions.json",
+          storePath: MOCK_SESSION_DATABASE_PATH,
         },
       );
       expect(broadcastToConnIds.mock.calls.map((call) => call[1]?.reason)).toEqual([

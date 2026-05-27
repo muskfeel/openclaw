@@ -13,11 +13,6 @@ import {
 import { closeOpenClawAgentDatabasesForTest } from "../../state/openclaw-agent-db.js";
 import { closeOpenClawStateDatabaseForTest } from "../../state/openclaw-state-db.js";
 import {
-  createPluginStateKeyedStore,
-  resetPluginStateStoreForTests,
-} from "../plugin-state/plugin-state-store.js";
-import { seedPluginStateEntriesForTests } from "../plugin-state/plugin-state-store.test-helpers.js";
-import {
   autoMigrateLegacyStateDir,
   detectLegacyStateMigrations,
   resetAutoMigrateLegacyStateDirForTest,
@@ -25,6 +20,10 @@ import {
 } from "./state-migrations.js";
 
 let tempRoots: string[] = [];
+
+const mockedChannelMigrationPlans = vi.hoisted(() => ({
+  plans: [] as Array<Record<string, unknown>>,
+}));
 
 vi.mock("../../channels/plugins/bundled.js", async () => {
   const actual = await vi.importActual<typeof import("../../channels/plugins/bundled.js")>(
@@ -75,6 +74,7 @@ vi.mock("../../channels/plugins/bundled.js", async () => {
     ]),
     listBundledChannelDoctorLegacyStateDetectors: vi.fn(() => [
       ({ oauthDir }: { oauthDir: string }) => detectWhatsAppLegacyStateMigrations({ oauthDir }),
+      () => mockedChannelMigrationPlans.plans,
     ]),
     listBundledChannelSetupPluginsByFeature: vi.fn((feature: string) => {
       if (feature === "doctorSessionMigrationSurface") {
@@ -187,6 +187,20 @@ async function detectAndRunMigrations(params: {
     env: { OPENCLAW_STATE_DIR: params.root } as NodeJS.ProcessEnv,
   });
   await runLegacyStateMigrations({ detected, now: params.now });
+}
+
+async function withStateDir<T>(root: string, run: () => Promise<T>): Promise<T> {
+  const previous = process.env.OPENCLAW_STATE_DIR;
+  process.env.OPENCLAW_STATE_DIR = root;
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.OPENCLAW_STATE_DIR;
+    } else {
+      process.env.OPENCLAW_STATE_DIR = previous;
+    }
+  }
 }
 
 function readSessionsStore(params: { root: string; targetDir: string }) {

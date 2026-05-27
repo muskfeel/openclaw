@@ -451,6 +451,16 @@ function upsertTranscriptEventIdentity(params: {
   if (!identity) {
     return;
   }
+  if (identity.message_idempotency_key) {
+    executeSqliteQuerySync(
+      params.database.db,
+      getAgentTranscriptKysely(params.database.db)
+        .deleteFrom("transcript_event_identities")
+        .where("session_id", "=", identity.session_id)
+        .where("message_idempotency_key", "=", identity.message_idempotency_key)
+        .where("event_id", "!=", identity.event_id),
+    );
+  }
   executeSqliteQuerySync(
     params.database.db,
     getAgentTranscriptKysely(params.database.db)

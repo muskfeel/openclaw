@@ -334,39 +334,7 @@ export async function mirrorCodexAppServerTranscript(params: {
     }
   }
 
-  for (const message of messages) {
-    const dedupeIdentity = buildMirrorDedupeIdentity(message);
-    const idempotencyKey = params.idempotencyScope
-      ? `${params.idempotencyScope}:${dedupeIdentity}`
-      : undefined;
-    const transcriptMessage = {
-      ...message,
-      ...(idempotencyKey ? { idempotencyKey } : {}),
-    } as AgentMessage;
-    const nextMessage = runAgentHarnessBeforeMessageWriteHook({
-      message: transcriptMessage,
-      agentId: params.agentId,
-      sessionKey: params.sessionKey,
-    });
-    if (!nextMessage) {
-      continue;
-    }
-    const messageToAppend = (
-      idempotencyKey
-        ? {
-            ...(nextMessage as unknown as Record<string, unknown>),
-            idempotencyKey,
-          }
-        : nextMessage
-    ) as AgentMessage;
-    await appendSessionTranscriptMessage({
-      agentId,
-      sessionId,
-      message: messageToAppend,
-    });
-  }
-
-  if (params.sessionKey) {
+  for (const update of appendedUpdates) {
     emitSessionTranscriptUpdate({
       agentId,
       sessionId,
