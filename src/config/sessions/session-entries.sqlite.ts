@@ -71,7 +71,16 @@ type SessionConversationsTable = OpenClawAgentKyselyDatabase["session_conversati
 type SessionRoutesTable = OpenClawAgentKyselyDatabase["session_routes"];
 type SessionEntriesDatabase = Pick<
   OpenClawAgentKyselyDatabase,
-  "conversations" | "session_conversations" | "session_entries" | "session_routes" | "sessions"
+  | "conversations"
+  | "memory_index_chunks"
+  | "memory_index_sources"
+  | "session_conversations"
+  | "session_entries"
+  | "session_routes"
+  | "sessions"
+  | "trajectory_runtime_events"
+  | "transcript_events"
+  | "transcript_snapshots"
 >;
 
 type SessionEntryRow = Pick<Selectable<SessionEntriesTable>, "entry_json" | "session_key"> &

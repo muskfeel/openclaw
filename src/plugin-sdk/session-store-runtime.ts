@@ -11,7 +11,7 @@ import { resolveAndPersistSessionTranscriptScope } from "../config/sessions/sess
 import { resolveSessionRowEntry } from "../config/sessions/store-entry.js";
 import {
   deleteSessionEntry,
-  getSessionEntry,
+  getSessionEntry as getInternalSessionEntry,
   listSessionEntries,
   patchSessionEntry,
   readSessionUpdatedAt as readSqliteSessionUpdatedAt,
@@ -42,13 +42,7 @@ export {
   loadSqliteSessionTranscriptEvents,
   replaceSqliteSessionTranscriptEvents,
 } from "../config/sessions/transcript-store.sqlite.js";
-export {
-  deleteSessionEntry,
-  getSessionEntry,
-  listSessionEntries,
-  patchSessionEntry,
-  upsertSessionEntry,
-};
+export { deleteSessionEntry, listSessionEntries, patchSessionEntry, upsertSessionEntry };
 export {
   evaluateSessionFreshness,
   resolveChannelResetConfig,
@@ -61,6 +55,13 @@ export type { SessionEntry, SessionScope };
 type SessionRowOptions = {
   agentId: string;
   env?: NodeJS.ProcessEnv;
+};
+
+type GetSessionEntryOptions = {
+  agentId?: string;
+  sessionKey: string;
+  env?: NodeJS.ProcessEnv;
+  path?: string;
 };
 
 type SaveSessionStoreOptions = {
@@ -82,6 +83,14 @@ type SessionFilePathOptions = {
 
 function optionsWithEnv(agentId: string, env?: NodeJS.ProcessEnv): SessionRowOptions {
   return env ? { agentId, env } : { agentId };
+}
+
+export function getSessionEntry(options: GetSessionEntryOptions): SessionEntry | undefined {
+  return getInternalSessionEntry({
+    ...options,
+    agentId:
+      options.agentId ?? resolveAgentIdFromSessionKey(options.sessionKey) ?? DEFAULT_AGENT_ID,
+  });
 }
 
 function parseSessionStorePath(storePath: string): { agentId: string; stateDir: string } | null {
