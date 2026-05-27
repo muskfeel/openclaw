@@ -728,4 +728,45 @@ describe("state migrations", () => {
       path.join(stateDir, "agents", "reviewer", "sessions", "reviewer-trace.jsonl"),
     );
   });
+
+  it("keeps legacy session stores when rows without sessionId are skipped", async () => {
+    const root = await createTempDir();
+    const stateDir = path.join(root, ".openclaw");
+    const env = createEnv(stateDir);
+    const cfg = createConfig();
+    const legacyStorePath = path.join(stateDir, "sessions", "sessions.json");
+    await fs.mkdir(path.dirname(legacyStorePath), { recursive: true });
+    await fs.writeFile(
+      legacyStorePath,
+      `${JSON.stringify(
+        {
+          "agent:worker-1:desk": { sessionId: "valid-session", updatedAt: 2 },
+          "agent:worker-1:route-only": {
+            updatedAt: 3,
+            deliveryContext: { channel: "discord", to: "channel:C1" },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const detected = await detectLegacyStateMigrations({
+      cfg,
+      env,
+      homedir: () => root,
+    });
+    const result = await runLegacyStateMigrations({
+      detected,
+      now: () => 1234,
+    });
+
+    expect(result.warnings).toContain(
+      `Skipped 1 legacy session index row(s) without sessionId; left in place at ${legacyStorePath}`,
+    );
+    await expect(fs.stat(legacyStorePath)).resolves.toMatchObject({ size: expect.any(Number) });
+    const store = loadSqliteSessionEntries({ agentId: "worker-1", env });
+    expect(store["agent:worker-1:desk"]?.sessionId).toBe("valid-session");
+  });
 });

@@ -1927,6 +1927,12 @@ function normalizeSessionEntry(entry: SessionEntryLike): SessionEntry | null {
   return normalized;
 }
 
+function listSkippedLegacySessionKeys(store: Record<string, SessionEntryLike>): string[] {
+  return Object.entries(store).flatMap(([key, entry]) =>
+    normalizeSessionEntry(entry) ? [] : [key],
+  );
+}
+
 function resolveUpdatedAt(entry: SessionEntryLike): number {
   return typeof entry.updatedAt === "number" && Number.isFinite(entry.updatedAt)
     ? entry.updatedAt
@@ -2776,6 +2782,7 @@ async function migrateLegacySessions(
     mainKey: detected.targetMainKey,
     scope: detected.targetScope,
   });
+  const skippedRootLegacyKeys = listSkippedLegacySessionKeys(canonicalizedLegacy.store);
 
   if (!legacyParsed.ok) {
     warnings.push(
@@ -2794,6 +2801,7 @@ async function migrateLegacySessions(
       mainKey: detected.targetMainKey,
       scope: detected.targetScope,
     });
+    const skippedAgentLegacyKeys = listSkippedLegacySessionKeys(canonicalizedAgentLegacy.store);
     const merged: Record<string, SessionEntryLike> = { ...canonicalizedAgentLegacy.store };
     if (agentStore.agentId === detected.targetAgentId) {
       for (const [key, entry] of Object.entries(canonicalizedLegacy.store)) {
@@ -2860,7 +2868,16 @@ async function migrateLegacySessions(
     changes.push(
       `Imported ${imported.imported} session index row(s) into SQLite for agent ${agentStore.agentId}`,
     );
-    if (agentLegacyParsed.ok && fileExists(agentStore.legacyStorePath)) {
+    if (skippedAgentLegacyKeys.length > 0) {
+      warnings.push(
+        `Skipped ${skippedAgentLegacyKeys.length} legacy session index row(s) without sessionId; left in place at ${agentStore.legacyStorePath}`,
+      );
+    }
+    if (
+      agentLegacyParsed.ok &&
+      skippedAgentLegacyKeys.length === 0 &&
+      fileExists(agentStore.legacyStorePath)
+    ) {
       try {
         fs.rmSync(agentStore.legacyStorePath, { force: true });
       } catch {
@@ -2932,7 +2949,12 @@ async function migrateLegacySessions(
     }
   }
 
-  if (legacyParsed.ok) {
+  if (skippedRootLegacyKeys.length > 0) {
+    warnings.push(
+      `Skipped ${skippedRootLegacyKeys.length} legacy session index row(s) without sessionId; left in place at ${detected.sessions.legacyStorePath}`,
+    );
+  }
+  if (legacyParsed.ok && skippedRootLegacyKeys.length === 0) {
     try {
       if (fileExists(detected.sessions.legacyStorePath)) {
         fs.rmSync(detected.sessions.legacyStorePath, { force: true });
