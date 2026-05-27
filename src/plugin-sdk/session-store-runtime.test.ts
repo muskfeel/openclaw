@@ -33,7 +33,7 @@ describe("session-store-runtime compatibility", () => {
     ).toThrow(/Invalid session ID/);
   });
 
-  it("rejects custom store paths instead of falling back to the default agent", async () => {
+  it("loads custom store paths through the legacy JSON compatibility path", async () => {
     await withOpenClawTestState(
       {
         layout: "state-only",
@@ -43,6 +43,16 @@ describe("session-store-runtime compatibility", () => {
       async (state) => {
         const customStorePath = path.join(state.path("custom"), "sessions.json");
         await fs.mkdir(path.dirname(customStorePath), { recursive: true });
+        await fs.writeFile(
+          customStorePath,
+          `${JSON.stringify({
+            "custom:1": {
+              sessionId: "custom-session",
+              updatedAt: 456,
+              sessionStartedAt: 456,
+            },
+          })}\n`,
+        );
 
         upsertSessionEntry({
           agentId: "default",
@@ -55,7 +65,7 @@ describe("session-store-runtime compatibility", () => {
           },
         });
 
-        expect(() => loadSessionStore(customStorePath)).toThrow(/Custom sessions\.json paths/);
+        expect(loadSessionStore(customStorePath)["custom:1"]?.sessionId).toBe("custom-session");
         expect(
           readSessionUpdatedAt({
             agentId: "default",

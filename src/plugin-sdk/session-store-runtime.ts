@@ -170,6 +170,11 @@ function readLegacySessionStoreJson(storePath: string): Record<string, SessionEn
   }
 }
 
+function writeLegacySessionStoreJson(storePath: string, store: Record<string, SessionEntry>): void {
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`);
+}
+
 export function clearSessionStoreCacheForTest(): void {
   closeOpenClawAgentDatabasesForTest();
 }
@@ -287,6 +292,9 @@ export function loadSessionStore(
   storePath: string,
   _opts?: { skipCache?: boolean },
 ): Record<string, SessionEntry> {
+  if (!parseSessionStorePath(storePath)) {
+    return readLegacySessionStoreJson(storePath) ?? {};
+  }
   const options = resolveSessionRowOptionsFromStorePath(storePath);
   const sqliteStore = loadSqliteSessionEntries(options);
   if (Object.keys(sqliteStore).length > 0) {
@@ -301,6 +309,10 @@ export async function saveSessionStore(
   _opts?: SaveSessionStoreOptions,
 ): Promise<void> {
   normalizeSessionEntries(store);
+  if (!parseSessionStorePath(storePath)) {
+    writeLegacySessionStoreJson(storePath, store);
+    return;
+  }
   const options = resolveSessionRowOptionsFromStorePath(storePath);
   const deleteScope = new Set(Object.keys(loadSqliteSessionEntries(options)));
   await saveSessionStoreRows(options, store, deleteScope);
@@ -328,6 +340,13 @@ export async function updateSessionStore<T>(
   mutator: (store: Record<string, SessionEntry>) => Promise<T> | T,
   _opts?: SaveSessionStoreOptions,
 ): Promise<T> {
+  if (!parseSessionStorePath(storePath)) {
+    const store = readLegacySessionStoreJson(storePath) ?? {};
+    const result = await mutator(store);
+    normalizeSessionEntries(store);
+    writeLegacySessionStoreJson(storePath, store);
+    return result;
+  }
   const options = resolveSessionRowOptionsFromStorePath(storePath);
   const sqliteStore = loadSqliteSessionEntries(options);
   const store =
@@ -346,6 +365,23 @@ export async function updateSessionStoreEntry(params: {
   sessionKey: string;
   update: (entry: SessionEntry) => Promise<Partial<SessionEntry> | null>;
 }): Promise<SessionEntry | null> {
+  if (!parseSessionStorePath(params.storePath)) {
+    let nextEntry: SessionEntry | null = null;
+    await updateSessionStore(params.storePath, async (store) => {
+      const existing = store[params.sessionKey];
+      if (!existing) {
+        return;
+      }
+      const update = await params.update(existing);
+      if (!update) {
+        nextEntry = null;
+        return;
+      }
+      nextEntry = { ...existing, ...update };
+      store[params.sessionKey] = nextEntry;
+    });
+    return nextEntry;
+  }
   const options = resolveSessionRowOptionsFromStorePath(params.storePath);
   return await patchSessionEntry({
     ...options,
