@@ -326,7 +326,6 @@
   "web-media",
   "zalouser",
   "zod",
-  "agent-core",
   "agent-sessions",
   "llm"
 ]
