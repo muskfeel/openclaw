@@ -11,7 +11,6 @@ import {
   getTelegramTextParts,
   normalizeForwardedContext,
 } from "./bot/helpers.js";
-import { getOptionalTelegramRuntime } from "./runtime.js";
 
 export type TelegramReplyChainEntry = NonNullable<MsgContext["ReplyChain"]>[number];
 
@@ -58,6 +57,7 @@ type MessageWithExternalReply = Message & { external_reply?: Message };
 type TelegramMessageCacheBucket = {
   scopeKey?: string;
   messages: Map<string, TelegramCachedMessageNode>;
+  store: ReturnType<typeof createMessageCacheStore>;
 };
 
 type TelegramMessageObservationMode = "authoritative" | "partial";
@@ -90,16 +90,6 @@ function createMessageCacheStore(env?: NodeJS.ProcessEnv) {
 }
 
 const MESSAGE_CACHE_STORE = createMessageCacheStore();
-
-export type PersistedTelegramMessageCacheValue = {
-  sourceMessage: Message;
-  threadId?: string;
-};
-
-export type TelegramMessageCachePersistentStore = {
-  register(key: string, value: PersistedTelegramMessageCacheValue): Promise<void>;
-  entries(): Promise<Array<{ key: string; value: PersistedTelegramMessageCacheValue }>>;
-};
 
 export function resetTelegramMessageCacheBucketsForTest(): void {
   persistedMessageCacheBuckets.clear();
@@ -239,6 +229,10 @@ function isString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return isString(value) ? value : undefined;
@@ -359,10 +353,15 @@ function persistedMessageEntryKey(scopeKey: string, cacheKey: string): string {
   return createHash("sha256").update(`${scopeKey}\0${cacheKey}`, "utf8").digest("hex").slice(0, 32);
 }
 
-function readPersistedMessages(scopeKey: string, maxMessages: number) {
+function readPersistedMessages(
+  scopeKey: string,
+  maxMessages: number,
+  store: ReturnType<typeof createMessageCacheStore>,
+) {
   const messages = new Map<string, TelegramCachedMessageNode>();
   try {
-    for (const entry of MESSAGE_CACHE_STORE.entries()
+    for (const entry of store
+      .entries()
       .filter((entry) => entry.value.scopeKey === scopeKey)
       .slice(-maxMessages)) {
       if (!isString(entry.value.cacheKey)) {
@@ -370,7 +369,10 @@ function readPersistedMessages(scopeKey: string, maxMessages: number) {
       }
       const node = parsePersistedNode(entry.value);
       if (node) {
-        messages.set(entry.value.cacheKey, node);
+        const cacheKey = entry.value.cacheKey.startsWith(`${scopeKey}:`)
+          ? entry.value.cacheKey
+          : `${scopeKey}:${entry.value.cacheKey}`;
+        messages.set(cacheKey, node);
       }
     }
   } catch (error) {
@@ -382,19 +384,21 @@ function readPersistedMessages(scopeKey: string, maxMessages: number) {
 function persistMessages(params: {
   messages: Map<string, TelegramCachedMessageNode>;
   scopeKey?: string;
+  store?: ReturnType<typeof createMessageCacheStore>;
 }) {
   const { scopeKey, messages } = params;
   if (!scopeKey) {
     return;
   }
+  const store = params.store ?? MESSAGE_CACHE_STORE;
   const retained = new Set(messages.keys());
-  for (const entry of MESSAGE_CACHE_STORE.entries()) {
+  for (const entry of store.entries()) {
     if (entry.value.scopeKey === scopeKey && !retained.has(entry.value.cacheKey)) {
-      MESSAGE_CACHE_STORE.delete(entry.key);
+      store.delete(entry.key);
     }
   }
   for (const [key, node] of messages) {
-    MESSAGE_CACHE_STORE.register(
+    store.register(
       persistedMessageEntryKey(scopeKey, key),
       {
         scopeKey,
@@ -420,7 +424,8 @@ export function importTelegramMessageCacheEntries(
   const bucket = options?.env ? undefined : persistedMessageCacheBuckets.get(scopeKey);
   for (const entry of entries) {
     for (const parsed of parsePersistedEntry(entry)) {
-      const existing = bucket?.messages.get(parsed.key);
+      const cacheKey = `${scopeKey}:${parsed.key}`;
+      const existing = bucket?.messages.get(cacheKey);
       const node = existing
         ? mergeCachedMessageNode(existing, parsed.node, parsed.mode)
         : parsed.node;
@@ -434,7 +439,7 @@ export function importTelegramMessageCacheEntries(
         },
         { ttlMs: DEFAULT_TTL_MS },
       );
-      bucket?.messages.set(parsed.key, node);
+      bucket?.messages.set(cacheKey, node);
       imported += 1;
     }
   }
@@ -451,122 +456,24 @@ export function resetTelegramMessageCacheForTests(): void {
 function resolveMessageCacheBucket(params: {
   scopeKey?: string;
   maxMessages: number;
+  store: ReturnType<typeof createMessageCacheStore>;
 }): TelegramMessageCacheBucket {
-  const { scopeKey, maxMessages } = params;
+  const { scopeKey, maxMessages, store } = params;
   if (!scopeKey) {
-    return { messages: new Map<string, TelegramCachedMessageNode>() };
+    return { messages: new Map<string, TelegramCachedMessageNode>(), store };
   }
   const existing = persistedMessageCacheBuckets.get(scopeKey);
   if (existing) {
+    existing.store = store;
     return existing;
   }
   const bucket = {
     scopeKey,
-    messages: readPersistedMessages(scopeKey, maxMessages),
+    messages: readPersistedMessages(scopeKey, maxMessages, store),
+    store,
   };
   persistedMessageCacheBuckets.set(scopeKey, bucket);
   return bucket;
-}
-
-async function hydrateMessageCacheBucket(
-  bucket: TelegramMessageCacheBucket,
-  maxMessages: number,
-  scopeKey?: string,
-): Promise<void> {
-  if (bucket.hydrated) {
-    return;
-  }
-  if (bucket.hydratePromise) {
-    await bucket.hydratePromise;
-    return;
-  }
-  bucket.hydratePromise = (async () => {
-    let storeEntries: Array<{ key: string; value: PersistedTelegramMessageCacheValue }> = [];
-    try {
-      storeEntries = (await bucket.persistentStore?.entries()) ?? [];
-    } catch (error) {
-      logVerbose(`telegram: failed to hydrate message cache from plugin state: ${String(error)}`);
-    }
-    const scopedStoreEntries = scopeKey
-      ? storeEntries.filter(({ key }) => key.startsWith(`${scopeKey}:`))
-      : storeEntries;
-
-    const legacyPath = bucket.legacyPersistedPath;
-    if (legacyPath) {
-      const legacy = readPersistedMessages(legacyPath, maxMessages);
-      if (legacy.messages.size > 0) {
-        for (const [key, node] of legacy.messages) {
-          const cacheKey = bucket.persistentStore && scopeKey ? `${scopeKey}:${key}` : key;
-          upsertCachedMessageNode({
-            messages: bucket.messages,
-            key: cacheKey,
-            node,
-            mode: "authoritative",
-          });
-          trimMessages(bucket.messages, maxMessages);
-        }
-      }
-      if (!bucket.persistentStore && legacy.needsRewrite) {
-        try {
-          bucket.persistedEntryCount = replaceLegacyPersistedMessages({
-            messages: bucket.messages,
-            persistedPath: legacyPath,
-          });
-        } catch (error) {
-          logVerbose(`telegram: failed to compact message cache: ${String(error)}`);
-        }
-      }
-    }
-    for (const { key, value } of scopedStoreEntries) {
-      for (const entry of parsePersistedEntry(persistedValueToEntry(key, value))) {
-        bucket.persistedEntryCount++;
-        upsertCachedMessageNode({
-          messages: bucket.messages,
-          key: entry.key,
-          node: entry.node,
-          mode: entry.mode,
-        });
-        trimMessages(bucket.messages, maxMessages);
-      }
-    }
-    bucket.hydrated = true;
-  })().finally(() => {
-    bucket.hydratePromise = undefined;
-  });
-  await bucket.hydratePromise;
-}
-
-async function persistCachedNode(params: {
-  bucket: TelegramMessageCacheBucket;
-  key: string;
-  maxMessages: number;
-  node: TelegramCachedMessageNode;
-}): Promise<void> {
-  const { persistentStore } = params.bucket;
-  if (!persistentStore) {
-    try {
-      params.bucket.persistedEntryCount += appendLegacyPersistedMessage({
-        key: params.key,
-        node: params.node,
-        persistedPath: params.bucket.legacyPersistedPath,
-      });
-      if (params.bucket.persistedEntryCount > params.maxMessages * COMPACT_THRESHOLD_RATIO) {
-        params.bucket.persistedEntryCount = replaceLegacyPersistedMessages({
-          messages: params.bucket.messages,
-          persistedPath: params.bucket.legacyPersistedPath,
-        });
-      }
-    } catch (error) {
-      logVerbose(`telegram: failed to persist message cache: ${String(error)}`);
-    }
-    return;
-  }
-  try {
-    await persistentStore.register(params.key, toPersistedCacheValue(params.node));
-    params.bucket.persistedEntryCount++;
-  } catch (error) {
-    logVerbose(`telegram: failed to persist message cache: ${String(error)}`);
-  }
 }
 
 export function createTelegramMessageCache(params?: {
@@ -575,14 +482,15 @@ export function createTelegramMessageCache(params?: {
 }): TelegramMessageCache {
   const maxMessages = params?.maxMessages ?? DEFAULT_MAX_MESSAGES;
   const scopeKey = params?.persistedScopeKey;
-  const { messages } = resolveMessageCacheBucket({
+  const store = createMessageCacheStore();
+  const bucket = resolveMessageCacheBucket({
     scopeKey,
     maxMessages,
-    ...(persistentStore ? { persistentStore } : {}),
+    store,
   });
+  const { messages } = bucket;
 
   const get: TelegramMessageCache["get"] = async ({ accountId, chatId, messageId }) => {
-    await hydrateMessageCacheBucket(bucket, maxMessages, scopeKey);
     if (!messageId) {
       return null;
     }
@@ -601,7 +509,6 @@ export function createTelegramMessageCache(params?: {
     chatId: string | number;
     threadId?: number;
   }) => {
-    await hydrateMessageCacheBucket(bucket, maxMessages, scopeKey);
     const prefix = telegramMessageCacheKeyPrefix({ scopeKey, ...params });
     const threadId = params.threadId != null ? String(params.threadId) : undefined;
     return Array.from(messages, ([key, node]) => ({ key, node }))
@@ -617,7 +524,6 @@ export function createTelegramMessageCache(params?: {
 
   return {
     record: async ({ accountId, chatId, msg, threadId }) => {
-      await hydrateMessageCacheBucket(bucket, maxMessages, scopeKey);
       const observations = normalizeMessageNodes(msg, { threadId });
       const currentObservation = observations.at(-1);
       if (!currentObservation) {
@@ -636,7 +542,7 @@ export function createTelegramMessageCache(params?: {
         }
         trimMessages(messages, maxMessages);
         try {
-          persistMessages({ messages, scopeKey });
+          persistMessages({ messages, scopeKey, store: bucket.store });
         } catch (error) {
           logVerbose(`telegram: failed to persist message cache: ${String(error)}`);
         }
@@ -750,8 +656,8 @@ async function resolveSessionBoundaryNode(params: {
   if (!params.messageId) {
     return undefined;
   }
-  const candidates = params.cache
-    .recentBefore({
+  const candidates = (
+    await params.cache.recentBefore({
       accountId: params.accountId,
       chatId: params.chatId,
       messageId: params.messageId,

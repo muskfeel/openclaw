@@ -15,12 +15,12 @@ describe("telegram message cache", () => {
     resetPluginStateStoreForTests();
   });
 
-  it("hydrates reply chains from persisted cached messages", () => {
+  it("hydrates reply chains from persisted cached messages", async () => {
     const persistedScopeKey = resolveTelegramMessageCacheScopeKey(
       `message-cache-test:${process.pid}:${Date.now()}`,
     );
     const firstCache = createTelegramMessageCache({ persistedScopeKey });
-    firstCache.record({
+    await firstCache.record({
       accountId: "default",
       chatId: 7,
       msg: {
@@ -31,7 +31,7 @@ describe("telegram message cache", () => {
         photo: [{ file_id: "photo-1", file_unique_id: "photo-unique-1", width: 640, height: 480 }],
       } as Message,
     });
-    firstCache.record({
+    await firstCache.record({
       accountId: "default",
       chatId: 7,
       msg: {
@@ -54,7 +54,7 @@ describe("telegram message cache", () => {
 
     resetTelegramMessageCacheBucketsForTest();
     const secondCache = createTelegramMessageCache({ persistedScopeKey });
-    const chain = buildTelegramReplyChain({
+    const chain = await buildTelegramReplyChain({
       cache: secondCache,
       accountId: "default",
       chatId: 7,
@@ -119,13 +119,13 @@ describe("telegram message cache", () => {
     ]);
   });
 
-  it("shares one persisted bucket across live cache instances", () => {
+  it("shares one persisted bucket across live cache instances", async () => {
     const persistedScopeKey = resolveTelegramMessageCacheScopeKey(
       `message-cache-shared-test:${process.pid}:${Date.now()}`,
     );
     const firstCache = createTelegramMessageCache({ persistedScopeKey });
     const secondCache = createTelegramMessageCache({ persistedScopeKey });
-    firstCache.record({
+    await firstCache.record({
       accountId: "default",
       chatId: 7,
       msg: {
@@ -136,7 +136,7 @@ describe("telegram message cache", () => {
         from: { id: 1, is_bot: false, first_name: "Nora" },
       } as Message,
     });
-    secondCache.record({
+    await secondCache.record({
       accountId: "default",
       chatId: 7,
       msg: {
@@ -156,7 +156,7 @@ describe("telegram message cache", () => {
     });
 
     const reloadedCache = createTelegramMessageCache({ persistedScopeKey });
-    const chain = buildTelegramReplyChain({
+    const chain = await buildTelegramReplyChain({
       cache: reloadedCache,
       accountId: "default",
       chatId: 7,

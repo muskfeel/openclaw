@@ -27,6 +27,7 @@ import {
   __testing,
   type TelegramThreadBindingRecord,
 } from "./thread-bindings.js";
+import { fingerprintTelegramBotToken } from "./token-fingerprint.js";
 import {
   getTopicName,
   resolveTopicNameCacheScope,
@@ -37,7 +38,6 @@ import {
   readTelegramUpdateOffset,
   resetTelegramUpdateOffsetsForTests,
 } from "./update-offset-store.js";
-import { fingerprintTelegramBotToken } from "./token-fingerprint.js";
 
 const tempDirs: string[] = [];
 
@@ -252,7 +252,9 @@ describe("Telegram legacy state migrations", () => {
     const cache = createTelegramMessageCache({
       persistedScopeKey: resolveTelegramMessageCacheScopeKey(legacyStorePath),
     });
-    expect(cache.get({ accountId: "work", chatId: "-100123", messageId: "77" })).toMatchObject({
+    await expect(
+      cache.get({ accountId: "work", chatId: "-100123", messageId: "77" }),
+    ).resolves.toMatchObject({
       body: "Ship the cache migration",
       messageId: "77",
       threadId: "42",
@@ -284,9 +286,9 @@ describe("Telegram legacy state migrations", () => {
 
     expect(result.changes.join("\n")).toContain("Imported 1 Telegram topic-name cache");
     resetTopicNameCacheForTest();
-    expect(getTopicName("-100123", "42", resolveTopicNameCacheScope(legacyStorePath))).toBe(
-      "Deployments",
-    );
+    await expect(
+      getTopicName("-100123", "42", resolveTopicNameCacheScope(legacyStorePath)),
+    ).resolves.toBe("Deployments");
     expect(fs.existsSync(sourcePath)).toBe(false);
   });
 
