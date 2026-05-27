@@ -459,9 +459,9 @@ describe("live model switch", () => {
       const result = shouldSwitchToLiveModel(makeShouldSwitchParams());
 
       expect(result).toBeUndefined();
-      expect(state.loadSessionStoreMock).toHaveBeenCalledWith("/tmp/session-store.json", {
-        skipCache: true,
-        clone: false,
+      expect(state.getSessionEntryMock).toHaveBeenCalledWith({
+        agentId: "reply",
+        sessionKey: "main",
       });
     });
 
@@ -517,7 +517,7 @@ describe("live model switch", () => {
         providerOverride: "openai",
         modelOverride: "gpt-5.5",
       };
-      state.loadSessionStoreMock.mockReturnValue({ main: sessionEntry });
+      state.getSessionEntryMock.mockReturnValue(sessionEntry);
 
       const { shouldSwitchToLiveModel } = await loadModule();
 

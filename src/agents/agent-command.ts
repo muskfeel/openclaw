@@ -398,14 +398,16 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     sessionId,
     sessionKey,
     agentId: resolvedSessionAgentId,
+    sessionEntry: resolvedSessionEntry,
+    sessionStore: resolvedSessionStore,
     isNewSession,
     persistedThinking,
     persistedVerbose,
   } = sessionResolution;
   const { sessionEntry: sessionEntryRaw, sessionStore } = createAgentCommandSessionWorkingCopy({
     sessionKey,
-    sessionEntry: sessionResolution.sessionEntry,
-    sessionStore: sessionResolution.sessionStore,
+    sessionEntry: resolvedSessionEntry,
+    sessionStore: resolvedSessionStore,
   });
   if (agentIdOverride && resolvedSessionAgentId !== agentIdOverride) {
     throw new Error(
@@ -820,6 +822,7 @@ async function agentCommandInternal(
       sessionStore &&
       sessionKey &&
       needsSkillsSnapshot &&
+      !opts.skipInitialSessionTouch &&
       !suppressVisibleSessionEffects
     ) {
       const now = Date.now();
@@ -844,7 +847,12 @@ async function agentCommandInternal(
     }
 
     // Persist explicit /command overrides to the SQLite session row when we have a key.
-    if (sessionStore && sessionKey && !suppressVisibleSessionEffects) {
+    if (
+      sessionStore &&
+      sessionKey &&
+      !suppressVisibleSessionEffects &&
+      (!opts.skipInitialSessionTouch || thinkOverride || verboseOverride)
+    ) {
       const now = Date.now();
       const entry = sessionStore[sessionKey] ??
         sessionEntry ?? { sessionId, updatedAt: now, sessionStartedAt: now };

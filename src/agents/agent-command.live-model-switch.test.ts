@@ -904,7 +904,7 @@ describe("agentCommand – LiveSessionModelSwitchError retry", () => {
       return entry?.lastInteractionAt !== undefined;
     });
     expect(touchWrites).toHaveLength(1);
-    expect(state.updateSessionStoreAfterAgentRunMock).toHaveBeenCalledTimes(1);
+    expect(state.updateSessionEntryAfterAgentRunMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips the initial session touch after gateway ingress already persisted activity", async () => {
@@ -919,7 +919,7 @@ describe("agentCommand – LiveSessionModelSwitchError retry", () => {
     });
 
     expect(state.persistSessionEntryMock).not.toHaveBeenCalled();
-    expect(state.updateSessionStoreAfterAgentRunMock).toHaveBeenCalledTimes(1);
+    expect(state.updateSessionEntryAfterAgentRunMock).toHaveBeenCalledTimes(1);
   });
 
   it("persists explicit overrides even when ingress skips the initial touch", async () => {
@@ -939,7 +939,7 @@ describe("agentCommand – LiveSessionModelSwitchError retry", () => {
     };
     expect(touchWrite.entry?.thinkingLevel).toBe("medium");
     expect(touchWrite.entry?.lastInteractionAt).toBeDefined();
-    expect(state.updateSessionStoreAfterAgentRunMock).toHaveBeenCalledTimes(1);
+    expect(state.updateSessionEntryAfterAgentRunMock).toHaveBeenCalledTimes(1);
   });
 
   it("clears stale flag-only pending final delivery when there is no final payload", async () => {
