@@ -1,7 +1,7 @@
 import type { StreamFn } from "openclaw/plugin-sdk/agent-core";
 import { describe, expect, it } from "vitest";
-import type { Context, Model } from "../pi-ai-contract.js";
-import { createAssistantMessageEventStream } from "../pi-ai-contract.js";
+import type { Context, Model } from "../../../agents/pi-ai-contract.js";
+import { createAssistantMessageEventStream } from "../../../agents/pi-ai-contract.js";
 import {
   createOpenRouterSystemCacheWrapper,
   createOpenRouterWrapper,
