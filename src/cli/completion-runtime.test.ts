@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkShellCompletionStatus } from "../commands/doctor-completion.js";
 import { installCompletion } from "./completion-runtime.js";
 
@@ -74,18 +74,22 @@ describe("completion runtime", () => {
     expect(profile).toContain(`[ -f "${retiredCachePath}" ] && source "${retiredCachePath}"`);
   });
 
-  it("rejects install when the completion cache is missing", async () => {
+  it("does not install when the completion cache is missing", async () => {
     const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-completion-home-"));
     const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-completion-state-"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     process.env.HOME = homeDir;
     process.env.OPENCLAW_STATE_DIR = stateDir;
 
     try {
-      await expect(installCompletion("zsh", true, "openclaw")).rejects.toThrow(
-        "Completion cache not found",
-      );
+      await expect(installCompletion("zsh", true, "openclaw")).resolves.toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Completion cache not found"));
+      await expect(fs.stat(path.join(homeDir, ".zshrc"))).rejects.toMatchObject({
+        code: "ENOENT",
+      });
     } finally {
+      errorSpy.mockRestore();
       await fs.rm(homeDir, { recursive: true, force: true });
       await fs.rm(stateDir, { recursive: true, force: true });
     }
