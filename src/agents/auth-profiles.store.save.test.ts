@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { resolveAuthStorePath } from "./auth-profiles/path-resolve.js";
 import { authProfileStoreKey } from "./auth-profiles/persisted.js";
+import { getRuntimeAuthProfileStoreSnapshot } from "./auth-profiles/runtime-snapshots.js";
 import {
   readAuthProfileStatePayloadResult,
   readAuthProfileStorePayloadResult,

@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AgentMessage } from "../agents/runtime/index.js";
 import { appendSessionTranscriptMessage } from "../config/sessions/transcript-append.js";
+import { loadSqliteSessionTranscriptEvents } from "../config/sessions/transcript-store.sqlite.js";
 import { mimeTypeFromFilePath } from "../media/mime.js";
 import {
   applyInputProvenanceToUserMessage,
@@ -52,12 +53,13 @@ export type UserTurnBeforeMessageWrite = (params: {
 }) => AgentMessage | null;
 
 type AppendUserTurnTranscriptMessageParams = {
-  transcriptPath: string;
+  transcriptPath?: string;
   input?: UserTurnInput;
   message?: PersistedUserTurnMessage;
   sessionId?: string;
   agentId?: string;
   sessionKey?: string;
+  sessionFile?: string;
   cwd?: string;
   config?: TranscriptAppendConfig;
   updateMode?: UserTurnTranscriptUpdateMode;
@@ -86,10 +88,11 @@ type UserTurnTranscriptPersistenceTarget = Omit<
 >;
 
 type UserTurnTranscriptFileTarget = {
-  transcriptPath: string;
+  transcriptPath?: string;
   sessionId?: string;
   agentId?: string;
   sessionKey?: string;
+  sessionFile?: string;
   cwd?: string;
   config?: TranscriptAppendConfig;
 };
@@ -375,6 +378,50 @@ function applyBeforeMessageWriteToUserTurn(
     : nextUserMessage;
 }
 
+function readExistingUserTurnByIdempotencyKey(params: {
+  agentId: string;
+  path?: string;
+  sessionId: string;
+  idempotencyKey: string;
+}): { messageId: string; message: PersistedUserTurnMessage } | undefined {
+  for (const entry of loadSqliteSessionTranscriptEvents({
+    agentId: params.agentId,
+    ...(params.path ? { path: params.path } : {}),
+    sessionId: params.sessionId,
+  })) {
+    const event = entry.event as
+      | { id?: unknown; message?: AgentMessage & { idempotencyKey?: unknown }; type?: unknown }
+      | undefined;
+    if (
+      event?.type === "message" &&
+      typeof event.id === "string" &&
+      event.message?.role === "user" &&
+      event.message.idempotencyKey === params.idempotencyKey
+    ) {
+      return {
+        messageId: event.id,
+        message: event.message as PersistedUserTurnMessage,
+      };
+    }
+  }
+  return undefined;
+}
+
+function resolveAppendSessionId(params: {
+  sessionId?: string;
+  transcriptPath?: string;
+}): string | undefined {
+  const explicit = normalizeOptionalText(params.sessionId);
+  if (explicit) {
+    return explicit;
+  }
+  const transcriptPath = normalizeOptionalText(params.transcriptPath);
+  if (!transcriptPath) {
+    return undefined;
+  }
+  return path.basename(transcriptPath, path.extname(transcriptPath));
+}
+
 export async function appendUserTurnTranscriptMessage(
   params: AppendUserTurnTranscriptMessageParams,
 ): Promise<
@@ -389,16 +436,42 @@ export async function appendUserTurnTranscriptMessage(
   if (!resolvedMessage) {
     return undefined;
   }
+  const agentId = normalizeOptionalText(params.agentId) ?? "main";
+  const sessionId = resolveAppendSessionId(params);
+  if (!sessionId) {
+    return undefined;
+  }
+  const updateSessionFile = normalizeOptionalText(params.sessionFile) ?? params.transcriptPath;
+  const idempotencyKey = normalizeOptionalText(
+    (resolvedMessage as unknown as { idempotencyKey?: string }).idempotencyKey,
+  );
+  if (idempotencyKey) {
+    const existing = readExistingUserTurnByIdempotencyKey({
+      agentId,
+      ...(params.transcriptPath ? { path: params.transcriptPath } : {}),
+      sessionId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        sessionFile: updateSessionFile ?? params.transcriptPath ?? "",
+        messageId: existing.messageId,
+        message: existing.message,
+      };
+    }
+  }
+  const message = applyBeforeMessageWriteToUserTurn(resolvedMessage, params);
+  if (!message) {
+    return undefined;
+  }
 
   const appended = await appendSessionTranscriptMessage({
-    transcriptPath: params.transcriptPath,
-    ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+    agentId,
+    ...(params.transcriptPath ? { path: params.transcriptPath } : {}),
+    sessionId,
     ...(params.cwd ? { cwd: params.cwd } : {}),
     ...(params.config ? { config: params.config } : {}),
-    message: resolvedMessage,
-    idempotencyLookup: "scan",
-    prepareMessageAfterIdempotencyCheck: (message) =>
-      applyBeforeMessageWriteToUserTurn(message, params),
+    message,
   });
   if (!appended) {
     return undefined;
@@ -406,23 +479,23 @@ export async function appendUserTurnTranscriptMessage(
 
   switch (params.updateMode ?? "inline") {
     case "inline":
-      if (appended.appended) {
-        emitSessionTranscriptUpdate({
-          sessionFile: params.transcriptPath,
-          ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
-          message: appended.message,
-          messageId: appended.messageId,
-        });
-      }
+      emitSessionTranscriptUpdate({
+        ...(updateSessionFile ? { sessionFile: updateSessionFile } : {}),
+        agentId,
+        sessionId,
+        ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
+        message: appended.message,
+        messageId: appended.messageId,
+      });
       break;
     case "none":
       break;
   }
 
   return {
-    sessionFile: params.transcriptPath,
+    sessionFile: updateSessionFile ?? params.transcriptPath ?? "",
     messageId: appended.messageId,
-    message: appended.message,
+    message: appended.message as PersistedUserTurnMessage,
   };
 }
 
@@ -435,7 +508,7 @@ export async function persistUserTurnTranscript(
   }
 
   const { resolveSessionTranscriptFile } = await import("../config/sessions/transcript.js");
-  const { sessionFile, sessionEntry } = await resolveSessionTranscriptFile({
+  const { sessionEntry } = await resolveSessionTranscriptFile({
     sessionId: params.sessionId,
     sessionKey: params.sessionKey,
     sessionEntry: params.sessionEntry,
@@ -444,9 +517,20 @@ export async function persistUserTurnTranscript(
     agentId: params.agentId,
     ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
   });
+  const originalSessionFile = params.sessionEntry?.sessionFile;
+  const resolvedSessionFile = sessionEntry?.sessionFile;
+  const sessionFile =
+    originalSessionFile && path.extname(originalSessionFile) !== ".sqlite"
+      ? originalSessionFile
+      : resolvedSessionFile && path.extname(resolvedSessionFile) !== ".sqlite"
+        ? resolvedSessionFile
+        : `${params.sessionId}.jsonl`;
 
+  const transcriptPath =
+    params.storePath && path.extname(params.storePath) !== ".json" ? params.storePath : sessionFile;
   const appended = await appendUserTurnTranscriptMessage({
-    transcriptPath: sessionFile,
+    ...(transcriptPath ? { transcriptPath } : {}),
+    ...(sessionFile ? { sessionFile } : {}),
     message,
     sessionId: params.sessionId,
     agentId: params.agentId,

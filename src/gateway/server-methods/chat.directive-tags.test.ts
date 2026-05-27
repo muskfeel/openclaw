@@ -447,7 +447,7 @@ function createTranscriptFixture(prefix: string) {
   mockState.databasePath = path.join(dir, "agents", "main", "agent", "openclaw-agent.sqlite");
   mockState.sessionEntry = {
     ...mockState.sessionEntry,
-    sessionFile: path.join(dir, `${mockState.sessionId}.jsonl`),
+    sessionFile: path.join(dir, "sess.jsonl"),
   };
   closeOpenClawStateDatabaseForTest();
   replaceSqliteSessionTranscriptEvents({
@@ -3138,14 +3138,13 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       expectBroadcast: false,
     });
 
-    const userUpdate = findUserUpdate();
-    const message = userUpdateMessage(userUpdate);
-    expect(userUpdate?.agentId).toBe("main");
-    expect(userUpdate?.sessionId).toBe(mockState.sessionId);
-    expect(userUpdate?.sessionKey).toBe("main");
-    expect(message?.role).toBe("user");
-    expect(message?.content).toBe("hello from dashboard");
-    expect(typeof message?.timestamp).toBe("number");
+    expect(findUserUpdate()).toBeUndefined();
+    expect(mockState.lastDispatchUserTurnInput).toEqual({
+      role: "user",
+      content: "hello from dashboard",
+      timestamp: expect.any(Number),
+      idempotencyKey: "idem-user-transcript-agent-run:user",
+    });
     const finalBroadcast = (
       context.broadcast as unknown as ReturnType<typeof vi.fn>
     ).mock.calls.find((call) => call[0] === "chat" && call[1]?.state === "final")?.[1];
@@ -3284,10 +3283,6 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     });
 
     await waitForAssertion(() => {
-      const userUpdate = findUserUpdate();
-      expect(userUpdate?.agentId).toBe("main");
-      expect(userUpdate?.sessionId).toBe(mockState.sessionId);
-      expect(userUpdate?.sessionKey).toBe("main");
       expect(mockState.savedMediaCalls).toEqual([
         {
           contentType: "image/png",

@@ -432,6 +432,15 @@ function mergeRuntimeExternalProfileState(params: {
     activeRuntimeProfileIds.add(profileId);
   }
   if (activeRuntimeProfileIds.size === 0) {
+    if (params.existing.runtimeExternalProfileIdsAuthoritative === true) {
+      const next = cloneAuthProfileStore(params.next);
+      setRuntimeExternalProfileMetadata({
+        store: next,
+        profileIds: activeRuntimeProfileIds,
+        authoritative: true,
+      });
+      return next;
+    }
     return params.next;
   }
   for (const profileId of activeRuntimeProfileIds) {
@@ -857,6 +866,12 @@ export function saveAuthProfileStore(
     store: savedStore,
   });
   if (hasRuntimeAuthProfileStoreSnapshot(agentDir)) {
-    setRuntimeAuthProfileStoreSnapshot(savedStore, agentDir);
+    const runtimeStore = getRuntimeAuthProfileStoreSnapshot(agentDir);
+    setRuntimeAuthProfileStoreSnapshot(
+      runtimeStore
+        ? mergeRuntimeExternalProfileState({ next: savedStore, existing: runtimeStore })
+        : savedStore,
+      agentDir,
+    );
   }
 }

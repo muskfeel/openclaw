@@ -5,6 +5,7 @@ export type SessionTranscriptUpdate = {
   agentId?: string;
   sessionId?: string;
   sessionKey?: string;
+  sessionFile?: string;
   message?: unknown;
   messageId?: string;
   messageSeq?: number;
@@ -26,6 +27,7 @@ export function emitSessionTranscriptUpdate(update: SessionTranscriptUpdate): vo
     agentId: update.agentId,
     sessionId: update.sessionId,
     sessionKey: update.sessionKey,
+    sessionFile: update.sessionFile,
     message: update.message,
     messageId: update.messageId,
     messageSeq: update.messageSeq,
@@ -41,6 +43,9 @@ export function emitSessionTranscriptUpdate(update: SessionTranscriptUpdate): vo
     ...(agentId ? { agentId } : {}),
     ...(sessionId ? { sessionId } : {}),
     ...(sessionKey ? { sessionKey } : {}),
+    ...(normalizeOptionalString(normalized.sessionFile)
+      ? { sessionFile: normalizeOptionalString(normalized.sessionFile) }
+      : {}),
     ...(normalized.message !== undefined ? { message: normalized.message } : {}),
     ...(normalizeOptionalString(normalized.messageId)
       ? { messageId: normalizeOptionalString(normalized.messageId) }

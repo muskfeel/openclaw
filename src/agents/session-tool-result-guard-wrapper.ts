@@ -4,6 +4,10 @@ import {
   applyInputProvenanceToUserMessage,
   type InputProvenance,
 } from "../sessions/input-provenance.js";
+import {
+  mergePreparedUserTurnMessageForRuntime,
+  type PersistedUserTurnMessage,
+} from "../sessions/user-turn-transcript.js";
 import type { AgentMessage } from "./agent-core-contract.js";
 import { resolveLiveToolResultMaxChars } from "./pi-embedded-runner/tool-result-truncation.js";
 import { installSessionToolResultGuard } from "./session-tool-result-guard.js";

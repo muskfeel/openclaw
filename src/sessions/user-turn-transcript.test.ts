@@ -9,6 +9,7 @@ import { createMockPluginRegistry } from "openclaw/plugin-sdk/plugin-test-runtim
 import { castAgentMessage } from "openclaw/plugin-sdk/test-fixtures";
 import { afterEach, describe, expect, it } from "vitest";
 import { runAgentHarnessBeforeMessageWriteHook } from "../agents/harness/hook-helpers.js";
+import { loadSqliteSessionTranscriptEvents } from "../config/sessions/transcript-store.sqlite.js";
 import {
   appendUserTurnTranscriptMessage,
   buildPersistedUserTurnMediaInputsFromFields,
@@ -34,12 +35,28 @@ describe("user turn transcript persistence", () => {
     return dir;
   }
 
-  function readTranscriptMessages(transcriptPath: string): Array<Record<string, unknown>> {
-    return fs
-      .readFileSync(transcriptPath, "utf-8")
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as { message?: unknown })
+  function readTranscriptMessages(
+    transcriptPath: string,
+    options: { agentId?: string; sessionId?: string } = {},
+  ): Array<Record<string, unknown>> {
+    const agentId = options.agentId ?? "main";
+    const basenameSessionId = path.basename(transcriptPath, path.extname(transcriptPath));
+    const sessionIds = options.sessionId
+      ? [options.sessionId]
+      : ["session-1", basenameSessionId].filter(
+          (sessionId, index, values) => values.indexOf(sessionId) === index,
+        );
+    const events = sessionIds
+      .map((sessionId) =>
+        loadSqliteSessionTranscriptEvents({
+          agentId,
+          path: transcriptPath,
+          sessionId,
+        }),
+      )
+      .find((entries) => entries.length > 0);
+    return (events ?? [])
+      .map((entry) => entry.event as { message?: unknown })
       .map((entry) => entry.message)
       .filter(
         (message): message is Record<string, unknown> =>
@@ -417,7 +434,12 @@ describe("user turn transcript persistence", () => {
 
       expect(persisted?.sessionFile).toBeTruthy();
       expect(fs.existsSync(persisted?.sessionFile ?? "")).toBe(true);
-      expect(readTranscriptMessages(persisted?.sessionFile ?? "")).toEqual([
+      expect(
+        readTranscriptMessages(persisted?.sessionFile ?? "", {
+          agentId: "agent",
+          sessionId: "session-1",
+        }),
+      ).toEqual([
         expect.objectContaining({
           role: "user",
           content: "hello",
@@ -638,7 +660,9 @@ describe("user turn transcript persistence", () => {
 
       expect(persisted?.sessionFile).toBe(admittedTranscriptPath);
       expect(fs.existsSync(staleTranscriptPath)).toBe(false);
-      expect(readTranscriptMessages(admittedTranscriptPath)).toEqual([
+      expect(
+        readTranscriptMessages(admittedTranscriptPath, { sessionId: "admitted-session" }),
+      ).toEqual([
         expect.objectContaining({
           role: "user",
           content: "persist me in the admitted session",

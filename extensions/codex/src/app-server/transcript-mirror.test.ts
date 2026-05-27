@@ -406,13 +406,15 @@ describe("mirrorCodexAppServerTranscript", () => {
     });
 
     const first = await mirrorCodexAppServerTranscript({
-      sessionFile,
+      path: sessionFile,
+      sessionId: "session-1",
       sessionKey: "session-1",
       messages: [sourceMessage],
       idempotencyScope: "scope-1",
     });
     const second = await mirrorCodexAppServerTranscript({
-      sessionFile,
+      path: sessionFile,
+      sessionId: "session-1",
       sessionKey: "session-1",
       messages: [sourceMessage],
       idempotencyScope: "scope-1",
@@ -425,9 +427,7 @@ describe("mirrorCodexAppServerTranscript", () => {
       { type: "text", text: "[redacted by hook]" },
     ]);
     expect(JSON.stringify(second.userMessagesPresent)).not.toContain("secret prompt");
-    const records = parseJsonLines<{ type?: string; message?: { role?: string } }>(
-      await fs.readFile(sessionFile, "utf8"),
-    );
+    const records = loadTranscriptEvents(sessionFile, "session-1");
     expect(records.filter((record) => record.message?.role === "user")).toHaveLength(1);
   });
 

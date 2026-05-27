@@ -7,6 +7,7 @@ import {
 } from "openclaw/plugin-sdk/reply-payload";
 import type { AgentMessage } from "../../agents/agent-core-contract.js";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
 import { rewriteTranscriptEntriesInSqliteTranscript } from "../../agents/pi-embedded-runner/transcript-rewrite.js";
 import { resolveProviderIdForAuth } from "../../agents/provider-auth-aliases.js";
 import { ensureSandboxWorkspaceForSession } from "../../agents/sandbox/context.js";
@@ -54,6 +55,11 @@ import { isAcpSessionKey } from "../../routing/session-key.js";
 import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
+import {
+  createUserTurnTranscriptRecorder,
+  type UserTurnInput,
+  type UserTurnTranscriptRecorder,
+} from "../../sessions/user-turn-transcript.js";
 import {
   stripInlineDirectiveTagsForDisplay,
   sanitizeReplyDirectiveId,
@@ -1043,6 +1049,13 @@ function applyChatSendManagedMediaFields(ctx: MsgContext, fields: ChatSendManage
   if (ctx.MediaTypes === undefined && fields.MediaTypes !== undefined) {
     ctx.MediaTypes = fields.MediaTypes;
   }
+}
+
+function buildChatSendUserTurnMedia(savedMedia: SavedMedia[]): NonNullable<UserTurnInput["media"]> {
+  return savedMedia.map((entry) => ({
+    path: entry.path,
+    contentType: entry.contentType,
+  }));
 }
 
 async function rewriteChatSendUserTurnMediaPaths(params: {
@@ -2747,7 +2760,39 @@ export const chatHandlers: GatewayRequestHandlers = {
       const deliveredReplies: Array<{ payload: ReplyPayload; kind: "block" | "final" }> = [];
       let appendedWebchatAgentMedia = false;
       let agentRunStarted = false;
+      const userTurnRecorder: UserTurnTranscriptRecorder = createUserTurnTranscriptRecorder({
+        input: baseUserTurnInput,
+        resolveInput: () => userTurnInputPromise,
+        target: () => {
+          const {
+            entry: latestEntry,
+            databasePath: latestDatabasePath,
+            store: latestStore,
+          } = loadSessionEntry(sessionKey);
+          const resolvedSessionId = latestEntry?.sessionId ?? backingSessionId;
+          if (!resolvedSessionId) {
+            return undefined;
+          }
+          return {
+            sessionId: resolvedSessionId,
+            sessionKey,
+            sessionEntry: latestEntry ?? entry,
+            sessionStore: latestStore,
+            storePath: latestDatabasePath,
+            agentId,
+            config: cfg,
+          };
+        },
+        errorContext: "gateway chat user turn transcript",
+        beforeMessageWrite: runAgentHarnessBeforeMessageWriteHook,
+        onPersistenceError: (error) => {
+          context.logGateway.warn(
+            `gateway user transcript persistence failed: ${formatForLog(error)}`,
+          );
+        },
+      });
       const hasBeforeAgentRunGate = getGlobalHookRunner()?.hasHooks("before_agent_run") === true;
+      let userTranscriptUpdatePromise: Promise<void> | undefined;
       const emitUserTranscriptUpdate = async () => {
         if (userTranscriptUpdatePromise) {
           await userTranscriptUpdatePromise;
@@ -2786,10 +2831,10 @@ export const chatHandlers: GatewayRequestHandlers = {
       const emitUserTranscriptUpdateAfterAgentRun = async () => {
         await emitUserTranscriptUpdate().catch((transcriptErr) => {
           context.logGateway.warn(
-            `gateway user transcript persistence failed: ${formatForLog(error)}`,
+            `gateway user transcript persistence failed: ${formatForLog(transcriptErr)}`,
           );
-        },
-      });
+        });
+      };
       const persistGatewayUserTurnTranscript = async () => {
         await measureDiagnosticsTimelineSpan(
           "gateway.chat_send.persist_user_transcript",
@@ -2802,6 +2847,9 @@ export const chatHandlers: GatewayRequestHandlers = {
             attributes: chatSendTraceAttributes,
           },
         );
+      };
+      const persistGatewayUserTurnTranscriptBestEffort = async () => {
+        await persistGatewayUserTurnTranscript().catch(() => undefined);
       };
       let transcriptMediaRewriteDone = false;
       const rewriteUserTranscriptMedia = async () => {
@@ -2954,6 +3002,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               imageOrder: imageOrder.length > 0 ? imageOrder : undefined,
               thinkingLevelOverride: p.thinking,
               fastModeOverride: p.fastMode,
+              userTurnTranscriptRecorder: userTurnRecorder,
               onAgentRunStart: (runId) => {
                 agentRunStarted = true;
                 const connId = typeof client?.connId === "string" ? client.connId : undefined;
