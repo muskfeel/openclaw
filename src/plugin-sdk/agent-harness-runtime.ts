@@ -228,6 +228,7 @@ export {
 } from "../agents/transcript/session-transcript-contract.js";
 export { openTranscriptSessionManagerForSession } from "../agents/transcript/session-manager.js";
 export {
+  getBeforeToolCallPolicyDiagnosticState,
   hasBeforeToolCallPolicy,
   isToolWrappedWithBeforeToolCallHook,
   runBeforeToolCallHook,

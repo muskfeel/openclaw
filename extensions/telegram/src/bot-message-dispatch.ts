@@ -249,9 +249,9 @@ function resolveTelegramReasoningLevel(params: {
   cfg: OpenClawConfig;
   sessionKey?: string;
   agentId: string;
-  loadFreshSessionStore: FreshTelegramSessionStoreLoader;
+  telegramDeps: TelegramBotDeps;
 }): TelegramReasoningLevel {
-  const { cfg, sessionKey, agentId } = params;
+  const { cfg, sessionKey, agentId, telegramDeps } = params;
   const configDefault = resolveTelegramConfigReasoningDefault(cfg, agentId);
   if (!sessionKey) {
     return configDefault;
@@ -563,7 +563,6 @@ export const dispatchTelegramMessage = async ({
   const dispatchContext = resolveDispatchTelegramContext({ cfg, context });
   const telegramDeps =
     injectedTelegramDeps ?? (await import("./bot-deps.js")).defaultTelegramBotDeps;
-  const loadFreshSessionStore = createFreshTelegramSessionStoreLoader({ cfg, telegramDeps });
   const {
     ctxPayload,
     msg,
@@ -679,7 +678,7 @@ export const dispatchTelegramMessage = async ({
     cfg,
     sessionKey: ctxPayload.SessionKey,
     agentId: route.agentId,
-    loadFreshSessionStore,
+    telegramDeps,
   });
   const forceBlockStreamingForReasoning = resolvedReasoningLevel === "on";
   const streamReasoningDraft = resolvedReasoningLevel === "stream";
@@ -1428,8 +1427,6 @@ export const dispatchTelegramMessage = async ({
         logVerbose(`auto-topic-label: session row read error: ${formatErrorMessage(err)}`);
       }
     }
-    loadFreshSessionStore.clear();
-
     if (statusReactionController && !isRoomEvent) {
       void statusReactionController.setThinking();
     }

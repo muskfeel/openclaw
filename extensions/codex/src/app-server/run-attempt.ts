@@ -12,6 +12,7 @@ import {
   emitAgentEvent as emitGlobalAgentEvent,
   finalizeHarnessContextEngineTurn,
   formatErrorMessage,
+  getBeforeToolCallPolicyDiagnosticState,
   hasSqliteSessionTranscriptEvents,
   hasBeforeToolCallPolicy,
   isActiveHarnessContextEngine,
