@@ -139,12 +139,13 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput)?.let { parseGatewayEndpoint(it)?.displayUrl }
     }
 
+  val notSetLabel = stringResource(R.string.not_set)
   val activeEndpoint =
-    remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode) {
+    remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode, notSetLabel) {
       when {
         isConnected && !remoteAddress.isNullOrBlank() -> remoteAddress!!
-        inputMode == ConnectInputMode.SetupCode -> setupResolvedEndpoint ?: stringResource(R.string.not_set)
-        else -> manualResolvedEndpoint ?: stringResource(R.string.not_set)
+        inputMode == ConnectInputMode.SetupCode -> setupResolvedEndpoint ?: notSetLabel
+        else -> manualResolvedEndpoint ?: notSetLabel
       }
     }
 

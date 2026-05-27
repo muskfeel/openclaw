@@ -554,11 +554,13 @@ private fun NotificationSettingsScreen(
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = "Forwarding Mode", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+        val blocklistLabel = stringResource(R.string.blocklist)
+        val allowlistLabel = stringResource(R.string.allowlist)
         ClawSegmentedControl(
-          options = listOf(stringResource(R.string.blocklist), stringResource(R.string.allowlist)),
+          options = listOf(blocklistLabel, allowlistLabel),
           selected = modeLabel,
           onSelect = { selected ->
-            viewModel.setNotificationForwardingMode(if (selected == stringResource(R.string.allowlist)) NotificationPackageFilterMode.Allowlist else NotificationPackageFilterMode.Blocklist)
+            viewModel.setNotificationForwardingMode(if (selected == allowlistLabel) NotificationPackageFilterMode.Allowlist else NotificationPackageFilterMode.Blocklist)
           },
         )
       }
