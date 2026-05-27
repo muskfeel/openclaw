@@ -439,7 +439,6 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...createLazyCoreHandlers({
     methods: [
       "sessions.list",
-      "sessions.cleanup",
       "sessions.subscribe",
       "sessions.unsubscribe",
       "sessions.messages.subscribe",
