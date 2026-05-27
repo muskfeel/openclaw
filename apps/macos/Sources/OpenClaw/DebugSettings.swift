@@ -59,7 +59,6 @@ struct DebugSettings: View {
         }
         .task {
             guard !self.isPreview else { return }
-            await self.reloadModels()
             self.refreshSessionDatabasePath()
         }
         .alert(item: self.$pendingKill) { listener in
@@ -961,7 +960,6 @@ extension DebugSettings {
         _ = view.gridLabel("Test")
 
         view.refreshSessionDatabasePath()
-        await view.reloadModels()
     }
 }
 #endif
