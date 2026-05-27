@@ -295,7 +295,7 @@ export async function getStatusSummary(
           runtime,
           contextTokens,
           flags: buildFlags(entry),
-        } satisfies SessionStatus;
+        } satisfies SessionStatus);
       })
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 

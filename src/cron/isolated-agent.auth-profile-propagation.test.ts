@@ -13,18 +13,30 @@ import {
 } from "./isolated-agent.test-harness.js";
 import { setupIsolatedAgentTurnMocks } from "./isolated-agent.test-setup.js";
 
-const runCronIsolatedAgentTurn = await loadRunCronIsolatedAgentTurn();
+vi.mock("../plugins/provider-runtime.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../plugins/provider-runtime.js")>()),
+  resolveExternalAuthProfilesWithPlugins: () => [],
+}));
 
-function getEmbeddedAgentParams(): { authProfileId?: string; authProfileIdSource?: string } {
-  const params = runEmbeddedAgentMock.mock.calls[0]?.[0];
-  if (!params || typeof params !== "object" || Array.isArray(params)) {
-    throw new Error("Expected embedded OpenClaw agent params to be an object");
+function getEmbeddedPiAgentParams(): {
+  authProfileId?: string;
+  authProfileIdSource?: string;
+} {
+  const [call] = vi.mocked(runEmbeddedPiAgent).mock.calls;
+  if (!call) {
+    throw new Error("Expected embedded PI agent call for auth profile propagation");
+  }
+  const [params] = call;
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw new Error("Expected embedded PI agent params to be an object");
   }
   return params;
 }
 
 describe("runCronIsolatedAgentTurn auth profile propagation (#20624)", () => {
-  setupRunCronIsolatedAgentTurnSuite();
+  beforeEach(() => {
+    setupIsolatedAgentTurnMocks({ fast: true });
+  });
 
   it("passes authProfileId to runEmbeddedPiAgent when auth profiles exist", async () => {
     await withTempCronHome(async (home) => {
@@ -73,8 +85,7 @@ describe("runCronIsolatedAgentTurn auth profile propagation (#20624)", () => {
         message: "check status",
         sessionKey: "cron:job-1",
         lane: "cron",
-      }),
-    );
+      });
 
       expect(res.status).toBe("ok");
       expect(vi.mocked(runEmbeddedPiAgent)).toHaveBeenCalledTimes(1);

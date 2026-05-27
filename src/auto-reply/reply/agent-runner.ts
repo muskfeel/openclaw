@@ -1561,7 +1561,7 @@ export async function runReplyAgent(params: {
             fallbackNoticeSelectedModel: fallbackTransition.nextState.selectedModel,
             fallbackNoticeActiveModel: fallbackTransition.nextState.activeModel,
             fallbackNoticeReason: fallbackTransition.nextState.reason,
-          },
+          }),
         });
       }
     }
@@ -2131,7 +2131,7 @@ export async function runReplyAgent(params: {
             pendingFinalDeliveryText: resolvedPendingText,
             pendingFinalDeliveryCreatedAt: Date.now(),
             updatedAt: Date.now(),
-          },
+          }),
         });
       }
     }

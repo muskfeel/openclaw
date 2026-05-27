@@ -515,7 +515,7 @@ export async function getReplyFromConfig(
               pendingFinalDeliveryAttemptCount: undefined,
               pendingFinalDeliveryLastError: undefined,
               pendingFinalDeliveryContext: undefined,
-            },
+            }),
           });
         }
       } else {
@@ -541,7 +541,7 @@ export async function getReplyFromConfig(
               pendingFinalDeliveryAttemptCount: attemptCount,
               pendingFinalDeliveryLastError: null,
               updatedAt,
-            },
+            }),
           });
         }
         logResolverTiming("completed", "pending_final_delivery_replay");
