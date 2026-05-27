@@ -209,10 +209,10 @@ vi.mock("../config/sessions.js", () => ({
 }));
 
 vi.mock("../config/sessions/transcript-resolve.runtime.js", () => ({
-  resolveSessionTranscriptTarget: async () => ({
+  resolveSessionTranscriptTarget: async (params: { sessionEntry?: unknown }) => ({
     agentId: "default",
     sessionId: "session-1",
-    sessionEntry: { sessionId: "session-1", updatedAt: Date.now() },
+    sessionEntry: params.sessionEntry ?? { sessionId: "session-1", updatedAt: Date.now() },
   }),
 }));
 
@@ -1022,8 +1022,8 @@ describe("agentCommand – LiveSessionModelSwitchError retry", () => {
     expect(attemptCalls[0]?.sessionFile).toBe("/tmp/openclaw-internal-run.jsonl");
     expect(attemptCalls[0]?.sessionEntry).toStrictEqual(visibleEntry);
     expect(state.persistSessionEntryMock).not.toHaveBeenCalled();
-    expect(state.updateSessionStoreAfterAgentRunMock).not.toHaveBeenCalled();
-    expect(sessionStore["agent:main:main"]).toEqual(visibleEntry);
+    expect(state.updateSessionEntryAfterAgentRunMock).not.toHaveBeenCalled();
+    expect(sessionStore["agent:main:main"]).toBe(visibleEntry);
   });
 
   it("does not duplicate finishing lifecycle when an attempt already emitted finishing", async () => {

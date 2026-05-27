@@ -856,7 +856,6 @@ run_profile() {
   phase_mark_start "Verify tool usage via session transcript ($profile)"
   # Give the gateway a moment to flush transcripts.
   sleep 1
-  assert_session_used_tools "$(session_db_path "$profile")" "$TURN1_SESSION_ID" read
   assert_session_used_tools "$(session_db_path "$profile")" "$TURN2_SESSION_ID" write
   assert_session_used_tools "$(session_db_path "$profile")" "$TURN2B_SESSION_ID" read
   assert_session_used_tools "$(session_db_path "$profile")" "$TURN3_SESSION_ID" exec

@@ -546,6 +546,12 @@ async function agentCommandInternal(
     modelManifestContext,
   } = prepared;
   let sessionEntry = prepared.sessionEntry;
+  const visibleSessionEntryForInternalEffects =
+    suppressVisibleSessionEffects && sessionKey && sessionStore
+      ? sessionStore[sessionKey]
+      : suppressVisibleSessionEffects
+        ? sessionEntry
+        : undefined;
 
   try {
     if (opts.deliver === true) {
@@ -669,12 +675,12 @@ async function agentCommandInternal(
       const finalTextRaw = visibleTextAccumulator.finalizeRaw();
       const finalText = visibleTextAccumulator.finalize();
       try {
-        const [{ resolveAcpSessionCwd }, { resolveSessionTranscriptFile }] = await Promise.all([
+        const [{ resolveAcpSessionCwd }, { resolveSessionTranscriptTarget }] = await Promise.all([
           loadAcpSessionIdentifiersRuntime(),
           loadTranscriptResolveRuntime(),
         ]);
         const internalSource = suppressVisibleSessionEffects
-          ? await resolveSessionTranscriptFile({
+          ? await resolveSessionTranscriptTarget({
               sessionId,
               sessionKey,
               sessionEntry,
@@ -684,7 +690,9 @@ async function agentCommandInternal(
           : undefined;
         const internalSessionFile = suppressVisibleSessionEffects
           ? await prepareInternalSessionEffectsTranscript({
-              sessionFile: internalSource?.sessionFile,
+              sessionFile:
+                visibleSessionEntryForInternalEffects?.sessionFile ??
+                internalSource?.sessionEntry?.sessionFile,
               runId,
             })
           : undefined;
@@ -833,7 +841,7 @@ async function agentCommandInternal(
     }
 
     // Persist explicit /command overrides to the SQLite session row when we have a key.
-    if (sessionStore && sessionKey) {
+    if (sessionStore && sessionKey && !suppressVisibleSessionEffects) {
       const now = Date.now();
       const entry = sessionStore[sessionKey] ??
         sessionEntry ?? { sessionId, updatedAt: now, sessionStartedAt: now };
@@ -1165,9 +1173,11 @@ async function agentCommandInternal(
       });
       sessionEntry = resolvedTranscriptTarget.sessionEntry;
     }
+    const resolvedSessionFile =
+      visibleSessionEntryForInternalEffects?.sessionFile ?? sessionEntry?.sessionFile;
     const attemptSessionFile = suppressVisibleSessionEffects
-      ? await prepareInternalSessionEffectsTranscript({ sessionFile, runId })
-      : sessionFile;
+      ? await prepareInternalSessionEffectsTranscript({ sessionFile: resolvedSessionFile, runId })
+      : resolvedSessionFile;
 
     const startedAt = Date.now();
     const attemptLifecycleState = {
@@ -1252,10 +1262,11 @@ async function agentCommandInternal(
               autoFallbackPrimaryProbe &&
               providerOverride === autoFallbackPrimaryProbe.provider &&
               modelOverride === autoFallbackPrimaryProbe.model;
-            const attemptSessionEntry =
-              autoFallbackPrimaryProbe &&
-              providerOverride === autoFallbackPrimaryProbe.fallbackProvider &&
-              !isAutoFallbackPrimaryProbeCandidate
+            const attemptSessionEntry = suppressVisibleSessionEffects
+              ? visibleSessionEntryForInternalEffects
+              : autoFallbackPrimaryProbe &&
+                  providerOverride === autoFallbackPrimaryProbe.fallbackProvider &&
+                  !isAutoFallbackPrimaryProbeCandidate
                 ? sessionEntry
                 : sessionEntryForAttempt;
             if (isAutoFallbackPrimaryProbeCandidate) {
@@ -1277,6 +1288,7 @@ async function agentCommandInternal(
               originalProvider: provider,
               cfg,
               sessionEntry: attemptSessionEntry,
+              sessionFile: attemptSessionFile,
               sessionId,
               sessionKey,
               sessionAgentId,
@@ -1312,6 +1324,7 @@ async function agentCommandInternal(
               suppressPromptPersistenceOnRetry:
                 opts.suppressPromptPersistence === true ||
                 (isFallbackRetry && attemptLifecycleState.currentTurnUserMessagePersisted),
+              deferTerminalLifecycleEnd: true,
               onUserMessagePersisted: attemptLifecycleCallbacks.onUserMessagePersisted,
               onAgentEvent: attemptLifecycleCallbacks.onAgentEvent,
             });
@@ -1376,22 +1389,21 @@ async function agentCommandInternal(
             },
           };
         }
-        if (!attemptLifecycleState.lifecycleEnded) {
-          const stopReason = result.meta.stopReason;
-          if (stopReason && stopReason !== "end_turn") {
-            console.error(`[agent] run ${runId} ended with stopReason=${stopReason}`);
-          }
+        if (!attemptLifecycleState.lifecycleEnded && !attemptLifecycleState.lifecycleFinishing) {
           emitAgentEvent({
             runId,
             stream: "lifecycle",
             data: {
-              phase: "end",
+              phase: "finishing",
               startedAt,
               endedAt: Date.now(),
-              aborted: result.meta.aborted ?? false,
-              stopReason,
             },
           });
+          attemptLifecycleState.lifecycleFinishing = true;
+        }
+        if (result.meta.stopReason && result.meta.stopReason !== "end_turn") {
+          const stopReason = result.meta.stopReason;
+          console.error(`[agent] run ${runId} ended with stopReason=${stopReason}`);
         }
         break;
       } catch (err) {
@@ -1495,7 +1507,7 @@ async function agentCommandInternal(
     await fallbackTrajectoryRecorder?.flush();
 
     // Update token+model fields in the SQLite session row.
-    if (sessionStore && sessionKey) {
+    if (sessionStore && sessionKey && !suppressVisibleSessionEffects) {
       await updateSessionEntryAfterAgentRun({
         cfg,
         contextTokensOverride: agentCfg?.contextTokens,
@@ -1565,6 +1577,36 @@ async function agentCommandInternal(
 
     const payloads = result.payloads ?? [];
 
+    if (
+      opts.deliver === true &&
+      sessionStore &&
+      sessionKey &&
+      payloads.length === 0 &&
+      !isSubagentSessionKey(sessionKey)
+    ) {
+      const entry = sessionStore[sessionKey] ?? sessionEntry;
+      if (entry?.pendingFinalDelivery === true && !entry.pendingFinalDeliveryText) {
+        const next: SessionEntry = {
+          ...entry,
+          pendingFinalDelivery: undefined,
+          pendingFinalDeliveryText: undefined,
+          pendingFinalDeliveryCreatedAt: undefined,
+          pendingFinalDeliveryLastAttemptAt: undefined,
+          pendingFinalDeliveryAttemptCount: undefined,
+          pendingFinalDeliveryLastError: undefined,
+          pendingFinalDeliveryContext: undefined,
+          pendingFinalDeliveryIntentId: undefined,
+          updatedAt: Date.now(),
+        };
+        await persistSessionEntry({
+          sessionStore,
+          sessionKey,
+          entry: next,
+        });
+        sessionEntry = next;
+      }
+    }
+
     // Phase 2: Persist pending final delivery for main sessions before attempting delivery.
     // This ensures that if the process restarts during delivery, the payload is durable.
     if (
@@ -1632,6 +1674,21 @@ async function agentCommandInternal(
         : deliveryParams,
     );
 
+    if (!attemptLifecycleState.lifecycleEnded) {
+      emitAgentEvent({
+        runId,
+        stream: "lifecycle",
+        data: {
+          phase: "end",
+          startedAt,
+          endedAt: Date.now(),
+          aborted: result.meta.aborted ?? false,
+          stopReason: result.meta.stopReason,
+        },
+      });
+      attemptLifecycleState.lifecycleEnded = true;
+    }
+
     // Phase 2: Clear pending delivery payload after successful delivery.
     if (
       deliveryResult?.deliverySucceeded === true &&
@@ -1645,6 +1702,11 @@ async function agentCommandInternal(
         pendingFinalDelivery: undefined,
         pendingFinalDeliveryText: undefined,
         pendingFinalDeliveryCreatedAt: undefined,
+        pendingFinalDeliveryLastAttemptAt: undefined,
+        pendingFinalDeliveryAttemptCount: undefined,
+        pendingFinalDeliveryLastError: undefined,
+        pendingFinalDeliveryContext: undefined,
+        pendingFinalDeliveryIntentId: undefined,
         updatedAt: Date.now(),
       };
       await persistSessionEntry({
