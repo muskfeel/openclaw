@@ -1,3 +1,5 @@
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 package ai.openclaw.app.ui
 
 import ai.openclaw.app.BuildConfig
@@ -161,7 +163,7 @@ private fun UsageSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = "Usage", subtitle = "Provider limits and quota health.", icon = Icons.Default.Storage, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.usage), subtitle = "Provider limits and quota health.", icon = Icons.Default.Storage, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -171,7 +173,7 @@ private fun UsageSettingsScreen(
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawSecondaryButton(text = if (usageRefreshing) "Refreshing" else "Refresh", onClick = viewModel::refreshUsage, enabled = isConnected && !usageRefreshing, modifier = Modifier.weight(1f))
+      ClawSecondaryButton(text = if (usageRefreshing) stringResource(R.string.refreshing) else stringResource(R.string.refresh), onClick = viewModel::refreshUsage, enabled = isConnected && !usageRefreshing, modifier = Modifier.weight(1f))
     }
     usageErrorText?.let { errorText ->
       ClawPanel {
@@ -212,7 +214,7 @@ private fun CronJobsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = "Cron Jobs", subtitle = "Scheduled OpenClaw work from your gateway.", icon = Icons.Default.Bolt, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.cron_jobs), subtitle = "Scheduled OpenClaw work from your gateway.", icon = Icons.Default.Bolt, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -221,7 +223,7 @@ private fun CronJobsSettingsScreen(
           SettingsMetric("Next Wake", formatCronWake(cronStatus.nextWakeAtMs)),
         ),
     )
-    ClawSecondaryButton(text = if (cronRefreshing) "Refreshing" else "Refresh", onClick = viewModel::refreshCronJobs, enabled = isConnected && !cronRefreshing, modifier = Modifier.fillMaxWidth())
+    ClawSecondaryButton(text = if (cronRefreshing) stringResource(R.string.refreshing) else stringResource(R.string.refresh), onClick = viewModel::refreshCronJobs, enabled = isConnected && !cronRefreshing, modifier = Modifier.fillMaxWidth())
     ClawPanel {
       Text(text = "Android shows scheduled work status. Create and edit schedules from the desktop app.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
     }
@@ -262,7 +264,7 @@ private fun AgentsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = "Agents", subtitle = "Choose and inspect the assistants available on this gateway.", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.agents), subtitle = "Choose and inspect the assistants available on this gateway.", icon = Icons.Default.Person, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -294,7 +296,7 @@ private fun ApprovalsSettingsScreen(
   val waitingCount = pendingToolCalls.count { it.isError != true }
   val issueCount = pendingToolCalls.count { it.isError == true }
 
-  SettingsDetailFrame(title = "Approvals", subtitle = "Review actions that need your attention.", icon = Icons.Default.Lock, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.approvals), subtitle = "Review actions that need your attention.", icon = Icons.Default.Lock, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -324,11 +326,11 @@ private fun ProfileSettingsScreen(
   val displayName by viewModel.displayName.collectAsState()
   var draft by remember(displayName) { mutableStateOf(displayName.ifBlank { "OpenClaw" }) }
 
-  SettingsDetailFrame(title = "Profile", subtitle = "How this phone appears to OpenClaw.", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.profile), subtitle = "How this phone appears to OpenClaw.", icon = Icons.Default.Person, onBack = onBack) {
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        ClawTextField(value = draft, onValueChange = { draft = it }, placeholder = "Device name")
-        ClawPrimaryButton(text = "Save Profile", onClick = { viewModel.setDisplayName(draft) }, enabled = draft.isNotBlank())
+        ClawTextField(value = draft, onValueChange = { draft = it }, placeholder = stringResource(R.string.device_name))
+        ClawPrimaryButton(text = stringResource(R.string.save_profile), onClick = { viewModel.setDisplayName(draft) }, enabled = draft.isNotBlank())
       }
     }
   }
@@ -343,23 +345,23 @@ private fun VoiceSettingsScreen(
   val micEnabled by viewModel.micEnabled.collectAsState()
   val talkModeEnabled by viewModel.talkModeEnabled.collectAsState()
 
-  SettingsDetailFrame(title = "Talk Provider Setup", subtitle = "Configure voice, transport, and playback.", icon = Icons.Default.Mic, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.talk_provider_setup), subtitle = "Configure voice, transport, and playback.", icon = Icons.Default.Mic, onBack = onBack) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       VoiceSetupPanel(
         voiceActive = micEnabled || talkModeEnabled,
       )
-      Text(text = "Audio Test", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+      Text(text = stringResource(R.string.audio_test), style = ClawTheme.type.section, color = ClawTheme.colors.text)
       Text(text = "Check that OpenClaw can speak clearly on this phone.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       SettingsWaveformPanel(active = speakerEnabled, onClick = ::playVoiceSetupTone)
       VoiceSetupActionRow(
-        title = if (speakerEnabled) "Mute speaker" else "Enable speaker",
-        subtitle = if (speakerEnabled) "Replies play aloud" else "Assistant speech muted",
+        title = if (speakerEnabled) stringResource(R.string.mute_speaker) else stringResource(R.string.enable_speaker),
+        subtitle = if (speakerEnabled) stringResource(R.string.replies_play_aloud) else stringResource(R.string.assistant_speech_muted),
         icon = Icons.AutoMirrored.Filled.VolumeUp,
         statusText = if (speakerEnabled) "On" else "Muted",
         ready = speakerEnabled,
         onClick = { viewModel.setSpeakerEnabled(!speakerEnabled) },
       )
-      ClawPrimaryButton(text = "Done", onClick = onBack, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.GraphicEq)
+      ClawPrimaryButton(text = stringResource(R.string.done), onClick = onBack, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.GraphicEq)
     }
   }
 }
@@ -371,23 +373,23 @@ private fun VoiceSetupPanel(
   Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
     VoiceSetupActionRow(
       title = "Realtime Provider",
-      subtitle = "Gateway voice relay",
+      subtitle = stringResource(R.string.gateway_voice_relay),
       icon = Icons.Default.GraphicEq,
-      statusText = if (voiceActive) "Live" else "Ready",
+      statusText = if (voiceActive) stringResource(R.string.live) else "Ready",
       ready = true,
     )
     VoiceSetupActionRow(
       title = "Voice",
-      subtitle = "Voice input",
+      subtitle = stringResource(R.string.voice_input),
       icon = Icons.Default.Mic,
-      statusText = "Configured",
+      statusText = stringResource(R.string.configured),
       ready = true,
     )
     VoiceSetupActionRow(
-      title = "Transport",
-      subtitle = "Socket relay",
+      title = stringResource(R.string.transport),
+      subtitle = stringResource(R.string.socket_relay),
       icon = Icons.Default.Bolt,
-      statusText = "Configured",
+      statusText = stringResource(R.string.configured),
       ready = true,
     )
   }
@@ -500,7 +502,7 @@ private fun NotificationSettingsScreen(
   val quietStart by viewModel.notificationForwardingQuietStart.collectAsState()
   val quietEnd by viewModel.notificationForwardingQuietEnd.collectAsState()
   val maxEventsPerMinute by viewModel.notificationForwardingMaxEventsPerMinute.collectAsState()
-  val modeLabel = if (mode == NotificationPackageFilterMode.Blocklist) "Blocklist" else "Allowlist"
+  val modeLabel = if (mode == NotificationPackageFilterMode.Blocklist) stringResource(R.string.blocklist) else stringResource(R.string.allowlist)
   var listenerEnabled by remember { mutableStateOf(DeviceNotificationListenerService.isAccessEnabled(context)) }
   val notificationPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -520,12 +522,12 @@ private fun NotificationSettingsScreen(
     listenerEnabled = DeviceNotificationListenerService.isAccessEnabled(context)
   }
 
-  SettingsDetailFrame(title = "Notifications", subtitle = "Choose what reaches OpenClaw.", icon = Icons.Default.Notifications, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.notifications), subtitle = "Choose what reaches OpenClaw.", icon = Icons.Default.Notifications, onBack = onBack) {
     SettingsTogglePanel(
       rows =
         listOf(
-          SettingsToggleRow("Forward Notifications", if (enabled) "OpenClaw can receive selected alerts." else "Alerts stay on this phone.", Icons.Default.Notifications, enabled, ::setForwarding),
-          SettingsToggleRow("Quiet Hours", "$quietStart to $quietEnd", Icons.Default.Bolt, quietEnabled) { checked ->
+          SettingsToggleRow(stringResource(R.string.forward_notifications), if (enabled) "OpenClaw can receive selected alerts." else "Alerts stay on this phone.", Icons.Default.Notifications, enabled, ::setForwarding),
+          SettingsToggleRow(stringResource(R.string.quiet_hours), "$quietStart to $quietEnd", Icons.Default.Bolt, quietEnabled) { checked ->
             viewModel.setNotificationForwardingQuietHours(enabled = checked, start = quietStart, end = quietEnd)
           },
         ),
@@ -553,10 +555,10 @@ private fun NotificationSettingsScreen(
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = "Forwarding Mode", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         ClawSegmentedControl(
-          options = listOf("Blocklist", "Allowlist"),
+          options = listOf(stringResource(R.string.blocklist), stringResource(R.string.allowlist)),
           selected = modeLabel,
           onSelect = { selected ->
-            viewModel.setNotificationForwardingMode(if (selected == "Allowlist") NotificationPackageFilterMode.Allowlist else NotificationPackageFilterMode.Blocklist)
+            viewModel.setNotificationForwardingMode(if (selected == stringResource(R.string.allowlist)) NotificationPackageFilterMode.Allowlist else NotificationPackageFilterMode.Blocklist)
           },
         )
       }
