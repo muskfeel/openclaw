@@ -2020,7 +2020,20 @@ export function createConfigIO(
       throw err;
     }
 
-    await options.preCommitRuntimePreflight?.(stampedOutputConfig);
+    const preCommitRuntimePreflight =
+      options.preCommitRuntimePreflight ??
+      (async (sourceConfig: OpenClawConfig) => {
+        await preflightRuntimeSnapshotWrite({
+          nextSourceConfig: sourceConfig,
+          formatRefreshError: (error) => formatErrorMessage(error),
+          createRefreshError: (detail, cause) =>
+            new ConfigRuntimeRefreshError(
+              `Config write blocked before committing ${configPath}: active SecretRef resolution failed: ${detail}`,
+              { cause },
+            ),
+        });
+      });
+    await preCommitRuntimePreflight(stampedOutputConfig);
 
     try {
       const result = await replaceFileAtomic({

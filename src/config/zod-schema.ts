@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseByteSize } from "../cli/parse-bytes.js";
+import { normalizeAgentId } from "../routing/session-key.js";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeStringifiedOptionalString,
