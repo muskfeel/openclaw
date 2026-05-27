@@ -116,6 +116,39 @@ describe("SQLite session row backend", () => {
     });
   });
 
+  it("removes the old session root when a session key is rebound to a new session id", () => {
+    const stateDir = createTempDir();
+    const env = { OPENCLAW_STATE_DIR: stateDir };
+
+    upsertSessionEntry({
+      agentId: "ops",
+      env,
+      sessionKey: "discord:ops",
+      entry: {
+        sessionId: "old-session",
+        updatedAt: 100,
+      },
+    });
+    upsertSessionEntry({
+      agentId: "ops",
+      env,
+      sessionKey: "discord:ops",
+      entry: {
+        sessionId: "new-session",
+        updatedAt: 200,
+      },
+    });
+
+    const database = openOpenClawAgentDatabase({ agentId: "ops", env });
+    const db = getNodeSqliteKysely<SessionEntriesTestDatabase>(database.db);
+    const sessionIds = executeSqliteQuerySync(
+      database.db,
+      db.selectFrom("sessions").select("session_id").orderBy("session_id", "asc"),
+    ).rows.map((row) => row.session_id);
+
+    expect(sessionIds).toEqual(["new-session"]);
+  });
+
   it("converts legacy origin routing into delivery context before stripping shadows", () => {
     const stateDir = createTempDir();
     const env = { OPENCLAW_STATE_DIR: stateDir };
@@ -792,7 +825,7 @@ describe("SQLite session row backend", () => {
     });
   });
 
-  it("keeps one active route while preserving rotated session roots", () => {
+  it("keeps one active route while preserving transcript-backed rotated session roots", () => {
     const stateDir = createTempDir();
     const env = { OPENCLAW_STATE_DIR: stateDir };
 
@@ -801,6 +834,12 @@ describe("SQLite session row backend", () => {
       env,
       sessionKey: "discord:ops",
       entry: { sessionId: "first-session", updatedAt: 100 },
+    });
+    appendSqliteSessionTranscriptEvent({
+      agentId: "ops",
+      env,
+      sessionId: "first-session",
+      event: { type: "session", id: "first-session" },
     });
     upsertSessionEntry({
       agentId: "ops",
@@ -821,7 +860,7 @@ describe("SQLite session row backend", () => {
         db
           .selectFrom("sessions")
           .select(["session_id", "session_key"])
-          .orderBy("updated_at", "asc"),
+          .orderBy("session_id", "asc"),
       ).rows,
     ).toEqual([
       { session_id: "first-session", session_key: "discord:ops" },
@@ -845,6 +884,9 @@ describe("SQLite session row backend", () => {
           .orderBy("updated_at", "asc"),
       ).rows,
     ).toEqual([{ session_id: "second-session", session_key: "discord:ops" }]);
+    expect(
+      hasSqliteSessionTranscriptEvents({ agentId: "ops", env, sessionId: "first-session" }),
+    ).toBe(true);
   });
 
   it("keeps aliased routes bound to their own entry rows", () => {

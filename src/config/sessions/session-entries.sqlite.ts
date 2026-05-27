@@ -543,6 +543,19 @@ function upsertSessionEntries(
   }
   const db = getNodeSqliteKysely<SessionEntriesDatabase>(database.db);
   const now = Date.now();
+  const potentiallyOrphanedSessionIds = new Set<string>();
+  for (const row of rows) {
+    const existingRoute = executeSqliteQueryTakeFirstSync(
+      database.db,
+      db
+        .selectFrom("session_routes")
+        .select("session_id")
+        .where("session_key", "=", row.route.session_key),
+    );
+    if (existingRoute?.session_id && existingRoute.session_id !== row.route.session_id) {
+      potentiallyOrphanedSessionIds.add(existingRoute.session_id);
+    }
+  }
   const conversationRows = Array.from(
     new Map(
       rows.flatMap((row) =>
@@ -655,6 +668,9 @@ function upsertSessionEntries(
         }),
       ),
   );
+  for (const sessionId of potentiallyOrphanedSessionIds) {
+    deleteReboundSessionRootIfEmpty(database, db, sessionId);
+  }
 }
 
 function countSessionEntryRows(database: OpenClawAgentDatabase): number {
@@ -669,6 +685,89 @@ function countSessionEntryRows(database: OpenClawAgentDatabase): number {
 
 function parseSqliteCount(value: number | bigint | undefined): number {
   return typeof value === "bigint" ? Number(value) : (value ?? 0);
+}
+
+function deleteSessionRootIfUnreferenced(
+  database: OpenClawAgentDatabase,
+  db: ReturnType<typeof getNodeSqliteKysely<SessionEntriesDatabase>>,
+  sessionId: string,
+): void {
+  const remainingRoutes = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("session_routes")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  const remainingEntries = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("session_entries")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  if (
+    parseSqliteCount(remainingRoutes?.count) > 0 ||
+    parseSqliteCount(remainingEntries?.count) > 0
+  ) {
+    return;
+  }
+  executeSqliteQuerySync(
+    database.db,
+    db.deleteFrom("sessions").where("session_id", "=", sessionId),
+  );
+}
+
+function deleteReboundSessionRootIfEmpty(
+  database: OpenClawAgentDatabase,
+  db: ReturnType<typeof getNodeSqliteKysely<SessionEntriesDatabase>>,
+  sessionId: string,
+): void {
+  const transcriptEvents = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("transcript_events")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  const transcriptSnapshots = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("transcript_snapshots")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  const trajectoryEvents = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("trajectory_runtime_events")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  const memorySources = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("memory_index_sources")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  const memoryChunks = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("memory_index_chunks")
+      .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
+      .where("session_id", "=", sessionId),
+  );
+  if (
+    parseSqliteCount(transcriptEvents?.count) > 0 ||
+    parseSqliteCount(transcriptSnapshots?.count) > 0 ||
+    parseSqliteCount(trajectoryEvents?.count) > 0 ||
+    parseSqliteCount(memorySources?.count) > 0 ||
+    parseSqliteCount(memoryChunks?.count) > 0
+  ) {
+    return;
+  }
+  deleteSessionRootIfUnreferenced(database, db, sessionId);
 }
 
 function readProjectedSqliteSessionEntry(
@@ -931,30 +1030,7 @@ export function deleteSqliteSessionEntry(
       database.db,
       db.deleteFrom("session_routes").where("session_key", "=", options.sessionKey),
     );
-    const remainingRoutes = executeSqliteQueryTakeFirstSync(
-      database.db,
-      db
-        .selectFrom("session_routes")
-        .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
-        .where("session_id", "=", row.session_id),
-    );
-    const remainingEntries = executeSqliteQueryTakeFirstSync(
-      database.db,
-      db
-        .selectFrom("session_entries")
-        .select((eb) => eb.fn.countAll<number | bigint>().as("count"))
-        .where("session_id", "=", row.session_id),
-    );
-    if (
-      parseSqliteCount(remainingRoutes?.count) > 0 ||
-      parseSqliteCount(remainingEntries?.count) > 0
-    ) {
-      return true;
-    }
-    executeSqliteQuerySync(
-      database.db,
-      db.deleteFrom("sessions").where("session_id", "=", row.session_id),
-    );
+    deleteSessionRootIfUnreferenced(database, db, row.session_id);
     return true;
   }, options);
 }
