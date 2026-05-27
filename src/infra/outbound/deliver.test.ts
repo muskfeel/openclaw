@@ -26,6 +26,7 @@ import {
   type DiagnosticEventPayload,
 } from "../diagnostic-events.js";
 import { resolvePreferredOpenClawTmpDir } from "../tmp-openclaw-dir.js";
+import { OutboundDeliveryError } from "./deliver-types.js";
 
 const mocks = vi.hoisted(() => ({
   appendAssistantMessageToSessionTranscript: vi.fn(async () => ({
@@ -1031,6 +1032,43 @@ describe("deliverOutboundPayloads", () => {
     const failDeliveryCall = requireMockCall(queueMocks.failDelivery, "failDelivery");
     expect(failDeliveryCall[0]).toBe("mock-queue-id");
     expect(String(failDeliveryCall[1])).toContain("marker offline");
+    expect(queueMocks.ackDelivery).not.toHaveBeenCalled();
+  });
+
+  it("preserves partial results when required durable platform delivery fails", async () => {
+    const transportError = new Error("transport offline");
+    const sendMatrix = vi
+      .fn()
+      .mockResolvedValueOnce({ messageId: "m1" })
+      .mockRejectedValueOnce(transportError);
+
+    const error = await deliverOutboundPayloads({
+      cfg: {},
+      channel: "matrix",
+      to: "!room:example",
+      payloads: [{ text: "first" }, { text: "second" }],
+      deps: { matrix: sendMatrix },
+      queuePolicy: "required",
+    }).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(OutboundDeliveryError);
+    expect((error as OutboundDeliveryError).results).toEqual([
+      { channel: "matrix", messageId: "m1" },
+    ]);
+    expect((error as OutboundDeliveryError).payloadOutcomes).toMatchObject([
+      { index: 0, status: "sent" },
+      {
+        index: 1,
+        status: "failed",
+        error: transportError,
+        sentBeforeError: true,
+        stage: "platform_send",
+      },
+    ]);
+    expect(queueMocks.failDelivery).toHaveBeenCalledWith(
+      "mock-queue-id",
+      expect.stringContaining("transport offline"),
+    );
     expect(queueMocks.ackDelivery).not.toHaveBeenCalled();
   });
 
