@@ -192,11 +192,13 @@ class DeviceAuthStore private constructor(
     deviceId: String,
     role: String,
   ) {
+    val normalizedDevice = normalizeDeviceId(deviceId)
+    val normalizedRole = normalizeRole(role)
+    removeLegacyEntry(normalizedDevice, normalizedRole)
     stateStore.deleteDeviceAuthToken(
-      deviceId = normalizeDeviceId(deviceId),
-      role = normalizeRole(role),
+      deviceId = normalizedDevice,
+      role = normalizedRole,
     )
-    removeLegacyEntry(normalizeDeviceId(deviceId), normalizeRole(role))
   }
 
   private fun migrateLegacyEntryIfNoSqliteAuthRows(
