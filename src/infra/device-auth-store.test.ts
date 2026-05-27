@@ -121,6 +121,38 @@ describe("infra/device-auth-store", () => {
     });
   });
 
+  it("does not resurrect legacy JSON after clearing the seeded SQLite token", async () => {
+    await withTempDir("openclaw-device-auth-", async (stateDir) => {
+      const env = createEnv(stateDir);
+      const filePath = path.join(stateDir, "identity", "device-auth.json");
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(
+        filePath,
+        `${JSON.stringify({
+          version: 1,
+          deviceId: "legacy-device",
+          tokens: {
+            operator: {
+              token: "stale-token",
+              role: "operator",
+              scopes: ["operator.read"],
+              updatedAtMs: 42,
+            },
+          },
+        })}\n`,
+        "utf8",
+      );
+
+      expect(loadDeviceAuthToken({ deviceId: "legacy-device", role: "operator", env })).toEqual(
+        expect.objectContaining({ token: "stale-token" }),
+      );
+      clearDeviceAuthToken({ deviceId: "legacy-device", role: "operator", env });
+
+      expect(loadDeviceAuthToken({ deviceId: "legacy-device", role: "operator", env })).toBeNull();
+      expect(fs.existsSync(filePath)).toBe(false);
+    });
+  });
+
   it("does not re-seed stale legacy JSON after SQLite has current auth rows", async () => {
     await withTempDir("openclaw-device-auth-", async (stateDir) => {
       const env = createEnv(stateDir);

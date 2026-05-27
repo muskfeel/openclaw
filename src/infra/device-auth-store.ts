@@ -145,6 +145,14 @@ function readLegacyDeviceAuthState(env?: NodeJS.ProcessEnv): DeviceAuthStore | n
   }
 }
 
+function removeLegacyDeviceAuthState(env?: NodeJS.ProcessEnv): void {
+  try {
+    fs.rmSync(resolveLegacyDeviceAuthPath(env), { force: true });
+  } catch {
+    // SQLite is authoritative after a successful write; stale legacy cleanup is best effort.
+  }
+}
+
 function readLegacyDeviceAuthStateAndSeedSqlite(env?: NodeJS.ProcessEnv): DeviceAuthStore | null {
   const legacy = readLegacyDeviceAuthState(env);
   if (legacy) {
@@ -220,6 +228,7 @@ function writeDeviceAuthState(env: NodeJS.ProcessEnv | undefined, store: DeviceA
       upsertDeviceAuthTokenRow(db, database.db, row);
     }
   }, sqliteOptions(env));
+  removeLegacyDeviceAuthState(env);
 }
 
 export function loadDeviceAuthStore(
@@ -311,6 +320,7 @@ export function storeDeviceAuthToken(params: {
     );
     upsertDeviceAuthTokenRow(db, database.db, row);
   }, sqliteOptions(params.env));
+  removeLegacyDeviceAuthState(params.env);
   return entry;
 }
 
@@ -330,4 +340,5 @@ export function clearDeviceAuthToken(params: {
         .where("role", "=", role),
     );
   }, sqliteOptions(params.env));
+  removeLegacyDeviceAuthState(params.env);
 }
