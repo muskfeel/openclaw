@@ -259,11 +259,20 @@ function resolveGroupContextFromParsedSessionKey(sessionKey?: string | null): {
   channel?: string;
   groupIds?: string[];
 } {
+  const raw = (sessionKey ?? "").trim();
   const parsed = parseAgentSessionKey(sessionKey);
-  if (!parsed) {
+  const rest = parsed?.rest ?? raw;
+  if (!rest) {
     return {};
   }
-  const parts = parsed.rest.split(":").filter(Boolean);
+  let parts = rest.split(":").filter(Boolean);
+  if (!parsed && parts[0] === "agent" && parts.length >= 5) {
+    parts = parts.slice(2);
+  }
+  const threadIndex = parts.findIndex((part) => part === "thread");
+  if (threadIndex >= 0) {
+    parts = parts.slice(0, threadIndex);
+  }
   if (parts.length < 3) {
     return {};
   }

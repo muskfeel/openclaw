@@ -255,6 +255,30 @@ describe("resolveGroupToolPolicy group context validation", () => {
 
     expect(policy).toEqual({ allow: ["read"] });
   });
+
+  it("falls back to legacy raw group session keys when SQLite routing is missing", () => {
+    useTempStateDir();
+
+    expect(
+      resolveGroupToolPolicy({
+        config: cfg,
+        sessionKey: "whatsapp:group:safe-room",
+        messageProvider: "whatsapp",
+      }),
+    ).toEqual({ allow: ["read"] });
+  });
+
+  it("strips thread suffixes from parsed group session key fallback", () => {
+    useTempStateDir();
+
+    expect(
+      resolveGroupToolPolicy({
+        config: cfg,
+        sessionKey: "agent:main:whatsapp:group:safe-room:thread:66",
+        messageProvider: "whatsapp",
+      }),
+    ).toEqual({ allow: ["read"] });
+  });
 });
 
 describe("resolveSubagentToolPolicy depth awareness", () => {
