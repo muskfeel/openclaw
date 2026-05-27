@@ -125,6 +125,56 @@ async function createWorkspaceBackupArchive(params: {
   await tar.c({ cwd: archiveBuildDir, file: params.archivePath, gzip: true }, [archiveRoot]);
 }
 
+async function createStateBackupArchiveWithoutSnapshots(params: {
+  archivePath: string;
+  sourceStateDir: string;
+  restoredStateText?: string;
+  restoredStateSymlinkTarget?: string;
+}): Promise<void> {
+  const archiveRoot = "2026-03-09T00-00-00-000Z-openclaw-backup";
+  const assetArchivePath = `${archiveRoot}/payload/posix${params.sourceStateDir}`;
+  const archiveBuildDir = path.join(
+    tempDir,
+    `archive-build-no-snapshots-${path.basename(params.archivePath)}`,
+  );
+  const payloadPath = path.join(archiveBuildDir, ...assetArchivePath.split("/"));
+  await fs.mkdir(payloadPath, { recursive: true });
+  if (params.restoredStateSymlinkTarget) {
+    await fs.symlink(params.restoredStateSymlinkTarget, path.join(payloadPath, "state.txt"));
+  } else {
+    await fs.writeFile(
+      path.join(payloadPath, "state.txt"),
+      params.restoredStateText ?? "restored\n",
+    );
+  }
+  await fs.writeFile(
+    path.join(archiveBuildDir, archiveRoot, "manifest.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        createdAt: "2026-03-09T00:00:00.000Z",
+        archiveRoot,
+        runtimeVersion: "test",
+        platform: process.platform,
+        nodeVersion: process.version,
+        assets: [
+          {
+            kind: "state",
+            sourcePath: params.sourceStateDir,
+            archivePath: assetArchivePath,
+          },
+        ],
+        databaseSnapshots: [],
+        skipped: [],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  await tar.c({ cwd: archiveBuildDir, file: params.archivePath, gzip: true }, [archiveRoot]);
+}
+
 async function createBackupArchiveWithSeparateDatabaseSnapshot(params: {
   archivePath: string;
   sourceStateDir: string;
@@ -245,6 +295,41 @@ describe("backupRestoreCommand", () => {
     ]);
     expect(await fs.readFile(path.join(sourceStateDir, "state.txt"), "utf8")).toBe("restored\n");
     expect(readSqliteValue(path.join(sourceStateDir, "state", "openclaw.sqlite"))).toBe("restored");
+  });
+
+  it("rejects archive entries that change after verification", async () => {
+    const sourceStateDir = path.join(tempDir, "state");
+    const archivePath = path.join(tempDir, "backup.tar.gz");
+    const swappedArchivePath = path.join(tempDir, "backup-swapped.tar.gz");
+    const outsideTarget = path.join(tempDir, "outside-target.txt");
+    await fs.mkdir(sourceStateDir, { recursive: true });
+    await fs.writeFile(path.join(sourceStateDir, "state.txt"), "current\n");
+    await fs.writeFile(outsideTarget, "outside\n");
+    await createStateBackupArchiveWithoutSnapshots({
+      archivePath,
+      sourceStateDir,
+      restoredStateText: "restored\n",
+    });
+    await createStateBackupArchiveWithoutSnapshots({
+      archivePath: swappedArchivePath,
+      sourceStateDir,
+      restoredStateSymlinkTarget: outsideTarget,
+    });
+    vi.stubEnv("OPENCLAW_STATE_DIR", sourceStateDir);
+
+    const realMkdtemp = fs.mkdtemp.bind(fs);
+    vi.spyOn(fs, "mkdtemp").mockImplementationOnce(async (prefix) => {
+      const dir = await realMkdtemp(prefix);
+      await fs.copyFile(swappedArchivePath, archivePath);
+      return dir;
+    });
+
+    const runtime = createRuntime();
+    await expect(
+      backupRestoreCommand(runtime, { archive: archivePath, yes: true }),
+    ).rejects.toThrow("Archive entry changed after verification");
+
+    expect(await fs.readFile(path.join(sourceStateDir, "state.txt"), "utf8")).toBe("current\n");
   });
 
   it("restores SQLite snapshots stored outside the asset tree", async () => {

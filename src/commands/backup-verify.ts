@@ -61,9 +61,15 @@ export type BackupVerifyResult = {
   entryCount: number;
 };
 
+export type VerifiedBackupArchiveEntry = {
+  path: string;
+  type: string;
+};
+
 export type VerifiedBackupArchive = {
   result: BackupVerifyResult;
   manifest: BackupManifest;
+  entries: VerifiedBackupArchiveEntry[];
 };
 
 function stripTrailingSlashes(value: string): string {
@@ -457,7 +463,11 @@ export async function verifyBackupArchive(opts: {
     entryCount: rawEntries.length,
   };
 
-  return { result, manifest };
+  return {
+    result,
+    manifest,
+    entries: rawEntries.map((entry) => ({ path: entry.path, type: entry.type })),
+  };
 }
 
 export async function backupVerifyCommand(

@@ -79,6 +79,32 @@ async function replacePathFromExtracted(params: {
   }
 }
 
+function archiveEntryType(entry: unknown): string {
+  const type = (entry as { type?: unknown }).type;
+  return typeof type === "string" ? type : "";
+}
+
+function createVerifiedExtractionFilter(verified: Awaited<ReturnType<typeof verifyBackupArchive>>) {
+  const verifiedEntries = new Map(verified.entries.map((entry) => [entry.path, entry.type]));
+  let changedEntryPath: string | undefined;
+  return {
+    filter: (entryPath: string, entry: unknown): boolean => {
+      const expectedType = verifiedEntries.get(entryPath);
+      const actualType = archiveEntryType(entry);
+      if (expectedType !== actualType) {
+        changedEntryPath ??= entryPath;
+        return false;
+      }
+      return true;
+    },
+    assertVerified: () => {
+      if (changedEntryPath) {
+        throw new Error(`Archive entry changed after verification: ${changedEntryPath}`);
+      }
+    },
+  };
+}
+
 function normalizeRestoreAssetKind(kind: string): BackupAssetKind {
   switch (kind) {
     case "state":
@@ -251,11 +277,14 @@ export async function backupRestoreCommand(
 
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-backup-restore-"));
   try {
+    const extractionFilter = createVerifiedExtractionFilter(verified);
     await tar.x({
       file: archivePath,
       gzip: true,
       cwd: tempDir,
+      filter: extractionFilter.filter,
     });
+    extractionFilter.assertVerified();
     const { manifest } = verified;
     const restoredAssets = await resolveBackupRestoreAssets(manifest.assets);
     await stageDatabaseSnapshots({
