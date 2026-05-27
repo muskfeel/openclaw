@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import type { Insertable } from "kysely";
 import { DEFAULT_AGENT_ID } from "../routing/session-key.js";
 import {
@@ -19,7 +20,8 @@ import type { CommandExplanationSummary } from "./command-analysis/explain.js";
 import { resolveAllowAlwaysPatternEntries } from "./exec-approvals-allowlist.js";
 import type { ExecCommandSegment } from "./exec-approvals-analysis.js";
 import type { ExecAllowlistEntry } from "./exec-approvals.types.js";
-import { expandHomePrefix } from "./home-dir.js";
+import { assertNoSymlinkParentsSync } from "./fs-safe-advanced.js";
+import { expandHomePrefix, resolveRequiredHomeDir } from "./home-dir.js";
 import { requestJsonlSocket } from "./jsonl-socket.js";
 import {
   executeSqliteQuerySync,
@@ -485,6 +487,28 @@ function resolveLegacyExecApprovalsPath(env: NodeJS.ProcessEnv = process.env): s
   return expandHomePrefix(LEGACY_EXEC_APPROVALS_FILE, { env });
 }
 
+function assertNoExecApprovalsSymlinkParents(targetPath: string, trustedRoot: string): void {
+  assertNoSymlinkParentsSync({
+    rootDir: trustedRoot,
+    targetPath,
+    allowOutsideRoot: true,
+    messagePrefix: "Refusing to traverse symlink in exec approvals path",
+  });
+}
+
+function assertSafeExecApprovalsDestination(filePath: string): void {
+  try {
+    const stat = fs.lstatSync(filePath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Refusing to write exec approvals via symlink: ${filePath}`);
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw err;
+    }
+  }
+}
+
 function readExecApprovalsRaw(env: NodeJS.ProcessEnv = process.env): string | null {
   const sqliteRaw = readExecApprovalsRawFromSqlite(env);
   if (sqliteRaw !== null) {
@@ -765,7 +789,7 @@ export function resolveExecApprovals(
   agentId?: string,
   overrides?: ExecApprovalsDefaultOverrides,
 ): ExecApprovalsResolved {
-  const filePath = resolveExecApprovalsPath();
+  const filePath = resolveLegacyExecApprovalsPath();
   if (!overrides?.requireSocket) {
     const file = readExecApprovalsForNoPersistence(filePath);
     const resolved = resolveExecApprovalsFromFile({
