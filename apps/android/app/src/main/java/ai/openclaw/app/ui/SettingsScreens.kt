@@ -1,6 +1,6 @@
+package ai.openclaw.app.ui
 import androidx.compose.ui.res.stringResource
 import ai.openclaw.app.R
-package ai.openclaw.app.ui
 
 import ai.openclaw.app.BuildConfig
 import ai.openclaw.app.GatewayAgentSummary
