@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { PreparedAgentRun } from "./runtime-backend.js";
 import {
@@ -87,6 +89,21 @@ describe("agent worker permission profile", () => {
       "--allow-fs-write=/tmp/openclaw-state/agents/main/agent",
       "--allow-fs-write=/tmp/openclaw-state/state",
     ]);
+  });
+
+  it("grants package runtime roots by default without exposing vfs-only workspace reads", () => {
+    const profile = createAgentWorkerPermissionProfile(
+      createPreparedRun({ filesystemMode: "vfs-only" }),
+      {
+        mode: "enforce",
+        env: { OPENCLAW_STATE_DIR: "/tmp/openclaw-state" },
+      },
+    );
+
+    expect(profile.fsRead).toContain(path.resolve(fileURLToPath(new URL("./", import.meta.url))));
+    expect(profile.fsRead).toContain(path.resolve(fileURLToPath(new URL("../", import.meta.url))));
+    expect(profile.fsRead).not.toContain("/tmp/workspace");
+    expect(profile.fsWrite).not.toContain("/tmp/workspace");
   });
 
   it("builds explicit allow flags only when requested", () => {

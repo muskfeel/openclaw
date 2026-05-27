@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveOpenClawAgentSqliteDir } from "../state/openclaw-agent-db.paths.js";
 import { resolveOpenClawStateSqliteDir } from "../state/openclaw-state-db.paths.js";
 import type { PreparedAgentRun } from "./runtime-backend.js";
@@ -32,12 +33,19 @@ function normalizePermissionPaths(paths: Iterable<string | undefined>): string[]
   return [...normalized].toSorted((left, right) => left.localeCompare(right));
 }
 
+function defaultRuntimeReadRoots(): string[] {
+  return [
+    fileURLToPath(new URL("./", import.meta.url)),
+    fileURLToPath(new URL("../", import.meta.url)),
+  ];
+}
+
 export function createAgentWorkerPermissionProfile(
   preparedRun: PreparedAgentRun,
   options: CreateAgentWorkerPermissionProfileOptions = {},
 ): AgentWorkerPermissionProfile {
   const mode = options.mode ?? "off";
-  const runtimeReadRoots = options.runtimeReadRoots ?? [process.cwd()];
+  const runtimeReadRoots = options.runtimeReadRoots ?? defaultRuntimeReadRoots();
   const env = options.env ?? process.env;
   const stateDir = resolveOpenClawStateSqliteDir(env);
   const agentStateDir = resolveOpenClawAgentSqliteDir({ agentId: preparedRun.agentId, env });
