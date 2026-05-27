@@ -2,10 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { coerceSecretRef } from "../../config/types.secrets.js";
 import { loadJsonFile } from "../../infra/json-file.js";
+import { uniqueStrings } from "../../shared/string-normalization.js";
 import type {
   OpenClawStateDatabase,
   OpenClawStateDatabaseOptions,
 } from "../../state/openclaw-state-db.js";
+import { asBoolean } from "../../utils/boolean.js";
 import { normalizeProviderId } from "../provider-id.js";
 import { AUTH_STORE_VERSION, log } from "./constants.js";
 import { loadLegacyOAuthSidecarMaterial } from "./legacy-oauth-sidecar.js";

@@ -543,11 +543,11 @@ describe("createOAuthManager", () => {
 
     expect(refreshCredential).toHaveBeenCalledTimes(1);
     expect(result?.apiKey).toBe("rotated-access");
-    const parsed = JSON.parse(await fs.readFile(resolveAuthStorePath(agentDir), "utf8")) as {
-      profiles: Record<string, Record<string, unknown>>;
-    };
-    expect(parsed.profiles[profileId]).not.toHaveProperty("oauthRef");
-    expect(parsed.profiles[profileId]).toMatchObject({
+    const persisted = loadAuthProfileStoreWithoutExternalProfiles(agentDir, {
+      resolveLegacyOAuthSidecars: false,
+    });
+    expect(persisted.profiles[profileId]).not.toHaveProperty("oauthRef");
+    expect(persisted.profiles[profileId]).toMatchObject({
       access: "rotated-access",
       refresh: "rotated-refresh",
     });
