@@ -500,6 +500,14 @@
       "types": "./dist/plugin-sdk/agent-core.d.ts",
       "default": "./dist/plugin-sdk/agent-core.js"
     },
+    "./plugin-sdk/agent-sessions": {
+      "types": "./dist/plugin-sdk/agent-sessions.d.ts",
+      "default": "./dist/plugin-sdk/agent-sessions.js"
+    },
+    "./plugin-sdk/llm": {
+      "types": "./dist/plugin-sdk/llm.d.ts",
+      "default": "./dist/plugin-sdk/llm.js"
+    },
     "./plugin-sdk/agent-runtime": {
       "types": "./dist/plugin-sdk/agent-runtime.d.ts",
       "default": "./dist/plugin-sdk/agent-runtime.js"
