@@ -112,6 +112,19 @@ describe("openclaw agent database", () => {
     ).toEqual([defaultDatabase.path, relocated.path].toSorted());
   });
 
+  it("does not chmod shared parent directories for explicit database paths", () => {
+    const parentDir = createTempStateDir();
+    fs.chmodSync(parentDir, 0o755);
+    const databasePath = path.join(parentDir, "worker-1.sqlite");
+
+    openOpenClawAgentDatabase({
+      agentId: "worker-1",
+      path: databasePath,
+    });
+
+    expect(fs.statSync(parentDir).mode & 0o777).toBe(0o755);
+  });
+
   it("configures durable SQLite connection pragmas", () => {
     const stateDir = createTempStateDir();
     const database = openOpenClawAgentDatabase({

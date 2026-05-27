@@ -65,9 +65,21 @@ function assertSupportedAgentSchemaVersion(db: DatabaseSync, pathname: string): 
   }
 }
 
-function ensureOpenClawAgentDatabasePermissions(pathname: string): void {
-  mkdirSync(path.dirname(pathname), { recursive: true, mode: OPENCLAW_AGENT_DB_DIR_MODE });
-  chmodSync(path.dirname(pathname), OPENCLAW_AGENT_DB_DIR_MODE);
+function ensureOpenClawAgentDatabasePermissions(
+  pathname: string,
+  options: OpenClawAgentDatabaseOptions,
+): void {
+  const dir = path.dirname(pathname);
+  const defaultPath = resolveOpenClawAgentSqlitePath({
+    agentId: options.agentId,
+    env: options.env,
+  });
+  const isDefaultAgentDatabase = path.resolve(pathname) === path.resolve(defaultPath);
+  const dirExisted = existsSync(dir);
+  mkdirSync(dir, { recursive: true, mode: OPENCLAW_AGENT_DB_DIR_MODE });
+  if (isDefaultAgentDatabase || !dirExisted) {
+    chmodSync(dir, OPENCLAW_AGENT_DB_DIR_MODE);
+  }
   for (const suffix of OPENCLAW_AGENT_DB_SIDECAR_SUFFIXES) {
     const candidate = `${pathname}${suffix}`;
     if (existsSync(candidate)) {
@@ -187,7 +199,7 @@ export function openOpenClawAgentDatabase(
     return cached;
   }
 
-  ensureOpenClawAgentDatabasePermissions(pathname);
+  ensureOpenClawAgentDatabasePermissions(pathname, options);
   const sqlite = requireNodeSqlite();
   const db = new sqlite.DatabaseSync(pathname);
   const walMaintenance = configureSqliteWalMaintenance(db, {
@@ -204,7 +216,7 @@ export function openOpenClawAgentDatabase(
     db.close();
     throw err;
   }
-  ensureOpenClawAgentDatabasePermissions(pathname);
+  ensureOpenClawAgentDatabasePermissions(pathname, options);
   const database = { agentId, db, path: pathname, walMaintenance };
   cachedDatabases.set(pathname, database);
   registerAgentDatabase({ agentId, path: pathname, env: options.env });
@@ -217,7 +229,7 @@ export function runOpenClawAgentWriteTransaction<T>(
 ): T {
   const database = openOpenClawAgentDatabase(options);
   const result = runSqliteImmediateTransactionSync(database.db, () => operation(database));
-  ensureOpenClawAgentDatabasePermissions(database.path);
+  ensureOpenClawAgentDatabasePermissions(database.path, options);
   return result;
 }
 
