@@ -394,17 +394,19 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     clone: false,
   });
 
-  const { sessionId, sessionKey, storePath, isNewSession, persistedThinking, persistedVerbose } =
-    sessionResolution;
-  const { sessionEntry: sessionEntryRaw, sessionStore } = createAgentCommandSessionWorkingCopy({
+  const {
+    sessionId,
     sessionKey,
-    sessionEntry: sessionEntryRaw,
-    sessionStore,
     agentId: resolvedSessionAgentId,
     isNewSession,
     persistedThinking,
     persistedVerbose,
   } = sessionResolution;
+  const { sessionEntry: sessionEntryRaw, sessionStore } = createAgentCommandSessionWorkingCopy({
+    sessionKey,
+    sessionEntry: sessionResolution.sessionEntry,
+    sessionStore: sessionResolution.sessionStore,
+  });
   if (agentIdOverride && resolvedSessionAgentId !== agentIdOverride) {
     throw new Error(
       `Agent id "${agentIdOverrideRaw}" does not match session key agent "${resolvedSessionAgentId}".`,

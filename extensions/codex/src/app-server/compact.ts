@@ -359,48 +359,6 @@ async function compactCodexNativeThread(
       await clearCodexAppServerBinding(bindingIdentity, { config: params.config });
       return failedCodexThreadBindingCompactionResult(params, {
         threadId: binding.threadId,
-      });
-      embeddedAgentLog.info("started codex app-server compaction", {
-        sessionId: params.sessionId,
-        threadId: binding.threadId,
-        attempt,
-      });
-      waiter.startTimeout();
-      completion = await waiter.promise;
-      break;
-    } catch (error) {
-      waiter.cancel();
-      if (isCodexThreadNotFoundError(error)) {
-        await clearCodexAppServerBinding(bindingIdentity);
-        return failedCodexThreadBindingCompactionResult(params, {
-          threadId: binding.threadId,
-          reason: formatCompactionError(error),
-          recovery: "stale_thread_binding",
-        });
-      }
-      if (
-        isCodexNativeCompactionTimeoutError(error, binding.threadId) &&
-        attempt < MAX_CODEX_NATIVE_COMPACTION_ATTEMPTS
-      ) {
-        restartCodexAppServerAfterNativeCompactionTimeout(
-          client,
-          params,
-          binding.threadId,
-          attempt,
-        );
-        continue;
-      }
-      if (isCodexNativeCompactionTimeoutError(error, binding.threadId)) {
-        restartCodexAppServerAfterNativeCompactionTimeout(
-          client,
-          params,
-          binding.threadId,
-          attempt,
-        );
-      }
-      return {
-        ok: false,
-        compacted: false,
         reason: formatCompactionError(error),
         recovery: "stale_thread_binding",
       });

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import {
   createServer,
   request as httpRequest,
@@ -7,24 +7,17 @@ import {
   type Server,
   type ServerResponse,
 } from "node:http";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Insertable, Selectable } from "kysely";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import {
-  executeSqliteQuerySync,
-  executeSqliteQueryTakeFirstSync,
-  getNodeSqliteKysely,
-} from "../../infra/kysely-sync.js";
 import { resolveOpenClawPackageRootSync } from "../../infra/openclaw-root.js";
+import { privateFileStoreSync } from "../../infra/private-file-store.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { hasGlobalHooks } from "../../plugins/hook-runner-global.js";
 import { PluginApprovalResolutions } from "../../plugins/types.js";
-import type { DB as OpenClawStateKyselyDatabase } from "../../state/openclaw-state-db.generated.js";
-import {
-  openOpenClawStateDatabase,
-  runOpenClawStateWriteTransaction,
-} from "../../state/openclaw-state-db.js";
-import { runBeforeToolCallHook } from "../pi-tools.before-tool-call.js";
+import { uniqueValues } from "../../shared/string-normalization.js";
+import { asBoolean } from "../../utils/boolean.js";
+import { hasBeforeToolCallPolicy, runBeforeToolCallHook } from "../pi-tools.before-tool-call.js";
 import { stableStringify } from "../stable-stringify.js";
 import { resolveToolLoopDetectionConfig } from "../tool-loop-detection-config.js";
 import { normalizeToolName } from "../tool-policy.js";
@@ -64,6 +57,7 @@ export type NativeHookRelayInvocation = {
   cwd?: string;
   model?: string;
   turnId?: string;
+  transcriptPath?: string;
   permissionMode?: string;
   stopHookActive?: boolean;
   lastAssistantMessage?: string;
@@ -148,6 +142,7 @@ type NativeHookRelayInvocationMetadata = Partial<
     | "cwd"
     | "model"
     | "turnId"
+    | "transcriptPath"
     | "permissionMode"
     | "stopHookActive"
     | "lastAssistantMessage"
@@ -268,6 +263,7 @@ type NativeHookRelayPermissionApprovalRequester = (
 
 type NativeHookRelayBridgeRegistration = {
   relayId: string;
+  registryPath: string;
   token: string;
   server: Server;
 };
@@ -282,13 +278,13 @@ type NativeHookRelayBridgeRecord = {
   expiresAtMs: number;
 };
 
-type NativeHookRelayBridgeDatabase = Pick<OpenClawStateKyselyDatabase, "native_hook_relay_bridges">;
-type NativeHookRelayBridgeRow = Selectable<
-  NativeHookRelayBridgeDatabase["native_hook_relay_bridges"]
->;
-type NativeHookRelayBridgeInsert = Insertable<
-  NativeHookRelayBridgeDatabase["native_hook_relay_bridges"]
->;
+type NativeHookRelayBridgeRequestAuth = {
+  provider: NativeHookRelayProvider;
+  relayId: string;
+  token: string;
+  registration: ActiveNativeHookRelayRegistration;
+  bridge: NativeHookRelayBridgeRegistration;
+};
 
 let nativeHookRelayPermissionApprovalRequester: NativeHookRelayPermissionApprovalRequester =
   requestNativeHookRelayPermissionApproval;
@@ -709,15 +705,13 @@ function pruneExpiredNativeHookRelays(now = Date.now()): void {
 function registerNativeHookRelayBridge(registration: ActiveNativeHookRelayRegistration): void {
   unregisterNativeHookRelayBridge(registration.relayId);
   const token = randomUUID();
-  const server = createServer((req, res) => {
-    void handleNativeHookRelayBridgeRequest(req, res, {
-      provider: registration.provider,
-      relayId: registration.relayId,
-      token,
-    });
-  });
+  const bridgeDir = ensureNativeHookRelayBridgeDir();
+  const bridgeKey = nativeHookRelayBridgeKey(registration.relayId);
+  const registryPath = path.join(bridgeDir, `${bridgeKey}.json`);
+  const server = createServer();
   const bridge: NativeHookRelayBridgeRegistration = {
     relayId: registration.relayId,
+    registryPath,
     token,
     server,
   };
@@ -766,7 +760,7 @@ function writeNativeHookRelayBridgeRecordForRegistration(
     token: bridge.token,
     expiresAtMs: registration.expiresAtMs,
   };
-  writeNativeHookRelayBridgeRecord(record);
+  writeNativeHookRelayBridgeRecord(bridge.registryPath, record);
 }
 
 function unregisterNativeHookRelayBridge(relayId: string): void {
@@ -778,7 +772,7 @@ function unregisterNativeHookRelayBridge(relayId: string): void {
   bridge.server.close();
   const record = readNativeHookRelayBridgeRecordIfExists(relayId);
   if (record?.token === bridge.token) {
-    deleteNativeHookRelayBridgeRecord(relayId);
+    rmSync(bridge.registryPath, { force: true });
   }
 }
 
@@ -890,52 +884,18 @@ function readNativeHookRelayBridgeRecord(relayId: string): NativeHookRelayBridge
 function readNativeHookRelayBridgeRecordIfExists(
   relayId: string,
 ): NativeHookRelayBridgeRecord | undefined {
+  const registryPath = nativeHookRelayBridgeRegistryPath(relayId);
   try {
-    const database = openOpenClawStateDatabase();
-    const db = getNodeSqliteKysely<NativeHookRelayBridgeDatabase>(database.db);
-    const row = executeSqliteQueryTakeFirstSync(
-      database.db,
-      db
-        .selectFrom("native_hook_relay_bridges")
-        .select(["relay_id", "pid", "hostname", "port", "token", "expires_at_ms", "updated_at_ms"])
-        .where("relay_id", "=", relayId),
-    );
-    const parsed: unknown = row ? rowToNativeHookRelayBridgeRecord(row) : undefined;
+    const parsed: unknown = JSON.parse(readFileSync(registryPath, "utf8"));
     if (isNativeHookRelayBridgeRecord(parsed, relayId)) {
       return parsed;
     }
   } catch (error) {
-    log.debug("failed to read native hook relay bridge record", { error, relayId });
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      log.debug("failed to read native hook relay bridge registry", { error, relayId });
+    }
   }
   return undefined;
-}
-
-function rowToNativeHookRelayBridgeRecord(
-  row: NativeHookRelayBridgeRow,
-): NativeHookRelayBridgeRecord {
-  return {
-    version: 1,
-    relayId: row.relay_id,
-    pid: row.pid,
-    hostname: row.hostname,
-    port: row.port,
-    token: row.token,
-    expiresAtMs: row.expires_at_ms,
-  };
-}
-
-function nativeHookRelayBridgeRecordToRow(
-  record: NativeHookRelayBridgeRecord,
-): NativeHookRelayBridgeInsert {
-  return {
-    relay_id: record.relayId,
-    pid: record.pid,
-    hostname: record.hostname,
-    port: record.port,
-    token: record.token,
-    expires_at_ms: record.expiresAtMs,
-    updated_at_ms: Date.now(),
-  };
 }
 
 function isNativeHookRelayBridgeRecord(
@@ -1070,29 +1030,48 @@ function isRetryableNativeHookRelayBridgeError(error: unknown): boolean {
   );
 }
 
-function writeNativeHookRelayBridgeRecord(record: NativeHookRelayBridgeRecord): void {
-  const row = nativeHookRelayBridgeRecordToRow(record);
-  runOpenClawStateWriteTransaction((database) => {
-    const db = getNodeSqliteKysely<NativeHookRelayBridgeDatabase>(database.db);
-    const { relay_id: _relayId, ...updates } = row;
-    executeSqliteQuerySync(
-      database.db,
-      db
-        .insertInto("native_hook_relay_bridges")
-        .values(row)
-        .onConflict((conflict) => conflict.column("relay_id").doUpdateSet(updates)),
-    );
-  });
+function nativeHookRelayBridgeDir(): string {
+  const uid = typeof process.getuid === "function" ? process.getuid() : "nouid";
+  return path.join(tmpdir(), `openclaw-native-hook-relays-${uid}`);
 }
 
-function deleteNativeHookRelayBridgeRecord(relayId: string): void {
-  runOpenClawStateWriteTransaction((database) => {
-    const db = getNodeSqliteKysely<NativeHookRelayBridgeDatabase>(database.db);
-    executeSqliteQuerySync(
-      database.db,
-      db.deleteFrom("native_hook_relay_bridges").where("relay_id", "=", relayId),
-    );
-  });
+function ensureNativeHookRelayBridgeDir(): string {
+  const bridgeDir = nativeHookRelayBridgeDir();
+  mkdirSync(bridgeDir, { recursive: true, mode: 0o700 });
+  const stats = lstatSync(bridgeDir);
+  const expectedUid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (!stats.isDirectory() || stats.isSymbolicLink()) {
+    throw new Error("unsafe native hook relay bridge directory");
+  }
+  if (expectedUid !== undefined && stats.uid !== expectedUid) {
+    throw new Error("unsafe native hook relay bridge directory owner");
+  }
+  if (process.platform !== "win32" && (stats.mode & 0o077) !== 0) {
+    chmodSync(bridgeDir, 0o700);
+    const repaired = lstatSync(bridgeDir);
+    if ((repaired.mode & 0o077) !== 0) {
+      throw new Error("unsafe native hook relay bridge directory permissions");
+    }
+  }
+  return bridgeDir;
+}
+
+function writeNativeHookRelayBridgeRecord(
+  registryPath: string,
+  record: NativeHookRelayBridgeRecord,
+): void {
+  privateFileStoreSync(path.dirname(registryPath)).writeText(
+    path.basename(registryPath),
+    `${JSON.stringify(record)}\n`,
+  );
+}
+
+function nativeHookRelayBridgeRegistryPath(relayId: string): string {
+  return path.join(nativeHookRelayBridgeDir(), `${nativeHookRelayBridgeKey(relayId)}.json`);
+}
+
+function nativeHookRelayBridgeKey(relayId: string): string {
+  return createHash("sha256").update(relayId).digest("hex").slice(0, 32);
 }
 
 function delay(ms: number): Promise<void> {
@@ -1248,6 +1227,9 @@ async function runNativeHookRelayBeforeAgentFinalize(params: {
       provider: params.registration.provider,
       ...(params.invocation.model ? { model: params.invocation.model } : {}),
       ...(params.invocation.cwd ? { cwd: params.invocation.cwd } : {}),
+      ...(params.invocation.transcriptPath
+        ? { transcriptPath: params.invocation.transcriptPath }
+        : {}),
       stopHookActive: params.invocation.stopHookActive === true,
       ...(params.invocation.lastAssistantMessage
         ? { lastAssistantMessage: params.invocation.lastAssistantMessage }
@@ -1589,6 +1571,10 @@ function normalizeCodexHookMetadata(rawPayload: JsonValue): NativeHookRelayInvoc
   const turnId = readOptionalString(payload.turn_id);
   if (turnId) {
     metadata.turnId = turnId;
+  }
+  const transcriptPath = readOptionalString(payload.transcript_path);
+  if (transcriptPath) {
+    metadata.transcriptPath = transcriptPath;
   }
   const permissionMode = readOptionalString(payload.permission_mode);
   if (permissionMode) {
@@ -2028,20 +2014,15 @@ export const testing = {
   getNativeHookRelayRegistrationForTests(relayId: string): NativeHookRelayRegistration | undefined {
     return relays.get(relayId);
   },
+  getNativeHookRelayBridgeDirForTests(): string {
+    return nativeHookRelayBridgeDir();
+  },
+  getNativeHookRelayBridgeRegistryPathForTests(relayId: string): string {
+    return nativeHookRelayBridgeRegistryPath(relayId);
+  },
   getNativeHookRelayBridgeRecordForTests(relayId: string): Record<string, unknown> | undefined {
     const record = readNativeHookRelayBridgeRecordIfExists(relayId);
     return record ? { ...record } : undefined;
-  },
-  setNativeHookRelayBridgeRecordForTests(relayId: string, record: Record<string, unknown>): void {
-    writeNativeHookRelayBridgeRecord({
-      version: 1,
-      relayId: typeof record.relayId === "string" ? record.relayId : relayId,
-      pid: typeof record.pid === "number" ? record.pid : process.pid,
-      hostname: typeof record.hostname === "string" ? record.hostname : "127.0.0.1",
-      port: typeof record.port === "number" ? record.port : 1,
-      token: typeof record.token === "string" ? record.token : "test-token",
-      expiresAtMs: typeof record.expiresAtMs === "number" ? record.expiresAtMs : Date.now(),
-    });
   },
   formatPermissionApprovalDescriptionForTests(
     request: NativeHookRelayPermissionApprovalRequest,

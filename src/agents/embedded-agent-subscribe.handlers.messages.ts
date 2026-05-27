@@ -1,3 +1,5 @@
+import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
 import {
   parseReplyDirectives,
@@ -15,8 +17,7 @@ import {
   type AssistantPhase,
 } from "../shared/chat-message-content.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import type { AgentEvent, AgentMessage } from "./agent-core-contract.js";
-import type { AssistantMessage } from "./pi-ai-contract.js";
+import { uniqueStrings } from "../shared/string-normalization.js";
 import {
   isMessagingToolDuplicateNormalized,
   normalizeTextForComparison,

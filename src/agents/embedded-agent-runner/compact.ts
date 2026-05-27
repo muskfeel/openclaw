@@ -520,6 +520,27 @@ async function compactEmbeddedAgentSessionDirectOnce(
   const runtimeProvider = resolvedCompactionTarget.runtimeProvider ?? provider;
   const modelId = resolvedCompactionTarget.model ?? DEFAULT_MODEL;
   const authProfileId = resolvedCompactionTarget.authProfileId;
+  const earlyAgentIds = resolveSessionAgentIds({
+    sessionKey: params.sessionKey,
+    agentId: params.agentId,
+    config: params.config,
+  });
+  const runtimeHarnessPolicy = resolveAgentHarnessPolicy({
+    provider: modelConfigProvider,
+    modelId,
+    config: params.config,
+    agentId: earlyAgentIds.sessionAgentId,
+    sessionKey: params.sessionKey,
+  });
+  const selectedHarnessRuntime = params.agentHarnessId ?? runtimeHarnessPolicy.runtime;
+  const provider = resolveOpenAICompactionRuntimeProvider({
+    provider: modelConfigProvider,
+    harnessRuntime: runtimeHarnessPolicy.runtime,
+    agentHarnessId: params.agentHarnessId,
+    authProfileId,
+    config: params.config,
+    workspaceDir: resolvedWorkspace,
+  });
   let thinkLevel: ThinkLevel = params.thinkLevel ?? "off";
   const attemptedThinking = new Set<ThinkLevel>();
   const fail = (reason: string, err?: unknown): EmbeddedAgentCompactResult => {
@@ -548,11 +569,6 @@ async function compactEmbeddedAgentSessionDirectOnce(
         : undefined,
     };
   };
-  const earlyAgentIds = resolveSessionAgentIds({
-    sessionKey: params.sessionKey,
-    agentId: params.agentId,
-    config: params.config,
-  });
   const sessionAgentId = earlyAgentIds.sessionAgentId;
   const agentDir = params.agentDir ?? resolveAgentDir(params.config ?? {}, sessionAgentId);
   await ensureOpenClawModelCatalog(params.config, agentDir, {

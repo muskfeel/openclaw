@@ -1,12 +1,13 @@
-import type { TSchema } from "typebox";
-import { readLocalFileSafely } from "../../infra/fs-safe.js";
-import { detectMime } from "../../media/mime.js";
-import { readSnakeCaseParamRaw } from "../../param-key.js";
 import type {
   AgentTool,
   AgentToolResult,
   AgentToolUpdateCallback,
-} from "../agent-core-contract.js";
+} from "@earendil-works/pi-agent-core";
+import type { TSchema } from "typebox";
+import { readLocalFileSafely } from "../../infra/fs-safe.js";
+import { detectMime } from "../../media/mime.js";
+import { readSnakeCaseParamRaw } from "../../param-key.js";
+import { normalizeStringEntries } from "../../shared/string-normalization.js";
 import type { ImageSanitizationLimits } from "../image-sanitization.js";
 import type { AgentTool, AgentToolResult, AgentToolUpdateCallback } from "../runtime/index.js";
 import { sanitizeToolResultImages } from "../tool-images.js";
@@ -24,11 +25,11 @@ type ErasedAgentToolExecute = {
     toolCallId: string,
     params: unknown,
     signal?: AbortSignal,
-    onUpdate?: AgentToolUpdateCallback,
-  ): Promise<AgentToolResult>;
+    onUpdate?: AgentToolUpdateCallback<unknown>,
+  ): Promise<AgentToolResult<unknown>>;
 };
 
-export type AnyAgentTool = Omit<AgentTool, "execute"> &
+export type AnyAgentTool = Omit<AgentTool<TSchema, unknown>, "execute"> &
   ErasedAgentToolExecute & {
     displaySummary?: string;
   };
@@ -293,7 +294,7 @@ export function payloadTextResult<TDetails>(payload: TDetails): AgentToolResult<
   return textResult(stringifyToolPayload(payload), payload);
 }
 
-export function jsonResult(payload: unknown): AgentToolResult {
+export function jsonResult(payload: unknown): AgentToolResult<unknown> {
   return textResult(JSON.stringify(payload, null, 2), payload);
 }
 
@@ -305,8 +306,8 @@ export async function imageResult(params: {
   extraText?: string;
   details?: Record<string, unknown>;
   imageSanitization?: ImageSanitizationLimits;
-}): Promise<AgentToolResult> {
-  const content: AgentToolResult["content"] = [
+}): Promise<AgentToolResult<unknown>> {
+  const content: AgentToolResult<unknown>["content"] = [
     ...(params.extraText ? [{ type: "text" as const, text: params.extraText }] : []),
     {
       type: "image",
@@ -320,7 +321,7 @@ export async function imageResult(params: {
     !Array.isArray(params.details.media)
       ? (params.details.media as Record<string, unknown>)
       : undefined;
-  const result: AgentToolResult = {
+  const result: AgentToolResult<unknown> = {
     content,
     details: {
       path: params.path,
@@ -340,7 +341,7 @@ export async function imageResultFromFile(params: {
   extraText?: string;
   details?: Record<string, unknown>;
   imageSanitization?: ImageSanitizationLimits;
-}): Promise<AgentToolResult> {
+}): Promise<AgentToolResult<unknown>> {
   const buf = (await readLocalFileSafely({ filePath: params.path })).buffer;
   const mimeType = (await detectMime({ buffer: buf.slice(0, 256) })) ?? "image/png";
   return await imageResult({

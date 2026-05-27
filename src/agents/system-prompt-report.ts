@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { SessionSystemPromptReport } from "../config/sessions/types.js";
-import type { AgentTool } from "./agent-core-contract.js";
 import { buildBootstrapInjectionStats } from "./bootstrap-budget.js";
 import type { EmbeddedContextFile } from "./embedded-agent-helpers.js";
 import type { AgentTool } from "./runtime/index.js";

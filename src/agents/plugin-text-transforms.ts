@@ -1,6 +1,7 @@
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { streamSimple, type AssistantMessageEvent } from "@earendil-works/pi-ai";
 import type { PluginTextReplacement, PluginTextTransforms } from "../plugins/cli-backend.types.js";
-import type { StreamFn } from "./agent-core-contract.js";
-import { streamSimple, type AssistantMessageEvent } from "./pi-ai-contract.js";
+import { isRecord } from "../shared/record-coerce.js";
 import { createStreamIteratorWrapper } from "./stream-iterator-wrapper.js";
 
 export function mergePluginTextTransforms(

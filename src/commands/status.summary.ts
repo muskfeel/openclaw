@@ -14,6 +14,10 @@ import { parseAgentSessionKey } from "../routing/session-key.js";
 import { createLazyImportLoader } from "../shared/lazy-promise.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
 import { resolveOpenClawAgentSqlitePath } from "../state/openclaw-agent-db.js";
+import {
+  summarizeActionableTaskAuditFindings,
+  summarizeRetainedLostTaskAuditFindings,
+} from "../tasks/task-registry.audit.js";
 import { resolveRuntimeServiceVersion } from "../version.js";
 import type { HeartbeatStatus, SessionStatus, StatusSummary } from "./status.types.js";
 
@@ -99,6 +103,19 @@ function hasUserPinnedModelSelection(entry: SessionEntry | undefined): boolean {
     return false;
   }
   return !hasSessionAutoModelFallbackProvenance(entry);
+}
+
+function discountRetainedLostTaskFailures(
+  tasks: StatusSummary["tasks"],
+  retainedLostCount: number,
+): StatusSummary["tasks"] {
+  if (retainedLostCount <= 0 || tasks.failures <= 0) {
+    return tasks;
+  }
+  return {
+    ...tasks,
+    failures: Math.max(0, tasks.failures - retainedLostCount),
+  };
 }
 
 export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSummary {
@@ -202,7 +219,6 @@ export async function getStatusSummary(
       allowAsyncLoad: false,
     }) ?? DEFAULT_CONTEXT_TOKENS;
 
-  const now = Date.now();
   const sessionCache = new Map<string, Array<{ sessionKey: string; entry: SessionEntry }>>();
   const loadSessionRows = (agentId: string) => {
     const cached = sessionCache.get(agentId);
