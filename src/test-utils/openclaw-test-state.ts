@@ -4,6 +4,7 @@ import path from "node:path";
 import { resolveAuthProfileStoreLocationForDisplay } from "../agents/auth-profiles/paths.js";
 import { savePersistedAuthProfileSecretsStore } from "../agents/auth-profiles/persisted.js";
 import type { AuthProfileSecretsStore } from "../agents/auth-profiles/types.js";
+import { uniqueStrings } from "../shared/string-normalization.js";
 import { captureEnv } from "./env.js";
 import { cleanupOpenClawStateForTest } from "./openclaw-state-cleanup.js";
 

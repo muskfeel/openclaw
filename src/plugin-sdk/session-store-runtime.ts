@@ -1,5 +1,6 @@
 // SQLite session row helpers plus deprecated session-store compatibility shims.
 
+import fs from "node:fs";
 import path from "node:path";
 import type { MsgContext } from "../auto-reply/templating.js";
 import { resolveStateDir } from "../config/paths.js";
@@ -74,6 +75,11 @@ type SaveSessionStoreOptions = {
 
 type CompatSessionEntry = SessionEntry & { sessionFile?: string };
 
+type SessionFilePathOptions = {
+  agentId?: string;
+  sessionsDir?: string;
+};
+
 function optionsWithEnv(agentId: string, env?: NodeJS.ProcessEnv): SessionRowOptions {
   return env ? { agentId, env } : { agentId };
 }
@@ -119,6 +125,23 @@ function resolveSessionRowOptionsFromStorePath(
     ...process.env,
     OPENCLAW_STATE_DIR: parsed.stateDir,
   });
+}
+
+function readLegacySessionStoreJson(storePath: string): Record<string, SessionEntry> | null {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed as Record<string, SessionEntry>;
+  } catch {
+    return null;
+  }
+}
+
+function writeLegacySessionStoreJson(storePath: string, store: Record<string, SessionEntry>): void {
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`);
 }
 
 function resolveSessionRowOptions(params: {
@@ -171,6 +194,54 @@ export function resolveStorePath(
   return path.resolve(resolveUserPath(store.replaceAll("{agentId}", agentId), env));
 }
 
+function resolveSessionsDir(opts?: SessionFilePathOptions): string {
+  const sessionsDir = opts?.sessionsDir?.trim();
+  if (sessionsDir) {
+    return path.resolve(sessionsDir);
+  }
+  return path.dirname(resolveStorePath(undefined, { agentId: opts?.agentId }));
+}
+
+function isCanonicalAgentSessionPath(candidate: string, agentId: string): boolean {
+  const parts = path.resolve(candidate).split(path.sep).filter(Boolean);
+  const sessionsIndex = parts.lastIndexOf("sessions");
+  if (sessionsIndex < 2 || parts[sessionsIndex - 2] !== "agents") {
+    return false;
+  }
+  if (normalizeAgentId(parts[sessionsIndex - 1] ?? "") !== normalizeAgentId(agentId)) {
+    return false;
+  }
+  return parts.slice(sessionsIndex + 1).length === 1;
+}
+
+function resolvePathWithinSessionsDir(
+  sessionsDir: string,
+  candidate: string,
+  opts?: { agentId?: string },
+): string {
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    throw new Error("Session file path must not be empty");
+  }
+  const resolvedBase = path.resolve(sessionsDir);
+  const resolvedCandidate = path.isAbsolute(trimmed)
+    ? path.resolve(trimmed)
+    : path.resolve(resolvedBase, trimmed);
+  const relative = path.relative(resolvedBase, resolvedCandidate);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    const agentId = opts?.agentId?.trim();
+    if (
+      path.isAbsolute(trimmed) &&
+      agentId &&
+      isCanonicalAgentSessionPath(resolvedCandidate, agentId)
+    ) {
+      return resolvedCandidate;
+    }
+    throw new Error("Session file path must be within sessions directory");
+  }
+  return resolvedCandidate;
+}
+
 export function resolveSessionTranscriptPathInDir(
   sessionId: string,
   sessionsDir: string,
@@ -188,8 +259,39 @@ export function resolveSessionTranscriptPathInDir(
   return path.resolve(sessionsDir, fileName);
 }
 
-export function loadSessionStore(storePath: string): Record<string, SessionEntry> {
-  return loadSqliteSessionEntries(resolveSessionRowOptionsFromStorePath(storePath));
+/**
+ * @deprecated Prefer SQLite transcript scope helpers. Kept for external plugin compatibility.
+ */
+export function resolveSessionFilePath(
+  sessionId: string,
+  entry?: { sessionFile?: string },
+  opts?: SessionFilePathOptions,
+): string {
+  const sessionsDir = resolveSessionsDir(opts);
+  const candidate = entry?.sessionFile?.trim();
+  if (candidate) {
+    try {
+      return resolvePathWithinSessionsDir(sessionsDir, candidate, { agentId: opts?.agentId });
+    } catch {
+      // Fall back to the canonical transcript path when legacy metadata is stale.
+    }
+  }
+  return resolveSessionTranscriptPathInDir(sessionId, sessionsDir);
+}
+
+export function loadSessionStore(
+  storePath: string,
+  _opts?: { skipCache?: boolean },
+): Record<string, SessionEntry> {
+  const parsed = parseSessionStorePath(storePath);
+  if (!parsed) {
+    return readLegacySessionStoreJson(storePath) ?? {};
+  }
+  const sqliteStore = loadSqliteSessionEntries(resolveSessionRowOptionsFromStorePath(storePath));
+  if (Object.keys(sqliteStore).length > 0) {
+    return sqliteStore;
+  }
+  return readLegacySessionStoreJson(storePath) ?? sqliteStore;
 }
 
 export async function saveSessionStore(
@@ -198,6 +300,10 @@ export async function saveSessionStore(
   _opts?: SaveSessionStoreOptions,
 ): Promise<void> {
   normalizeSessionEntries(store);
+  if (!parseSessionStorePath(storePath)) {
+    writeLegacySessionStoreJson(storePath, store);
+    return;
+  }
   const options = resolveSessionRowOptionsFromStorePath(storePath);
   const deleteScope = new Set(Object.keys(loadSqliteSessionEntries(options)));
   await saveSessionStoreRows(options, store, deleteScope);
@@ -225,12 +331,19 @@ export async function updateSessionStore<T>(
   mutator: (store: Record<string, SessionEntry>) => Promise<T> | T,
   _opts?: SaveSessionStoreOptions,
 ): Promise<T> {
-  const options = resolveSessionRowOptionsFromStorePath(storePath);
-  const store = loadSqliteSessionEntries(options);
+  const parsed = parseSessionStorePath(storePath);
+  const options = parsed ? resolveSessionRowOptionsFromStorePath(storePath) : undefined;
+  const sqliteStore = options ? loadSqliteSessionEntries(options) : {};
+  const legacyStore = readLegacySessionStoreJson(storePath);
+  const store = Object.keys(sqliteStore).length > 0 ? sqliteStore : (legacyStore ?? sqliteStore);
   const deleteScope = new Set(Object.keys(store));
   const result = await mutator(store);
   normalizeSessionEntries(store);
-  await saveSessionStoreRows(options, store, deleteScope);
+  if (options) {
+    await saveSessionStoreRows(options, store, deleteScope);
+  } else {
+    writeLegacySessionStoreJson(storePath, store);
+  }
   return result;
 }
 

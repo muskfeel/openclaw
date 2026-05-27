@@ -736,6 +736,7 @@ export async function createBackupArchive(
             gzip: true,
             portable: true,
             preservePaths: true,
+            linkCache: new BackupLinkCache(),
             onWriteEntry: (entry) => {
               entry.path = remapArchiveEntryPath({
                 entryPath: entry.path,

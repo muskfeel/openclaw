@@ -54,6 +54,21 @@ async function listArchiveEntries(archivePath: string): Promise<string[]> {
   return entries;
 }
 
+async function listArchiveEntryTypes(
+  archivePath: string,
+): Promise<Array<{ path: string; type: string }>> {
+  const entries: Array<{ path: string; type: string }> = [];
+  await tar.t({
+    file: archivePath,
+    gzip: true,
+    onentry: (entry) => {
+      entries.push({ path: entry.path, type: entry.type });
+      entry.resume();
+    },
+  });
+  return entries;
+}
+
 async function extractArchiveToTemp(archivePath: string): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-backup-test-extract-"));
   await tar.x({
@@ -271,6 +286,48 @@ describe("createBackupArchive", () => {
       },
     );
   });
+
+  it.runIf(process.platform !== "win32")(
+    "stores hardlinked workspace files as regular files so verification accepts the archive",
+    async () => {
+      await withOpenClawTestState(
+        {
+          layout: "split",
+          prefix: "openclaw-backup-hardlink-",
+          scenario: "minimal",
+        },
+        async (state) => {
+          await state.writeConfig({
+            agents: { defaults: { workspace: state.workspaceDir } },
+          });
+          const outputDir = state.path("backups");
+          await fs.mkdir(outputDir, { recursive: true });
+          const sourcePath = path.join(state.workspaceDir, "source.txt");
+          const linkedPath = path.join(state.workspaceDir, "linked.txt");
+          await fs.writeFile(sourcePath, "same inode\n", "utf8");
+          await fs.link(sourcePath, linkedPath);
+
+          const result = await createBackupArchive({
+            output: outputDir,
+            includeWorkspace: true,
+            nowMs: Date.UTC(2026, 4, 12, 12, 0, 0),
+          });
+          const entries = await listArchiveEntryTypes(result.archivePath);
+          const hardlinkedEntries = entries.filter(
+            (entry) =>
+              entry.path.endsWith("/workspace/source.txt") ||
+              entry.path.endsWith("/workspace/linked.txt"),
+          );
+          expect(hardlinkedEntries).toHaveLength(2);
+          expect(hardlinkedEntries.map((entry) => entry.type)).toEqual(["File", "File"]);
+
+          const runtime: RuntimeEnv = { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
+          const verification = await backupVerifyCommand(runtime, { archive: result.archivePath });
+          expect(verification.ok).toBe(true);
+        },
+      );
+    },
+  );
 
   it("omits volatile live state files from the staged archive", async () => {
     await withOpenClawTestState(
