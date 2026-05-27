@@ -2020,6 +2020,8 @@ export function createConfigIO(
       throw err;
     }
 
+    await options.preCommitRuntimePreflight?.(stampedOutputConfig);
+
     try {
       const result = await replaceFileAtomic({
         filePath: configPath,
@@ -2045,13 +2047,6 @@ export function createConfigIO(
       return {
         persistedHash: nextHash,
         persistedConfig: stampedOutputConfig,
-        ...(pluginInstallConfigMigration.migrated
-          ? {
-              [configWritePostCommitRollback]: () => {
-                rollbackShippedPluginInstallConfigWriteMigration(pluginInstallConfigMigration);
-              },
-            }
-          : {}),
       };
     } catch (err) {
       await appendWriteAudit("failed", err);
