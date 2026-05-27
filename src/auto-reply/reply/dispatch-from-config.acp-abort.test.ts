@@ -28,17 +28,21 @@ import { buildTestCtx } from "./test-ctx.js";
 let dispatchReplyFromConfig: typeof import("./dispatch-from-config.js").dispatchReplyFromConfig;
 let tryDispatchAcpReplyHook: typeof import("../../plugin-sdk/acp-runtime.js").tryDispatchAcpReplyHook;
 let resetInboundDedupe: typeof import("./inbound-dedupe.js").resetInboundDedupe;
+let getActiveReplyRunCount: typeof import("./reply-run-registry.js").getActiveReplyRunCount;
+let createReplyOperation: typeof import("./reply-run-registry.js").createReplyOperation;
+let replyRunTesting: typeof import("./reply-run-registry.js").__testing;
 
 function shouldUseAcpReplyDispatchHook(eventUnknown: unknown): boolean {
   const event = eventUnknown as {
     sessionKey?: string;
+    isTailDispatch?: boolean;
     ctx?: {
       SessionKey?: string;
       CommandTargetSessionKey?: string;
       AcpDispatchTailAfterReset?: boolean;
     };
   };
-  if (event.ctx?.AcpDispatchTailAfterReset) {
+  if (event.isTailDispatch === true || event.ctx?.AcpDispatchTailAfterReset) {
     return true;
   }
   return [event.sessionKey, event.ctx?.SessionKey, event.ctx?.CommandTargetSessionKey].some(
@@ -150,6 +154,11 @@ describe("dispatchReplyFromConfig ACP abort", () => {
     ({ dispatchReplyFromConfig } = await import("./dispatch-from-config.js"));
     ({ tryDispatchAcpReplyHook } = await import("../../plugin-sdk/acp-runtime.js"));
     ({ resetInboundDedupe } = await import("./inbound-dedupe.js"));
+    ({
+      getActiveReplyRunCount,
+      createReplyOperation,
+      __testing: replyRunTesting,
+    } = await import("./reply-run-registry.js"));
   });
 
   beforeEach(() => {
@@ -195,6 +204,8 @@ describe("dispatchReplyFromConfig ACP abort", () => {
     sessionBindingMocks.resolveByConversation.mockReset().mockReturnValue(null);
     sessionBindingMocks.touch.mockReset();
     resetPluginTtsAndThreadMocks();
+    diagnosticMocks.logMessageDispatchCompleted.mockReset();
+    diagnosticMocks.logMessageDispatchStarted.mockReset();
     diagnosticMocks.logMessageQueued.mockReset();
     diagnosticMocks.logMessageProcessed.mockReset();
     diagnosticMocks.logSessionStateChange.mockReset();
@@ -288,5 +299,46 @@ describe("dispatchReplyFromConfig ACP abort", () => {
     await dispatchPromise;
 
     expect(outcome).toBe("settled");
+    expect(getActiveReplyRunCount()).toBe(0);
+  });
+
+  it("waits for the active reply operation before running the fallback resolver", async () => {
+    const activeOperation = createReplyOperation({
+      sessionKey: "agent:active-run",
+      sessionId: "active-session",
+      resetTriggered: false,
+    });
+    const replyResolver = vi.fn(async () => undefined);
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "discord",
+      Surface: "discord",
+      SessionKey: "agent:active-run",
+      BodyForAgent: "second visible turn",
+    });
+
+    const dispatchPromise = dispatchReplyFromConfig({
+      ctx,
+      cfg: {
+        acp: {
+          enabled: true,
+          dispatch: { enabled: true },
+        },
+        session: {
+          sendPolicy: { default: "allow" },
+        },
+      } as OpenClawConfig,
+      dispatcher,
+      replyResolver,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(replyResolver).not.toHaveBeenCalled();
+
+    activeOperation.complete();
+    await dispatchPromise;
+
+    expect(replyResolver).toHaveBeenCalledTimes(1);
+    expect(getActiveReplyRunCount()).toBe(0);
   });
 });

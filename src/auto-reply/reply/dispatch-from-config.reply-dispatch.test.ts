@@ -107,6 +107,8 @@ describe("dispatchReplyFromConfig reply_dispatch hook", () => {
     }));
     agentEventMocks.emitAgentEvent.mockReset();
     agentEventMocks.onAgentEvent.mockReset().mockImplementation(() => () => {});
+    diagnosticMocks.logMessageDispatchCompleted.mockReset();
+    diagnosticMocks.logMessageDispatchStarted.mockReset();
     diagnosticMocks.logMessageQueued.mockReset();
     diagnosticMocks.logMessageProcessed.mockReset();
     diagnosticMocks.logSessionStateChange.mockReset();
