@@ -119,16 +119,15 @@ function parseSessionStorePath(storePath: string): { agentId: string; stateDir: 
 
 function resolveSessionRowOptionsFromStorePath(
   storePath: string,
-  fallback?: { agentId?: string; env?: NodeJS.ProcessEnv },
+  fallback?: { agentId?: string; env?: NodeJS.ProcessEnv; sessionKey?: string },
 ): SessionRowOptions {
   const parsed = parseSessionStorePath(storePath);
   if (!parsed) {
-    if (fallback?.agentId) {
-      return optionsWithEnv(normalizeAgentId(fallback.agentId), fallback.env);
-    }
-    throw new Error(
-      "Custom sessions.json paths are not supported by the SQLite session-store compatibility API. Pass a canonical OpenClaw sessions path or use the row APIs with an explicit agentId.",
-    );
+    const agentId =
+      fallback?.agentId ??
+      (fallback?.sessionKey ? resolveAgentIdFromSessionKey(fallback.sessionKey) : undefined) ??
+      DEFAULT_AGENT_ID;
+    return optionsWithEnv(normalizeAgentId(agentId), fallback?.env);
   }
   return optionsWithEnv(parsed.agentId, {
     ...process.env,
