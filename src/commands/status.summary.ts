@@ -229,15 +229,6 @@ export async function getStatusSummary(
     sessionCache.set(agentId, rows);
     return rows;
   };
-  const loadSessionCandidates = (storePath: string) => {
-    const cached = candidateCache.get(storePath);
-    if (cached) {
-      return cached;
-    }
-    const candidates = listSessionCandidates(loadStore(storePath));
-    candidateCache.set(storePath, candidates);
-    return candidates;
-  };
   const buildSessionRows = (
     rows: Array<{ sessionKey: string; entry: SessionEntry }>,
     opts: { agentIdOverride?: string } = {},
@@ -288,6 +279,34 @@ export async function getStatusSummary(
           cfg,
           entry,
           provider: resolvedModel.provider,
+          model: model ?? "",
+          agentId,
+          sessionKey: key,
+        });
+
+        return {
+          agentId,
+          key,
+          kind: classifySessionKey(key, entry),
+          sessionId: entry?.sessionId,
+          updatedAt,
+          age,
+          thinkingLevel: entry?.thinkingLevel,
+          fastMode: entry?.fastMode,
+          verboseLevel: entry?.verboseLevel,
+          traceLevel: entry?.traceLevel,
+          reasoningLevel: entry?.reasoningLevel,
+          elevatedLevel: entry?.elevatedLevel,
+          systemSent: entry?.systemSent,
+          abortedLastRun: entry?.abortedLastRun,
+          inputTokens: entry?.inputTokens,
+          outputTokens: entry?.outputTokens,
+          cacheRead: entry?.cacheRead,
+          cacheWrite: entry?.cacheWrite,
+          totalTokens: total ?? null,
+          totalTokensFresh,
+          remainingTokens: remaining,
+          percentUsed: pct,
           model,
           configuredModel: configuredSessionModelLabel,
           selectedModel: selectedModelLabel,
@@ -295,7 +314,7 @@ export async function getStatusSummary(
           runtime,
           contextTokens,
           flags: buildFlags(entry),
-        } satisfies SessionStatus);
+        } satisfies SessionStatus;
       })
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 
