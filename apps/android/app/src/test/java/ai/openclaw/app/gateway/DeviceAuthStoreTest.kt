@@ -202,6 +202,41 @@ class DeviceAuthStoreTest {
     assertEquals("fresh-token", prefs.getString("gateway.deviceToken.device-2.operator"))
   }
 
+  @Test
+  fun saveTokenPrunesForeignLegacyTokensWithoutOrphaningCurrentSqliteRows() {
+    val app = RuntimeEnvironment.getApplication()
+    val prefs = legacyPrefs(app)
+    prefs.putString("gateway.deviceToken.device-1.operator", " operator-token ")
+    prefs.putString("gateway.deviceToken.device-1.node", " node-token ")
+    prefs.putString("gateway.deviceToken.device-2.operator", " stale-token ")
+    val sqlite = OpenClawSQLiteStateStore(app)
+    sqlite.upsertDeviceAuthToken(
+      OpenClawSQLiteDeviceAuthTokenRow(
+        deviceId = "device-1",
+        role = "operator",
+        token = "__openclaw_secure_prefs__",
+        scopesJson = """["operator.read"]""",
+        updatedAtMs = 1700000000000,
+      ),
+    )
+    sqlite.upsertDeviceAuthToken(
+      OpenClawSQLiteDeviceAuthTokenRow(
+        deviceId = "device-1",
+        role = "node",
+        token = "__openclaw_secure_prefs__",
+        scopesJson = """["node.connect"]""",
+        updatedAtMs = 1700000000001,
+      ),
+    )
+    val store = DeviceAuthStore(app, legacyPrefsOverride = prefs)
+
+    store.saveToken("device-1", "operator", "operator-token-2", scopes = listOf("operator.write"))
+
+    assertEquals("operator-token-2", store.loadEntry("device-1", "operator")?.token)
+    assertEquals("node-token", store.loadEntry("device-1", "node")?.token)
+    assertNull(prefs.getString("gateway.deviceToken.device-2.operator"))
+  }
+
   private fun legacyPrefs(context: Context): SecurePrefs {
     val prefs = context.getSharedPreferences("openclaw.node.secure.test", Context.MODE_PRIVATE)
     prefs.edit().clear().commit()

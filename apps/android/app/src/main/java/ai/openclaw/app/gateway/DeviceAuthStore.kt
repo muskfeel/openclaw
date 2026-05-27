@@ -169,7 +169,7 @@ class DeviceAuthStore private constructor(
       stateStore.deleteAllDeviceAuthTokens()
     }
     if (shouldDropLegacyAuth) {
-      removeAllLegacyEntries()
+      removeForeignLegacyEntries(normalizedDevice)
     }
     legacyPrefs.putString(tokenKey(normalizedDevice, normalizedRole), token.trim())
     removeLegacyMetadata(normalizedDevice, normalizedRole)
@@ -275,9 +275,17 @@ class DeviceAuthStore private constructor(
     legacyPrefs.remove(metadataKey(normalizedDevice, normalizedRole))
   }
 
-  private fun removeAllLegacyEntries() {
-    legacyPrefs.removeKeysWithPrefix(deviceAuthTokenPrefix)
-    legacyPrefs.removeKeysWithPrefix(deviceAuthMetadataPrefix)
+  private fun removeForeignLegacyEntries(normalizedDevice: String) {
+    val currentTokenPrefix = tokenKeyPrefix(normalizedDevice)
+    legacyPrefs
+      .keysWithPrefix(deviceAuthTokenPrefix)
+      .filterNot { it.startsWith(currentTokenPrefix) }
+      .forEach { legacyPrefs.remove(it) }
+    val currentMetadataPrefix = "$deviceAuthMetadataPrefix$normalizedDevice."
+    legacyPrefs
+      .keysWithPrefix(deviceAuthMetadataPrefix)
+      .filterNot { it.startsWith(currentMetadataPrefix) }
+      .forEach { legacyPrefs.remove(it) }
   }
 
   private fun tokenKeyPrefix(normalizedDevice: String): String = "$deviceAuthTokenPrefix$normalizedDevice."
