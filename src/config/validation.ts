@@ -144,6 +144,68 @@ function stripLegacyMemorySearchStorePaths(
   return next;
 }
 
+function cloneSessionWithoutDeprecatedValidationKeys(
+  session: unknown,
+): Record<string, unknown> | null {
+  if (!isRecord(session)) {
+    return null;
+  }
+  let next: Record<string, unknown> | undefined;
+  const root = () => {
+    next ??= { ...session };
+    return next;
+  };
+
+  for (const key of ["store", "maintenance", "writeLock", "parentForkMaxTokens"] as const) {
+    if (Object.hasOwn(session, key)) {
+      delete root()[key];
+    }
+  }
+
+  if (Object.hasOwn(session, "idleMinutes")) {
+    const idleMinutes = session.idleMinutes;
+    delete root().idleMinutes;
+    if (typeof idleMinutes === "number" && Number.isFinite(idleMinutes)) {
+      const currentSession = root();
+      const reset = isRecord(currentSession.reset) ? { ...currentSession.reset } : { mode: "idle" };
+      if (!Object.hasOwn(reset, "idleMinutes")) {
+        reset.idleMinutes = Math.floor(idleMinutes);
+      }
+      currentSession.reset = reset;
+    }
+  }
+
+  if (isRecord(session.resetByType) && Object.hasOwn(session.resetByType, "dm")) {
+    const resetByType = { ...session.resetByType };
+    const dm = resetByType.dm;
+    delete resetByType.dm;
+    if (!Object.hasOwn(resetByType, "direct") && isRecord(dm)) {
+      resetByType.direct = dm;
+    }
+    root().resetByType = resetByType;
+  }
+
+  return next ?? null;
+}
+
+function cloneDiagnosticsWithoutDeprecatedValidationKeys(
+  diagnostics: unknown,
+): Record<string, unknown> | null {
+  if (
+    !isRecord(diagnostics) ||
+    !isRecord(diagnostics.cacheTrace) ||
+    !Object.hasOwn(diagnostics.cacheTrace, "filePath")
+  ) {
+    return null;
+  }
+  const cacheTrace = { ...diagnostics.cacheTrace };
+  delete cacheTrace.filePath;
+  return {
+    ...diagnostics,
+    cacheTrace,
+  };
+}
+
 function stripDeprecatedValidationKeys(raw: unknown): unknown {
   if (!isRecord(raw)) {
     return raw;
@@ -162,6 +224,14 @@ function stripDeprecatedValidationKeys(raw: unknown): unknown {
     delete cron.store;
     delete cron.sessionRetention;
     next = { ...(next ?? raw), cron };
+  }
+  const session = cloneSessionWithoutDeprecatedValidationKeys(raw.session);
+  if (session) {
+    next = { ...(next ?? raw), session };
+  }
+  const diagnostics = cloneDiagnosticsWithoutDeprecatedValidationKeys(raw.diagnostics);
+  if (diagnostics) {
+    next = { ...(next ?? raw), diagnostics };
   }
   next = stripLegacyMemorySearchStorePaths(next ?? raw) ?? next;
   return next ?? raw;
