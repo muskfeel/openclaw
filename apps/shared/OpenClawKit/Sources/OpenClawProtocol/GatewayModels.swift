@@ -758,6 +758,7 @@ public struct AgentParams: Codable, Sendable {
     public let suppresspromptpersistence: Bool?
     public let sessioneffects: AnyCodable?
     public let sourcereplydeliverymode: AnyCodable?
+    public let disablemessagetool: Bool?
     public let initialvfsentries: [[String: AnyCodable]]?
     public let voicewaketrigger: String?
     public let idempotencykey: String
@@ -799,6 +800,7 @@ public struct AgentParams: Codable, Sendable {
         suppresspromptpersistence: Bool?,
         sessioneffects: AnyCodable?,
         sourcereplydeliverymode: AnyCodable?,
+        disablemessagetool: Bool?,
         initialvfsentries: [[String: AnyCodable]]?,
         voicewaketrigger: String?,
         idempotencykey: String,
@@ -839,6 +841,7 @@ public struct AgentParams: Codable, Sendable {
         self.suppresspromptpersistence = suppresspromptpersistence
         self.sessioneffects = sessioneffects
         self.sourcereplydeliverymode = sourcereplydeliverymode
+        self.disablemessagetool = disablemessagetool
         self.initialvfsentries = initialvfsentries
         self.voicewaketrigger = voicewaketrigger
         self.idempotencykey = idempotencykey
@@ -881,6 +884,7 @@ public struct AgentParams: Codable, Sendable {
         case suppresspromptpersistence = "suppressPromptPersistence"
         case sessioneffects = "sessionEffects"
         case sourcereplydeliverymode = "sourceReplyDeliveryMode"
+        case disablemessagetool = "disableMessageTool"
         case initialvfsentries = "initialVfsEntries"
         case voicewaketrigger = "voiceWakeTrigger"
         case idempotencykey = "idempotencyKey"
