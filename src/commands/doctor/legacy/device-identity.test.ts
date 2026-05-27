@@ -106,7 +106,7 @@ describe("legacy device identity migration", () => {
     closeOpenClawStateDatabaseForTest();
   });
 
-  it("leaves Swift raw-key identity files with mismatched key material", async () => {
+  it("quarantines Swift raw-key identity files with mismatched key material", async () => {
     await withStateDirEnv("openclaw-doctor-device-identity-", async ({ stateDir }) => {
       const identityPath = path.join(stateDir, "identity", "device.json");
       await fs.mkdir(path.dirname(identityPath), { recursive: true });
@@ -125,20 +125,26 @@ describe("legacy device identity migration", () => {
         "utf8",
       );
 
-      expect(importLegacyDeviceIdentityFileToSqlite()).toEqual({ imported: false });
-      expect(legacyDeviceIdentityFileExists()).toBe(true);
+      expect(importLegacyDeviceIdentityFileToSqlite()).toEqual({
+        imported: false,
+        quarantined: true,
+      });
+      expect(legacyDeviceIdentityFileExists()).toBe(false);
     });
     closeOpenClawStateDatabaseForTest();
   });
 
-  it("leaves invalid legacy identity files for a later doctor pass", async () => {
+  it("quarantines invalid legacy identity files so doctor can unblock startup", async () => {
     await withStateDirEnv("openclaw-doctor-device-identity-", async ({ stateDir }) => {
       const identityPath = path.join(stateDir, "identity", "device.json");
       await fs.mkdir(path.dirname(identityPath), { recursive: true });
       await fs.writeFile(identityPath, '{"version":1,"deviceId":"broken"}\n', "utf8");
 
-      expect(importLegacyDeviceIdentityFileToSqlite()).toEqual({ imported: false });
-      expect(legacyDeviceIdentityFileExists()).toBe(true);
+      expect(importLegacyDeviceIdentityFileToSqlite()).toEqual({
+        imported: false,
+        quarantined: true,
+      });
+      expect(legacyDeviceIdentityFileExists()).toBe(false);
     });
     closeOpenClawStateDatabaseForTest();
   });

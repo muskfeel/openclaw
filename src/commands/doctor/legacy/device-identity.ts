@@ -132,6 +132,7 @@ export function legacyDeviceIdentityFileExists(env: NodeJS.ProcessEnv = process.
 
 export function importLegacyDeviceIdentityFileToSqlite(env: NodeJS.ProcessEnv = process.env): {
   imported: boolean;
+  quarantined?: boolean;
 } {
   const filePath = resolveIdentityPathForEnv(env);
   let parsed: unknown;
@@ -145,7 +146,12 @@ export function importLegacyDeviceIdentityFileToSqlite(env: NodeJS.ProcessEnv = 
   }
   const stored = parseLegacyDeviceIdentity(parsed);
   if (!stored) {
-    return { imported: false };
+    try {
+      fs.renameSync(filePath, `${filePath}.invalid-legacy-${Date.now()}`);
+      return { imported: false, quarantined: true };
+    } catch {
+      return { imported: false };
+    }
   }
   writeStoredDeviceIdentitySnapshot(stored, { env });
   try {

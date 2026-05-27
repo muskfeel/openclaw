@@ -251,6 +251,8 @@ export async function maybeRepairLegacyRuntimeStateFiles(params: {
       const result = importLegacyDeviceIdentityFileToSqlite(env);
       if (result.imported) {
         changes.push("- Imported device identity into SQLite.");
+      } else if (result.quarantined) {
+        warnings.push("- Device identity: quarantined invalid legacy identity/device.json.");
       }
     });
   }
