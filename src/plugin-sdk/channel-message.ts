@@ -6,7 +6,6 @@
 
 import type { CreateChannelReplyPipelineParams } from "./channel-outbound.js";
 import { createChannelMessageReplyPipeline } from "./channel-outbound.js";
-import { deliverInboundReplyWithMessageSendContext } from "./channel-outbound.js";
 
 export * from "./channel-outbound.js";
 /** @deprecated Use `hasFinalInboundReplyDispatch(...)` from `openclaw/plugin-sdk/channel-inbound`. */
@@ -21,12 +20,6 @@ export function createChannelTurnReplyPipeline(params: CreateChannelReplyPipelin
   return createChannelMessageReplyPipeline(params);
 }
 
-/** @deprecated Use `buildInboundReplyDispatchBase(...)` from `openclaw/plugin-sdk/channel-inbound`. */
-export { buildChannelMessageReplyDispatchBase } from "./inbound-reply-dispatch.js";
-/** @deprecated Use `dispatchChannelInboundReply(...)` or `runPreparedInboundReply(...)` from `openclaw/plugin-sdk/channel-inbound`. */
-export { dispatchChannelMessageReplyWithBase } from "./inbound-reply-dispatch.js";
-/** @deprecated Use `recordChannelMessageReplyDispatch(...)` only from legacy compatibility paths. */
-export { recordChannelMessageReplyDispatch } from "./inbound-reply-dispatch.js";
 /** @deprecated Use `hasFinalInboundReplyDispatch(...)` from `openclaw/plugin-sdk/channel-inbound`. */
 export { hasFinalChannelMessageReplyDispatch } from "./inbound-reply-dispatch.js";
 /** @deprecated Use `hasVisibleInboundReplyDispatch(...)` from `openclaw/plugin-sdk/channel-inbound`. */

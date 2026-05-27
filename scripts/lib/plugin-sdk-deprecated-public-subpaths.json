@@ -2,7 +2,6 @@
   "agent-config-primitives",
   "agent-runtime-test-contracts",
   "channel-config-schema-legacy",
-  "channel-outbound",
   "channel-reply-pipeline",
   "channel-runtime",
   "channel-secret-runtime",
