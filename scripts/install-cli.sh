@@ -776,12 +776,9 @@ install_node() {
     return
   fi
 
-  if [[ -x "$(node_bin)" ]]; then
-    current_major="$("$(node_bin)" -v 2>/dev/null || echo "")"
-    if npm_node_version_is_supported "$current_major"; then
-      emit_json "{\"event\":\"step\",\"name\":\"node\",\"status\":\"skip\",\"path\":\"${dir//\"/\\\\\\\"}\"}"
-      return
-    fi
+  if linked_node_is_usable; then
+    emit_json "{\"event\":\"step\",\"name\":\"node\",\"status\":\"skip\",\"path\":\"${dir//\"/\\\\\\\"}\"}"
+    return
   fi
 
   if ! npm_node_version_is_supported "$NODE_VERSION"; then
