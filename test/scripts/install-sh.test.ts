@@ -826,7 +826,7 @@ describe("install.sh", () => {
 
   it("loads nvm before checking Node.js so stale system Node does not win", () => {
     expect(script).toMatch(
-      /# Step 1: Node\.js[\s\S]*?load_nvm_for_node_detection\s+if ! check_node; then/,
+      /# Step 1: Node\.js\s+load_nvm_for_node_detection\s+if ! check_node; then/,
     );
 
     const tmp = mkdtempSync(join(tmpdir(), "openclaw-install-nvm-"));
@@ -1278,6 +1278,51 @@ describe("install.sh", () => {
 describe("install.sh macOS Homebrew Node behavior", () => {
   const script = readFileSync(SCRIPT_PATH, "utf8");
 
+  it("does not require Homebrew before checking an existing supported Node", () => {
+    const result = runInstallShell(`
+      set -euo pipefail
+      source "${SCRIPT_PATH}"
+      OS=macos
+      INSTALL_METHOD=npm
+      NO_ONBOARD=1
+      DRY_RUN=0
+      OPENCLAW_BIN=/tmp/openclaw
+      check_existing_openclaw() { return 1; }
+      detect_openclaw_checkout() { return 1; }
+      show_install_plan() { :; }
+      ui_stage() { echo "stage:$*"; }
+      load_nvm_for_node_detection() { echo "check-node-before-brew"; }
+      check_node() { echo "node-ok"; return 0; }
+      activate_supported_node_on_path() { :; }
+      ensure_default_node_active_shell() { return 0; }
+      check_git() { echo "git-ok"; return 0; }
+      fix_npm_permissions() { :; }
+      install_openclaw() { :; }
+      setup_agent_bootstrap() { :; }
+      print_shell_fix_instructions() { :; }
+      configure_systemd_user_environment() { :; }
+      migrate_systemd_unit_for_current_user() { :; }
+      run_doctor() { :; }
+      start_service() { :; }
+      verify_installation() { return 0; }
+      show_footer_links() { :; }
+      is_gateway_daemon_loaded() { return 1; }
+      command() {
+        if [[ "$1" == "-v" && "$2" == "openclaw" ]]; then
+          return 1
+        fi
+        builtin command "$@"
+      }
+      install_homebrew() { echo "unexpected-homebrew"; return 1; }
+      main
+    `);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("check-node-before-brew");
+    expect(result.stdout).toContain("node-ok");
+    expect(result.stdout).not.toContain("unexpected-homebrew");
+  });
+
   it("stops when Homebrew node installation fails", () => {
     expect(script).toContain(
       'if ! run_quiet_step "Installing node@${NODE_DEFAULT_MAJOR}" brew install "node@${NODE_DEFAULT_MAJOR}"; then',
@@ -1298,6 +1343,7 @@ describe("install.sh macOS Homebrew Node behavior", () => {
       set -euo pipefail
       source "${SCRIPT_PATH}"
       OS=macos
+      install_homebrew() { echo "install-homebrew"; }
       run_quiet_step() { echo "run_quiet_step:$*"; return 1; }
       brew() { echo "brew:$*"; return 0; }
       ensure_macos_default_node_active() { echo "ensure-called"; return 0; }

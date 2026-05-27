@@ -1784,6 +1784,7 @@ install_node_with_apk() {
 # Install Node.js
 install_node() {
     if [[ "$OS" == "macos" ]]; then
+        install_homebrew
         ui_info "Installing Node.js via Homebrew"
         if ! run_quiet_step "Installing node@${NODE_DEFAULT_MAJOR}" brew install "node@${NODE_DEFAULT_MAJOR}"; then
             echo "Re-run with --verbose or run 'brew install node@${NODE_DEFAULT_MAJOR}' directly, then rerun the installer."
@@ -3101,8 +3102,7 @@ main() {
 
     ui_stage "Preparing environment"
 
-    # Step 1: Node.js. macOS package-manager branches install Homebrew lazily
-    # only when they are about to call brew.
+    # Step 1: Node.js
     load_nvm_for_node_detection
     if ! check_node; then
         install_homebrew

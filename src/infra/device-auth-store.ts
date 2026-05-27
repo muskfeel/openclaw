@@ -140,6 +140,29 @@ function hasSqliteDeviceAuthTokens(
   return Boolean(row);
 }
 
+function seedSameDeviceLegacyAuthRowsForFirstWrite(params: {
+  db: ReturnType<typeof getNodeSqliteKysely<DeviceAuthDatabase>>;
+  sqliteDb: DatabaseSync;
+  deviceId: string;
+  env?: NodeJS.ProcessEnv;
+}): boolean {
+  if (hasSqliteDeviceAuthTokens(params.db, params.sqliteDb)) {
+    return false;
+  }
+  const legacy = readLegacyDeviceAuthState(params.env);
+  if (!legacy || legacy.deviceId !== params.deviceId) {
+    return false;
+  }
+  for (const entry of Object.values(legacy.tokens)) {
+    upsertDeviceAuthTokenRow(
+      params.db,
+      params.sqliteDb,
+      deviceAuthEntryToRow(legacy.deviceId, entry),
+    );
+  }
+  return true;
+}
+
 function readLegacyDeviceAuthState(env?: NodeJS.ProcessEnv): DeviceAuthStore | null {
   try {
     return parseDeviceAuthStoreSnapshot(
@@ -330,6 +353,12 @@ export function storeDeviceAuthToken(params: {
   const row = deviceAuthEntryToRow(params.deviceId, entry);
   runOpenClawStateWriteTransaction((database) => {
     const db = getNodeSqliteKysely<DeviceAuthDatabase>(database.db);
+    seedSameDeviceLegacyAuthRowsForFirstWrite({
+      db,
+      sqliteDb: database.db,
+      deviceId: params.deviceId,
+      env: params.env,
+    });
     executeSqliteQuerySync(
       database.db,
       db.deleteFrom("device_auth_tokens").where("device_id", "!=", params.deviceId),
@@ -346,8 +375,19 @@ export function clearDeviceAuthToken(params: {
   env?: NodeJS.ProcessEnv;
 }): void {
   const role = normalizeDeviceAuthRole(params.role);
+  let shouldRemoveLegacy = false;
   runOpenClawStateWriteTransaction((database) => {
     const db = getNodeSqliteKysely<DeviceAuthDatabase>(database.db);
+    const hasRows = hasSqliteDeviceAuthTokens(db, database.db);
+    const seeded = hasRows
+      ? false
+      : seedSameDeviceLegacyAuthRowsForFirstWrite({
+          db,
+          sqliteDb: database.db,
+          deviceId: params.deviceId,
+          env: params.env,
+        });
+    shouldRemoveLegacy = hasRows || seeded;
     executeSqliteQuerySync(
       database.db,
       db
@@ -356,5 +396,7 @@ export function clearDeviceAuthToken(params: {
         .where("role", "=", role),
     );
   }, sqliteOptions(params.env));
-  removeLegacyDeviceAuthState(params.env);
+  if (shouldRemoveLegacy) {
+    removeLegacyDeviceAuthState(params.env);
+  }
 }
