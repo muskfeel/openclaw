@@ -7,6 +7,11 @@ import {
   type PluginRuntime,
 } from "../runtime-api.js";
 import type { MSTeamsAccessTokenProvider } from "./attachments/types.js";
+import {
+  describeBotFrameworkServiceUrlHost,
+  isAllowedBotFrameworkServiceUrl,
+  normalizeBotFrameworkServiceUrl,
+} from "./bot-framework-service-url.js";
 import { createMSTeamsConversationStoreState } from "./conversation-store-state.js";
 import type {
   MSTeamsConversationStore,
