@@ -32,6 +32,8 @@ type DeviceAuthDatabase = Pick<OpenClawStateKyselyDatabase, "device_auth_tokens"
 type DeviceAuthTokenRow = Selectable<DeviceAuthDatabase["device_auth_tokens"]>;
 type DeviceAuthTokenInsert = Insertable<DeviceAuthDatabase["device_auth_tokens"]>;
 
+const ANDROID_SECURE_PREFS_TOKEN_MARKER = "__openclaw_secure_prefs__";
+
 function resolveLegacyDeviceAuthPath(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(resolveStateDir(env), "identity", "device-auth.json");
 }
@@ -85,7 +87,10 @@ function copyCanonicalDeviceAuthTokens(
   return out;
 }
 
-function rowToDeviceAuthEntry(row: DeviceAuthTokenRow): DeviceAuthEntry {
+function rowToDeviceAuthEntry(row: DeviceAuthTokenRow): DeviceAuthEntry | null {
+  if (row.token === ANDROID_SECURE_PREFS_TOKEN_MARKER) {
+    return null;
+  }
   return {
     token: row.token,
     role: row.role,
@@ -192,10 +197,21 @@ function readDeviceAuthState(env?: NodeJS.ProcessEnv): DeviceAuthStore | null {
     if (rows.length === 0) {
       return null;
     }
+    const tokenEntries: Array<[string, DeviceAuthEntry]> = [];
+    for (const row of rows) {
+      const entry = rowToDeviceAuthEntry(row);
+      if (entry) {
+        tokenEntries.push([row.role, entry]);
+      }
+    }
+    const tokens: Record<string, DeviceAuthEntry> = Object.fromEntries(tokenEntries);
+    if (Object.keys(tokens).length === 0) {
+      return null;
+    }
     return {
       version: 1,
       deviceId: latest.device_id,
-      tokens: Object.fromEntries(rows.map((row) => [row.role, rowToDeviceAuthEntry(row)])),
+      tokens,
     };
   } catch {
     return readLegacyDeviceAuthStateAndSeedSqlite(env);

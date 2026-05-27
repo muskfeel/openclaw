@@ -80,6 +80,27 @@ describe("infra/device-auth-store", () => {
     });
   });
 
+  it("ignores Android SecurePrefs token markers in shared SQLite auth rows", async () => {
+    await withTempDir("openclaw-device-auth-", async (stateDir) => {
+      const env = createEnv(stateDir);
+      const database = openOpenClawStateDatabase({ env });
+      const db = getNodeSqliteKysely<DeviceAuthTestDatabase>(database.db);
+      executeSqliteQuerySync(
+        database.db,
+        db.insertInto("device_auth_tokens").values({
+          device_id: "device-1",
+          role: "operator",
+          token: "__openclaw_secure_prefs__",
+          scopes_json: "[]",
+          updated_at_ms: 1,
+        }),
+      );
+
+      expect(loadDeviceAuthToken({ deviceId: "device-1", role: "operator", env })).toBeNull();
+      expect(loadDeviceAuthStore({ env })).toBeNull();
+    });
+  });
+
   it("falls back to legacy JSON device auth and seeds SQLite", async () => {
     await withTempDir("openclaw-device-auth-", async (stateDir) => {
       const env = createEnv(stateDir);

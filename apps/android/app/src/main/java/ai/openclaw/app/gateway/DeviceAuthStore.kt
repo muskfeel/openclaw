@@ -131,21 +131,16 @@ class DeviceAuthStore private constructor(
     val row =
       stateStore.readDeviceAuthToken(normalizedDevice, normalizedRole)
         ?: return migrateLegacyEntryIfNoSqliteAuthRows(normalizedDevice, normalizedRole)
-    val legacyToken =
+    val token =
       legacyPrefs
         .getString(tokenKey(normalizedDevice, normalizedRole))
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
-    val sqliteToken = row.token.trim().takeIf { it.isNotEmpty() }
-    val token = when {
-      sqliteToken == sqliteSecurePrefsTokenMarker -> legacyToken
-      sqliteToken != null -> sqliteToken.also {
-        if (legacyToken != it) {
+        ?: row.token.trim().takeIf { it.isNotEmpty() && it != sqliteSecurePrefsTokenMarker }?.also {
           legacyPrefs.putString(tokenKey(normalizedDevice, normalizedRole), it)
+          stateStore.upsertDeviceAuthToken(row.copy(token = sqliteSecurePrefsTokenMarker))
         }
-      }
-      else -> legacyToken
-    } ?: return null
+        ?: return null
     return DeviceAuthEntry(
       token = token,
       role = normalizedRole,
@@ -162,7 +157,6 @@ class DeviceAuthStore private constructor(
   ) {
     val normalizedDevice = normalizeDeviceId(deviceId)
     val normalizedRole = normalizeRole(role)
-    val normalizedToken = token.trim()
     val normalizedScopes = normalizeScopes(scopes)
     val latestDeviceId = stateStore.readLatestDeviceAuthDeviceId()
     val sqliteDeviceChanged = latestDeviceId != null && latestDeviceId != normalizedDevice
@@ -177,13 +171,13 @@ class DeviceAuthStore private constructor(
     if (shouldDropLegacyAuth) {
       removeForeignLegacyEntries(normalizedDevice)
     }
-    legacyPrefs.putString(tokenKey(normalizedDevice, normalizedRole), normalizedToken)
+    legacyPrefs.putString(tokenKey(normalizedDevice, normalizedRole), token.trim())
     removeLegacyMetadata(normalizedDevice, normalizedRole)
     stateStore.upsertDeviceAuthToken(
       OpenClawSQLiteDeviceAuthTokenRow(
         deviceId = normalizedDevice,
         role = normalizedRole,
-        token = normalizedToken,
+        token = sqliteSecurePrefsTokenMarker,
         scopesJson = json.encodeToString(normalizedScopes),
         updatedAtMs = System.currentTimeMillis(),
       ),
@@ -253,7 +247,7 @@ class DeviceAuthStore private constructor(
           OpenClawSQLiteDeviceAuthTokenRow(
             deviceId = normalizedDevice,
             role = normalizedRole,
-            token = entry.token,
+            token = sqliteSecurePrefsTokenMarker,
             scopesJson = json.encodeToString(entry.scopes),
             updatedAtMs = entry.updatedAtMs,
           ),

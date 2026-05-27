@@ -22,6 +22,7 @@ private struct DeviceAuthStoreFile: Codable {
 
 public enum DeviceAuthStore {
     private static let legacyFileName = "device-auth.json"
+    private static let androidSecurePrefsTokenMarker = "__openclaw_secure_prefs__"
 
     public static func loadToken(deviceId: String, role: String) -> DeviceAuthEntry? {
         let role = self.normalizeRole(role)
@@ -83,8 +84,9 @@ public enum DeviceAuthStore {
         return Array(Set(trimmed)).sorted()
     }
 
-    private static func entry(from row: OpenClawSQLiteDeviceAuthTokenRow) -> DeviceAuthEntry {
-        DeviceAuthEntry(
+    private static func entry(from row: OpenClawSQLiteDeviceAuthTokenRow) -> DeviceAuthEntry? {
+        guard row.token != self.androidSecurePrefsTokenMarker else { return nil }
+        return DeviceAuthEntry(
             token: row.token,
             role: row.role,
             scopes: self.decodeScopes(row.scopesJSON),
@@ -170,7 +172,10 @@ public enum DeviceAuthStore {
         } catch {
             return store.tokens[role].map(self.normalizedLegacyEntry)
         }
-        return OpenClawSQLiteStateStore.readDeviceAuthToken(deviceId: deviceId, role: role).map(self.entry(from:))
+        guard let row = OpenClawSQLiteStateStore.readDeviceAuthToken(deviceId: deviceId, role: role) else {
+            return nil
+        }
+        return self.entry(from: row)
     }
 
     private static func removeLegacyToken(deviceId: String, role: String) {

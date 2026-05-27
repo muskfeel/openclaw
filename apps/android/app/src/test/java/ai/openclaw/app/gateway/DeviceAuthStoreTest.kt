@@ -42,7 +42,7 @@ class DeviceAuthStoreTest {
     assertTrue((entry?.updatedAtMs ?: 0L) > 0L)
     val row = OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "operator")
     assertNotNull(row)
-    assertEquals("operator-token", row?.token)
+    assertEquals("__openclaw_secure_prefs__", row?.token)
     assertEquals("""["operator.read","operator.write"]""", row?.scopesJson)
   }
 
@@ -78,7 +78,7 @@ class DeviceAuthStoreTest {
     assertEquals("operator-token", prefs.getString("gateway.deviceToken.device-1.operator"))
     assertNull(prefs.getString("gateway.deviceTokenMeta.device-1.operator"))
     assertEquals(
-      "operator-token",
+      "__openclaw_secure_prefs__",
       OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "operator")?.token,
     )
   }
@@ -107,11 +107,11 @@ class DeviceAuthStoreTest {
     assertEquals("node-token", node?.token)
     assertEquals(listOf("node.connect"), node?.scopes)
     assertEquals(
-      "operator-token",
+      "__openclaw_secure_prefs__",
       OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "operator")?.token,
     )
     assertEquals(
-      "node-token",
+      "__openclaw_secure_prefs__",
       OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "node")?.token,
     )
   }
@@ -159,7 +159,7 @@ class DeviceAuthStoreTest {
   }
 
   @Test
-  fun loadEntrySyncsSqliteTokenBackToSecurePrefs() {
+  fun loadEntryMovesPlaintextSqliteTokenBackToSecurePrefs() {
     val app = RuntimeEnvironment.getApplication()
     val prefs = legacyPrefs(app)
     OpenClawSQLiteStateStore(app).upsertDeviceAuthToken(
@@ -177,7 +177,7 @@ class DeviceAuthStoreTest {
     assertEquals("operator-token", entry?.token)
     assertEquals("operator-token", prefs.getString("gateway.deviceToken.device-1.operator"))
     assertEquals(
-      "operator-token",
+      "__openclaw_secure_prefs__",
       OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-1", "operator")?.token,
     )
   }
@@ -201,7 +201,7 @@ class DeviceAuthStoreTest {
     assertEquals("fresh-token", store.loadEntry("device-2", "operator")?.token)
     assertEquals("fresh-token", prefs.getString("gateway.deviceToken.device-2.operator"))
     assertEquals(
-      "fresh-token",
+      "__openclaw_secure_prefs__",
       OpenClawSQLiteStateStore(app).readDeviceAuthToken("device-2", "operator")?.token,
     )
   }

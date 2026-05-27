@@ -158,6 +158,21 @@ struct DeviceIdentityStoreTests {
         }
     }
 
+    @Test("ignores Android SecurePrefs token markers in shared SQLite auth rows")
+    func ignoresAndroidSecurePrefsTokenMarkers() throws {
+        try Self.withTempStateDir { _ in
+            try OpenClawSQLiteStateStore.upsertDeviceAuthToken(
+                OpenClawSQLiteDeviceAuthTokenRow(
+                    deviceId: "device-1",
+                    role: "gateway",
+                    token: "__openclaw_secure_prefs__",
+                    scopesJSON: "[]",
+                    updatedAtMs: 1))
+
+            #expect(DeviceAuthStore.loadToken(deviceId: "device-1", role: "gateway") == nil)
+        }
+    }
+
     @Test("does not resurrect legacy device auth role after SQLite rows exist")
     func doesNotResurrectLegacyDeviceAuthRoleAfterSQLiteRowsExist() throws {
         try Self.withTempStateDir { stateDir in
