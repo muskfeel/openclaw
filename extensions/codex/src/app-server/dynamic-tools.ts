@@ -23,6 +23,10 @@ import {
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import type { ImageContent, TextContent } from "openclaw/plugin-sdk/provider-ai";
 import { normalizeAgentId } from "openclaw/plugin-sdk/routing";
+import {
+  asOptionalRecord as readRecord,
+  isRecord,
+} from "openclaw/plugin-sdk/string-coerce-runtime";
 import type { CodexDynamicToolsLoading } from "./config.js";
 import { invalidInlineImageText, sanitizeInlineImageDataUrl } from "./image-payload-sanitizer.js";
 import {
