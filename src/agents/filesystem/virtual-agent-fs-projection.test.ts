@@ -69,6 +69,31 @@ describe("createVirtualAgentFsProjection", () => {
     expect(scratch.readFile("/nested/work/out.txt").toString("utf8")).toBe("from command");
   });
 
+  it("maps absolute workspace workdirs relative to the projected root", async () => {
+    const workspaceRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "openclaw-vfs-workspace-root-"));
+    const scratch = createSqliteVirtualAgentFs({
+      agentId: "main",
+      namespace: "scratch",
+      path: createTempDbPath(),
+      now: () => 1000,
+    });
+    const projection = await createVirtualAgentFsProjection(scratch, { workspaceRoot });
+    try {
+      const workdir = await projection.resolveWorkdir(path.join(workspaceRoot, "nested", "work"));
+      expect(workdir).toBe(path.join(projection.root, "nested", "work"));
+      await fsp.writeFile(path.join(workdir, "out.txt"), "from absolute command");
+      await expect(projection.resolveWorkdir(path.join(os.tmpdir(), "outside"))).rejects.toThrow(
+        "VFS exec workdir must be inside workspace root",
+      );
+      await projection.syncBack();
+    } finally {
+      await projection.cleanup();
+      await fsp.rm(workspaceRoot, { recursive: true, force: true });
+    }
+
+    expect(scratch.readFile("/nested/work/out.txt").toString("utf8")).toBe("from absolute command");
+  });
+
   it("syncs directory-to-file replacements back", async () => {
     const scratch = createSqliteVirtualAgentFs({
       agentId: "main",

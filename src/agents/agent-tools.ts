@@ -231,7 +231,9 @@ function createLazyVirtualExecTool(
         throw new Error("VFS exec does not support elevated host execution.");
       }
 
-      const projection = await createVirtualAgentFsProjection(scratch);
+      const projection = await createVirtualAgentFsProjection(scratch, {
+        workspaceRoot: defaults?.cwd,
+      });
       try {
         params.host = "gateway";
         params.workdir = await projection.resolveWorkdir(

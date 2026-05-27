@@ -1124,6 +1124,18 @@ function isScratchAttachmentPath(vfsPath: string): boolean {
   return vfsPath === "/.openclaw/attachments" || vfsPath.startsWith("/.openclaw/attachments/");
 }
 
+function hasScratchDirectoryAtOrAbove(params: VirtualToolParams, vfsPath: string): boolean {
+  let current = vfsPath;
+  while (current && current !== "/") {
+    const stat = params.scratch.stat(current);
+    if (stat?.kind === "directory") {
+      return true;
+    }
+    current = path.posix.dirname(current);
+  }
+  return false;
+}
+
 function shouldUseScratchForWorkspacePath(
   params: VirtualToolParams,
   absolutePath: string,
@@ -1135,7 +1147,12 @@ function shouldUseScratchForWorkspacePath(
     return false;
   }
   const stat = params.scratch.stat(vfsPath);
-  return stat?.kind === "file" || stat?.kind === "directory" || isScratchAttachmentPath(vfsPath);
+  return (
+    stat?.kind === "file" ||
+    stat?.kind === "directory" ||
+    hasScratchDirectoryAtOrAbove(params, vfsPath) ||
+    isScratchAttachmentPath(vfsPath)
+  );
 }
 
 async function readWorkspaceScratchOverlayFile(

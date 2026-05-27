@@ -593,6 +593,39 @@ describe("createOpenClawCodingTools", () => {
     }
   });
 
+  it("keeps new child writes under scratch-owned workspace directories", async () => {
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-tools-overlay-"));
+    const scratch = createMemoryVirtualFs();
+    scratch.mkdir("/scratch-owned");
+    try {
+      const tools = createOpenClawCodingTools({
+        workspaceDir,
+        agentFilesystem: { scratch, workspace: { root: workspaceDir } },
+        toolConstructionPlan: {
+          includeBaseCodingTools: true,
+          includeShellTools: true,
+          includeChannelTools: false,
+          includeOpenClawTools: false,
+          includePluginTools: false,
+        },
+      });
+
+      await tools
+        .find((tool) => tool.name === "write")
+        ?.execute("call-write-scratch-child", {
+          path: "scratch-owned/new.txt",
+          content: "hello scratch",
+        });
+
+      expect(scratch.readFile("/scratch-owned/new.txt").toString("utf8")).toBe("hello scratch");
+      await expect(
+        fs.access(path.join(workspaceDir, "scratch-owned", "new.txt")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
   it("uses VFS-backed apply_patch when runtime filesystem has no workspace capability", async () => {
     vi.stubEnv("OPENCLAW_UNSAFE_VFS_EXEC", "0");
     const scratch = createMemoryVirtualFs();

@@ -10,6 +10,10 @@ export type VirtualAgentFsProjection = {
   resolveWorkdir: (workdir?: string) => Promise<string>;
 };
 
+export type VirtualAgentFsProjectionOptions = {
+  workspaceRoot?: string;
+};
+
 function normalizeVfsPath(input?: string): string {
   if (!input || input === ".") {
     return "/";
@@ -35,6 +39,35 @@ function vfsPathFor(projectedRoot: string, hostPath: string): string {
     return "/";
   }
   return normalizeVfsPath(relative.split(path.sep).join(path.posix.sep));
+}
+
+function isInsideOrAtRoot(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return !relative || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function resolveVfsWorkdir(
+  workdir: string | undefined,
+  options?: VirtualAgentFsProjectionOptions,
+): string {
+  if (!workdir || !path.isAbsolute(workdir)) {
+    return normalizeVfsPath(workdir);
+  }
+
+  const workspaceRoot = options?.workspaceRoot;
+  if (!workspaceRoot) {
+    return normalizeVfsPath(workdir);
+  }
+
+  const root = path.resolve(workspaceRoot);
+  const absoluteWorkdir = path.resolve(workdir);
+  if (!isInsideOrAtRoot(root, absoluteWorkdir)) {
+    throw new Error(`VFS exec workdir must be inside workspace root: ${workdir}`);
+  }
+
+  return normalizeVfsPath(
+    path.relative(root, absoluteWorkdir).split(path.sep).join(path.posix.sep),
+  );
 }
 
 async function walkProjectedFiles(projectedRoot: string): Promise<
@@ -66,6 +99,7 @@ async function walkProjectedFiles(projectedRoot: string): Promise<
 
 export async function createVirtualAgentFsProjection(
   vfs: VirtualAgentFs,
+  options?: VirtualAgentFsProjectionOptions,
 ): Promise<VirtualAgentFsProjection> {
   const root = await hostFs.mkdtemp(path.join(os.tmpdir(), "openclaw-vfs-exec-"));
   const exportedEntries = vfs.export("/", { recursive: true }).toSorted((left, right) => {
@@ -121,7 +155,7 @@ export async function createVirtualAgentFsProjection(
     cleanup: () => hostFs.rm(root, { recursive: true, force: true }),
     syncBack,
     resolveWorkdir: async (workdir?: string) => {
-      const resolved = hostPathFor(root, normalizeVfsPath(workdir));
+      const resolved = hostPathFor(root, resolveVfsWorkdir(workdir, options));
       await hostFs.mkdir(resolved, { recursive: true });
       return resolved;
     },
