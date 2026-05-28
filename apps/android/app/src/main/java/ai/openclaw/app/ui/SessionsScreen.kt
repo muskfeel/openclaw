@@ -141,7 +141,7 @@ internal fun SessionsScreen(
           val active = session.key == chatSessionKey
           SessionRow(
             title = displaySessionTitle(session.displayName),
-            subtitle = if (active) 当前会话" else "OpenClaw 会话",
+            subtitle = if (active) "当前会话" else "OpenClaw 会话",
             metadata = session.updatedAtMs?.let(::relativeSessionTime) ?: "now",
             active = active,
             compact = compactLayout,

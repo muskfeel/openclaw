@@ -51,7 +51,7 @@ internal fun HealthLogsSettingsScreen(
 
   SettingsDetailFrame(
     title = "健康状态",
-    subtitle = 网关状态、手机节点就绪状态和最近日志流。",
+    subtitle = "网关状态、手机节点就绪状态和最近日志流。",
     icon = Icons.Default.Settings,
     onBack = onBack,
   ) {

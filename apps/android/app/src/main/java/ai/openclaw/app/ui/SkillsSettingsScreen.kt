@@ -45,7 +45,7 @@ internal fun SkillsSettingsScreen(
 
   SettingsDetailFrame(
     title = "技能",
-    subtitle = OpenClaw 可用的已安装能力。",
+    subtitle = "OpenClaw 可用的已安装能力。",
     icon = Icons.Default.Settings,
     onBack = onBack,
   ) {
