@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">OpenClaw 节点</string>
     <string name="ui_about">关于</string>
     <string name="ui_active">活跃</string>
     <string name="ui_active_runs">活跃运行</string>
