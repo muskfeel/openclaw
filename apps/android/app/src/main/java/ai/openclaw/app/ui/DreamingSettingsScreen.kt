@@ -58,9 +58,9 @@ internal fun DreamingSettingsScreen(
       rows =
         listOf(
           SettingsMetric("状态", if (summary.enabled) "开启" else "关闭"),
-          SettingsMetric("Waiting", summary.shortTermCount.toString()),
-          SettingsMetric("Signals", summary.totalSignalCount.toString()),
-          SettingsMetric("Next Cycle", formatDreamingNextRun(summary.nextRunAtMs)),
+          SettingsMetric("等待中", summary.shortTermCount.toString()),
+          SettingsMetric("信号", summary.totalSignalCount.toString()),
+          SettingsMetric("下一周期", formatDreamingNextRun(summary.nextRunAtMs)),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -92,19 +92,19 @@ private fun DreamingPanel(summary: GatewayDreamingSummary) {
     ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
       Column {
         DreamingHealthRow(
-          title = "Memory Store",
-          value = if (summary.storeHealthy) "Healthy" else "Needs attention",
+          title = "记忆存储",
+          value = if (summary.storeHealthy) "健康" else "Needs attention",
           healthy = summary.storeHealthy,
         )
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         DreamingHealthRow(
           title = "Signal Index",
-          value = if (summary.phaseSignalHealthy) "Healthy" else "Needs attention",
+          value = if (summary.phaseSignalHealthy) "健康" else "Needs attention",
           healthy = summary.phaseSignalHealthy,
         )
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         DreamingHealthRow(
-          title = "Promoted",
+          title = "已提升",
           value = "${summary.promotedToday} today · ${summary.promotedTotal} total",
           healthy = true,
         )
@@ -134,7 +134,7 @@ private fun DreamingHealthRow(
 @Composable
 private fun DreamDiaryPanel(summary: GatewayDreamingSummary) {
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-    Text(text = "DIARY", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
+    Text(text = "日记", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
     if (!summary.diaryFound) {
       ClawPanel {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -188,13 +188,13 @@ private fun DreamDiaryRow(entry: GatewayDreamDiaryEntry) {
 }
 
 private fun formatDreamingNextRun(nextRunAtMs: Long?): String {
-  val next = nextRunAtMs ?: return "Not scheduled"
+  val next = nextRunAtMs ?: return "未计划"
   val deltaMinutes = ((next - System.currentTimeMillis()) / 60_000L).coerceAtLeast(0L)
   val hours = deltaMinutes / 60L
   return when {
     hours >= 24L -> "In ${hours / 24L}d"
     hours >= 1L -> "In ${hours}h"
     deltaMinutes >= 1L -> "In ${deltaMinutes}m"
-    else -> "Soon"
+    else -> "即将"
   }
 }

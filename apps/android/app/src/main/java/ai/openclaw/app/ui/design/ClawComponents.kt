@@ -470,7 +470,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
       ClawTopBar(
         title = "OpenClaw",
-        subtitle = "Local command center",
+        subtitle = "本地命令中心",
         navigation = { ClawAvatarMark(text = "OC") },
         actions = {
           ClawIconButton(icon = Icons.Default.Search, contentDescription = "搜索", onClick = {})
@@ -484,7 +484,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
           Text(text = "OpenClaw", style = ClawTheme.type.display, color = ClawTheme.colors.text)
-          Text(text = "Design system prototype", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+          Text(text = "设计系统原型", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
         ClawStatusPill(text = "已连接", status = ClawStatus.Success)
       }
@@ -504,16 +504,16 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
           metadata = "now",
         )
         ClawListItem(
-          title = "Provider setup",
-          subtitle = "OpenClaw gateway",
+          title = "提供商设置",
+          subtitle = "OpenClaw网关",
           metadata = "8m",
         )
       }
 
-      ClawTextField(value = prompt, onValueChange = { prompt = it }, placeholder = "Ask OpenClaw anything", minLines = 3)
+      ClawTextField(value = prompt, onValueChange = { prompt = it }, placeholder = "问OpenClaw任何问题", minLines = 3)
 
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ClawPrimaryButton(text = "Start Chat", onClick = {}, modifier = Modifier.weight(1f))
+        ClawPrimaryButton(text = "开始聊天", onClick = {}, modifier = Modifier.weight(1f))
         ClawSecondaryButton(text = "语音", onClick = {}, modifier = Modifier.weight(1f))
       }
 
@@ -524,7 +524,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
       }
 
       ClawEmptyState(
-        title = "Nothing needs your attention",
+        title = "没有需要关注的事项",
         body = "OpenClaw will surface approvals, failed jobs, and channel issues here.",
       )
 

@@ -328,7 +328,7 @@ private fun OverviewScreen(
         }
 
         item {
-          SectionLabel(title = "MODULES")
+          SectionLabel(title = "模块")
         }
 
         item {
@@ -367,10 +367,10 @@ private fun OverviewScreen(
 
         item {
           SectionLabel(
-            title = "Recent Sessions",
+            title = "最近会话",
             action = {
               Text(
-                text = "View all",
+                text = "查看全部",
                 modifier = Modifier.clickable { onSelectTab(Tab.Sessions) },
                 style = ClawTheme.type.caption,
                 color = ClawTheme.colors.textMuted,
@@ -382,9 +382,9 @@ private fun OverviewScreen(
         if (sessions.isEmpty()) {
           item {
             ClawEmptyState(
-              title = "No recent sessions",
+              title = "没有最近会话",
               body = "Start a chat and your active OpenClaw conversations will appear here.",
-              action = { ClawPrimaryButton(text = "Start Chat", onClick = { onSelectTab(Tab.Chat) }) },
+              action = { ClawPrimaryButton(text = "开始聊天", onClick = { onSelectTab(Tab.Chat) }) },
             )
           }
         } else {
@@ -395,7 +395,7 @@ private fun OverviewScreen(
                   RecentSessionListItem(
                     key = session.key,
                     title = displaySessionTitle(session.displayName),
-                    subtitle = if (pendingRunCount > 0) "Assistant working" else "OpenClaw session",
+                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw session",
                     metadata = session.updatedAtMs?.let(::relativeSessionTime) ?: "",
                   )
                 },
@@ -619,7 +619,7 @@ private fun RecentSessionRowContent(
       Text(text = metadata, style = ClawTheme.type.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = ClawTheme.colors.textMuted)
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open session",
+        contentDescription = "打开会话",
         modifier = Modifier.size(14.dp),
         tint = ClawTheme.colors.textMuted,
       )
@@ -744,7 +744,7 @@ private fun SettingsShellScreen(
 
       item {
         SettingsGroup(
-          rows = listOf(SettingsRow("Sign Out", "断开连接", Icons.AutoMirrored.Filled.ExitToApp)),
+          rows = listOf(SettingsRow("退出登录", "断开连接", Icons.AutoMirrored.Filled.ExitToApp)),
           onOpen = { },
           onAction = { viewModel.disconnect() },
         )
@@ -759,7 +759,7 @@ private fun SettingsShellScreen(
           Text(text = "OpenClaw ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted)
           Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = if (isConnected) "All systems operational" else "Gateway not connected",
+              text = if (isConnected) "所有系统正常" else "网关未连接",
               style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp),
               color = ClawTheme.colors.textSubtle,
             )
@@ -782,14 +782,14 @@ private fun approvalsStatus(count: Int): Boolean? = if (count > 0) true else nul
 
 private fun cronJobsSummary(count: Int): String =
   when (count) {
-    0 -> "No scheduled jobs"
+    0 -> "没有计划任务"
     1 -> "1 scheduled"
     else -> "$count scheduled"
   }
 
 private fun usageSummaryText(count: Int): String =
   when (count) {
-    0 -> "No provider usage"
+    0 -> "没有提供商使用"
     1 -> "1 provider"
     else -> "$count providers"
   }
@@ -813,7 +813,7 @@ private fun nodesDevicesSummaryText(summary: GatewayNodesDevicesSummary): String
     summary.pendingDevices.isNotEmpty() -> "${summary.pendingDevices.size} pending"
     summary.nodes.isNotEmpty() -> "$online/${summary.nodes.size} online"
     devices > 0 -> "$devices paired"
-    else -> "No devices"
+    else -> "没有设备"
   }
 }
 
@@ -830,7 +830,7 @@ private fun channelsSummaryText(summary: GatewayChannelsSummary): String {
   return when {
     summary.channels.any { it.error != null } -> "${summary.channels.count { it.error != null }} issue"
     summary.channels.isNotEmpty() -> "$connected/${summary.channels.size} connected"
-    else -> "No channels"
+    else -> "没有频道"
   }
 }
 
@@ -896,11 +896,11 @@ private fun ProfilePanel(
       }
       Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(text = displayName, style = ClawTheme.type.section, color = ClawTheme.colors.text, maxLines = 1)
-        Text(text = "OpenClaw mobile", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
+        Text(text = "OpenClaw移动版", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
       }
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open profile",
+        contentDescription = "打开资料",
         modifier = Modifier.size(15.dp),
         tint = ClawTheme.colors.text,
       )
@@ -975,7 +975,7 @@ private fun SettingsListRow(
 private fun SettingsSearchButton(onClick: () -> Unit) {
   Surface(onClick = onClick, modifier = Modifier.size(ClawTheme.spacing.touchTarget), shape = CircleShape, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
     Box(contentAlignment = Alignment.Center) {
-      Icon(imageVector = Icons.Default.Search, contentDescription = "Search settings", modifier = Modifier.size(18.dp))
+      Icon(imageVector = Icons.Default.Search, contentDescription = "搜索设置", modifier = Modifier.size(18.dp))
     }
   }
 }
@@ -1018,13 +1018,13 @@ private fun gatewaySummary(
   statusText: String,
   isConnected: Boolean,
 ): String {
-  if (isConnected) return "Online and ready"
+  if (isConnected) return "在线并就绪"
   val status = statusText.trim().lowercase()
   return when {
     status.contains("connecting") || status.contains("reconnecting") -> "Connecting..."
     status.contains("pairing") -> "Waiting for pairing"
     status.contains("auth") -> "Authentication needed"
     status.contains("certificate") || status.contains("tls") -> "Certificate review needed"
-    else -> "Not connected"
+    else -> "未连接"
   }
 }

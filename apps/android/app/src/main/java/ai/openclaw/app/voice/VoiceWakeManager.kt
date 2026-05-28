@@ -146,12 +146,12 @@ class VoiceWakeManager(
         _statusText.value =
           when (error) {
             SpeechRecognizer.ERROR_AUDIO -> "音频错误"
-            SpeechRecognizer.ERROR_CLIENT -> "Client error"
+            SpeechRecognizer.ERROR_CLIENT -> "客户端错误"
             SpeechRecognizer.ERROR_NETWORK -> "网络错误"
-            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
             SpeechRecognizer.ERROR_NO_MATCH -> "监听中"
-            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
-            SpeechRecognizer.ERROR_SERVER -> "Server error"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别器忙碌"
+            SpeechRecognizer.ERROR_SERVER -> "服务器错误"
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "监听中"
             else -> "Speech error ($error)"
           }

@@ -55,7 +55,7 @@ internal fun NodesDevicesSettingsScreen(
       rows =
         listOf(
           SettingsMetric("节点", summary.nodes.size.toString()),
-          SettingsMetric("Online", summary.nodes.count { it.connected }.toString()),
+          SettingsMetric("在线", summary.nodes.count { it.connected }.toString()),
           SettingsMetric("设备", if (summary.devicePairingAvailable) summary.pairedDevices.size.toString() else "Admin"),
           SettingsMetric("待处理", summary.pendingDevices.size.toString()),
         ),
@@ -99,7 +99,7 @@ private fun NodesDevicesPanel(summary: GatewayNodesDevicesSummary) {
       }
     }
     if (summary.pendingDevices.isNotEmpty()) {
-      NodesSection(title = "Pending Requests") {
+      NodesSection(title = "待处理请求") {
         summary.pendingDevices.forEachIndexed { index, device ->
           PendingDeviceRow(device = device)
           if (index != summary.pendingDevices.lastIndex) {
@@ -119,7 +119,7 @@ private fun NodesDevicesPanel(summary: GatewayNodesDevicesSummary) {
       }
     }
     if (summary.pairedDevices.isNotEmpty()) {
-      NodesSection(title = "Paired Devices") {
+      NodesSection(title = "已配对设备") {
         summary.pairedDevices.forEachIndexed { index, device ->
           PairedDeviceRow(device = device)
           if (index != summary.pairedDevices.lastIndex) {
@@ -152,7 +152,7 @@ private fun NodeRow(node: GatewayNodeSummary) {
     badge = nodeBadge(node.displayName ?: node.id),
     title = node.displayName ?: node.id,
     subtitle = nodeSubtitle(node),
-    statusText = if (node.connected) "Online" else "离线",
+    statusText = if (node.connected) "在线" else "离线",
     status = if (node.connected) ClawStatus.Success else ClawStatus.Warning,
   )
 }
@@ -161,9 +161,9 @@ private fun NodeRow(node: GatewayNodeSummary) {
 private fun PendingDeviceRow(device: GatewayPendingDeviceSummary) {
   DeviceListRow(
     badge = nodeBadge(device.displayName ?: device.deviceId),
-    title = device.displayName ?: "New device",
+    title = device.displayName ?: "新设备",
     subtitle = pendingDeviceSubtitle(device),
-    statusText = if (device.repair) "Repair" else "Review",
+    statusText = if (device.repair) "修复" else "Review",
     status = ClawStatus.Warning,
   )
 }
@@ -172,7 +172,7 @@ private fun PendingDeviceRow(device: GatewayPendingDeviceSummary) {
 private fun PairedDeviceRow(device: GatewayPairedDeviceSummary) {
   DeviceListRow(
     badge = nodeBadge(device.displayName ?: device.deviceId),
-    title = device.displayName ?: "Paired device",
+    title = device.displayName ?: "已配对设备",
     subtitle = pairedDeviceSubtitle(device),
     statusText = pairedDeviceStatusText(device.tokens),
     status = pairedDeviceStatus(device.tokens),
@@ -198,7 +198,7 @@ private fun DeviceListRow(
 private fun GatewayNodesDevicesSummary.isEmpty(): Boolean = nodes.isEmpty() && pendingDevices.isEmpty() && pairedDevices.isEmpty()
 
 private fun nodeSubtitle(node: GatewayNodeSummary): String {
-  val kind = node.deviceFamily ?: "Node host"
+  val kind = node.deviceFamily ?: "节点主机"
   val version = node.version?.let { "OpenClaw $it" }
   val status = if (node.paired) "已配对" else "未配对"
   val commands =

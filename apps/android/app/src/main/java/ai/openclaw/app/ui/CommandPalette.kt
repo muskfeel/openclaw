@@ -70,9 +70,9 @@ internal fun CommandPalette(
   val normalizedQuery = query.trim().lowercase()
   val quickActions =
     listOf(
-      CommandItem("Open Chat", "Start or continue a conversation", Icons.Outlined.ChatBubbleOutline, onOpenChat),
-      CommandItem("Start Voice", "Talk or dictate with OpenClaw", Icons.Outlined.MicNone, onOpenVoice),
-      CommandItem("Browse Sessions", "Find previous conversations", Icons.Outlined.AccessTime, onOpenSessions),
+      CommandItem("打开聊天", "Start or continue a conversation", Icons.Outlined.ChatBubbleOutline, onOpenChat),
+      CommandItem("开始语音", "Talk or dictate with OpenClaw", Icons.Outlined.MicNone, onOpenVoice),
+      CommandItem("浏览会话", "Find previous conversations", Icons.Outlined.AccessTime, onOpenSessions),
       CommandItem("Providers & Models", providerCommandSubtitle(isConnected, providers, models), Icons.Outlined.Inventory2, onOpenProviders),
       CommandItem("设置", "Gateway, voice, notifications, privacy", Icons.Outlined.Settings, onOpenSettings),
     )
@@ -93,23 +93,23 @@ internal fun CommandPalette(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
           ) {
-            CommandIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search", onClick = onDismiss)
+            CommandIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "关闭搜索", onClick = onDismiss)
             Text(text = "搜索", style = ClawTheme.type.title, color = ClawTheme.colors.text, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
             CommandAvatar(text = "OC")
           }
         }
 
         item {
-          ClawTextField(value = query, onValueChange = { query = it }, placeholder = "Search OpenClaw")
+          ClawTextField(value = query, onValueChange = { query = it }, placeholder = "搜索OpenClaw")
         }
 
         item {
-          CommandSectionLabel(title = "Quick actions")
+          CommandSectionLabel(title = "快速操作")
         }
 
         if (actionRows.isEmpty()) {
           item {
-            ClawEmptyState(title = "No actions found", body = "Try Chat, Voice, Sessions, Providers, or Settings.")
+            ClawEmptyState(title = "未找到操作", body = "Try Chat, Voice, Sessions, Providers, or Settings.")
           }
         } else {
           item {
@@ -139,7 +139,7 @@ internal fun CommandPalette(
                   CommandSessionRow(
                     key = session.key,
                     title = commandSessionTitle(session.displayName),
-                    subtitle = if (pendingRunCount > 0) "Assistant working" else "OpenClaw session",
+                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw session",
                     metadata = session.updatedAtMs?.let(::commandRelativeTime) ?: "now",
                   )
                 },
@@ -252,7 +252,7 @@ private fun CommandSessionListRow(
       Text(text = row.metadata, style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open session",
+        contentDescription = "打开会话",
         modifier = Modifier.size(17.dp),
         tint = ClawTheme.colors.textMuted,
       )
@@ -300,11 +300,11 @@ private fun providerCommandSubtitle(
   providers: List<GatewayModelProviderSummary>,
   models: List<GatewayModelSummary>,
 ): String {
-  if (!isConnected) return "Connect Gateway to load models"
+  if (!isConnected) return "连接网关以加载模型"
   val readyProviderCount = providers.count { modelProviderReady(it.status) }
   if (readyProviderCount > 0) return "$readyProviderCount providers ready"
   if (models.isNotEmpty()) return "${models.size} models available"
-  return "Configure model access"
+  return "配置模型访问"
 }
 
 private fun commandSessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "Main session"

@@ -83,12 +83,12 @@ class CameraHandler(
           return GatewaySession.InvokeResult.error(code = code, message = message)
         }
       camLog("returning result")
-      showCameraHud("Photo captured", CameraHudKind.Success, 1600)
+      showCameraHud("已拍照", CameraHudKind.Success, 1600)
       return GatewaySession.InvokeResult.ok(res.payloadJson)
     } catch (err: Throwable) {
       camLog("outer error: ${err::class.java.simpleName}: ${err.message}")
       camLog("stack: ${err.stackTraceToString().take(2000)}")
-      return GatewaySession.InvokeResult.error(code = "UNAVAILABLE", message = err.message ?: "camera snap failed")
+      return GatewaySession.InvokeResult.error(code = "不可用", message = err.message ?: "camera snap failed")
     }
   }
 
@@ -125,7 +125,7 @@ class CameraHandler(
       if (!isCameraClipWithinPayloadLimit(rawBytes)) {
         clipLog("payload too large: bytes=$rawBytes max=$CAMERA_CLIP_MAX_RAW_BYTES")
         withContext(Dispatchers.IO) { filePayload.file.delete() }
-        showCameraHud("Clip too large", CameraHudKind.Error, 2400)
+        showCameraHud("截取太大", CameraHudKind.Error, 2400)
         return GatewaySession.InvokeResult.error(
           code = "PAYLOAD_TOO_LARGE",
           message =
@@ -143,14 +143,14 @@ class CameraHandler(
         }
       val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
       clipLog("returning base64 payload")
-      showCameraHud("Clip captured", CameraHudKind.Success, 1800)
+      showCameraHud("已截取", CameraHudKind.Success, 1800)
       return GatewaySession.InvokeResult.ok(
         """{"format":"mp4","base64":"$base64","durationMs":${filePayload.durationMs},"hasAudio":${filePayload.hasAudio}}""",
       )
     } catch (err: Throwable) {
       clipLog("outer error: ${err::class.java.simpleName}: ${err.message}")
       clipLog("stack: ${err.stackTraceToString().take(2000)}")
-      return GatewaySession.InvokeResult.error(code = "UNAVAILABLE", message = err.message ?: "camera clip failed")
+      return GatewaySession.InvokeResult.error(code = "不可用", message = err.message ?: "camera clip failed")
     } finally {
       if (includeAudio) externalAudioCaptureActive.value = false
     }

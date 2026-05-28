@@ -170,7 +170,7 @@ fun ChatComposer(
             )
             Icon(
               Icons.Default.ArrowDropDown,
-              contentDescription = "Select thinking level",
+              contentDescription = "选择思维级别",
               modifier = Modifier.size(18.dp),
               tint = mobileTextTertiary,
             )
@@ -194,7 +194,7 @@ fun ChatComposer(
       }
 
       SecondaryActionButton(
-        label = "Attach",
+        label = "附件",
         icon = Icons.Default.AttachFile,
         enabled = true,
         compact = true,
@@ -210,7 +210,7 @@ fun ChatComposer(
       )
 
       SecondaryActionButton(
-        label = "Abort",
+        label = "中止",
         icon = Icons.Default.Stop,
         enabled = pendingRunCount > 0,
         compact = true,

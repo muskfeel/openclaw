@@ -14,7 +14,7 @@ class DebugHandler(
 ) {
   fun handleEd25519(): GatewaySession.InvokeResult {
     if (!BuildConfig.DEBUG) {
-      return GatewaySession.InvokeResult.error(code = "UNAVAILABLE", message = "debug commands are disabled in release builds")
+      return GatewaySession.InvokeResult.error(code = "不可用", message = "debug commands are disabled in release builds")
     }
     // Self-test Ed25519 signing and return diagnostic info
     try {
@@ -76,7 +76,7 @@ class DebugHandler(
 
   fun handleLogs(): GatewaySession.InvokeResult {
     if (!BuildConfig.DEBUG) {
-      return GatewaySession.InvokeResult.error(code = "UNAVAILABLE", message = "debug commands are disabled in release builds")
+      return GatewaySession.InvokeResult.error(code = "不可用", message = "debug commands are disabled in release builds")
     }
     val pid = android.os.Process.myPid()
     val rt = Runtime.getRuntime()

@@ -58,15 +58,15 @@ internal fun HealthLogsSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("网关", if (isConnected) "Online" else "离线"),
-          SettingsMetric("Node", if (isNodeConnected) "Online" else "Waiting"),
+          SettingsMetric("网关", if (isConnected) "在线" else "离线"),
+          SettingsMetric("节点", if (isNodeConnected) "在线" else "等待中"),
           SettingsMetric("模型", modelCount.size.toString()),
-          SettingsMetric("Logs", logsSummary.entries.size.toString()),
+          SettingsMetric("日志", logsSummary.entries.size.toString()),
         ),
     )
     HealthStatusPanel(
       gateway = statusText,
-      node = if (isNodeConnected) "Online" else "Waiting",
+      node = if (isNodeConnected) "在线" else "等待中",
       chat = if (chatHealthOk) "就绪" else "Needs connection",
       models = "${modelCount.size} available",
       voice = talkStatus,
@@ -112,7 +112,7 @@ private fun HealthStatusPanel(
     Column {
       HealthStatusRow(title = "网关", value = gateway, healthy = isConnected)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-      HealthStatusRow(title = "Phone Node", value = node, healthy = isNodeConnected)
+      HealthStatusRow(title = "手机节点", value = node, healthy = isNodeConnected)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "聊天", value = chat, healthy = chatHealthOk)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
@@ -120,7 +120,7 @@ private fun HealthStatusPanel(
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "语音", value = voice, healthy = voiceReady)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-      HealthStatusRow(title = "Runs", value = runs, healthy = true)
+      HealthStatusRow(title = "运行", value = runs, healthy = true)
     }
   }
 }
@@ -195,7 +195,7 @@ private fun GatewayLogRow(entry: GatewayLogEntry) {
         Text(text = subsystem, style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
     }
-    ClawStatusPill(text = entry.level?.uppercase() ?: "LOG", status = logLevelStatus(entry.level))
+    ClawStatusPill(text = entry.level?.uppercase() ?: "日志", status = logLevelStatus(entry.level))
   }
 }
 

@@ -533,15 +533,15 @@ private fun NotificationSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Policy", modeLabel),
+          SettingsMetric("策略", modeLabel),
           SettingsMetric("Selected Apps", packages.size.toString()),
-          SettingsMetric("Rate Limit", "$maxEventsPerMinute/min"),
-          SettingsMetric("Access", if (listenerEnabled) "Granted" else "设置"),
+          SettingsMetric("速率限制", "$maxEventsPerMinute/min"),
+          SettingsMetric("访问", if (listenerEnabled) "已授予" else "设置"),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (listenerEnabled) "Check Access" else "Open System Access",
+        text = if (listenerEnabled) "检查访问" else "Open System Access",
         onClick = {
           openNotificationListenerSettings(context)
           listenerEnabled = DeviceNotificationListenerService.isAccessEnabled(context)
@@ -629,19 +629,19 @@ private fun PhoneCapabilitiesScreen(
     SettingsTogglePanel(
       rows =
         listOf(
-          SettingsToggleRow("Camera", "Allow camera tools when requested.", Icons.Default.CameraAlt, cameraEnabled, ::setCameraAccess),
-          SettingsToggleRow("Precise Location", "Share precise location while location is enabled.", Icons.Default.LocationOn, locationPreciseEnabled, ::setPreciseLocation),
-          SettingsToggleRow("Keep Awake", "Keep the node available during active work.", Icons.Default.Bolt, preventSleep, viewModel::setPreventSleep),
+          SettingsToggleRow("相机", "Allow camera tools when requested.", Icons.Default.CameraAlt, cameraEnabled, ::setCameraAccess),
+          SettingsToggleRow("精确位置", "Share precise location while location is enabled.", Icons.Default.LocationOn, locationPreciseEnabled, ::setPreciseLocation),
+          SettingsToggleRow("保持唤醒", "Keep the node available during active work.", Icons.Default.Bolt, preventSleep, viewModel::setPreventSleep),
           SettingsToggleRow("Canvas Status", "Show screen-sharing debug state.", Icons.AutoMirrored.Filled.ScreenShare, canvasDebugStatusEnabled, viewModel::setCanvasDebugStatusEnabled),
         ),
     )
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = "Location", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+        Text(text = "位置", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         ClawSegmentedControl(
-          options = listOf("关闭", "While Using"),
-          selected = if (locationMode == LocationMode.WhileUsing) "While Using" else "关闭",
-          onSelect = { selected -> setLocationAccess(if (selected == "While Using") LocationMode.WhileUsing else LocationMode.Off) },
+          options = listOf("关闭", "使用时"),
+          selected = if (locationMode == LocationMode.WhileUsing) "使用时" else "关闭",
+          onSelect = { selected -> setLocationAccess(if (selected == "使用时") LocationMode.WhileUsing else LocationMode.Off) },
         )
       }
     }
@@ -676,8 +676,8 @@ private fun GatewaySettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Connection", if (isConnected) "已连接" else "离线"),
-          SettingsMetric("Node", if (isNodeConnected) "Online" else "Not paired"),
+          SettingsMetric("连接", if (isConnected) "已连接" else "离线"),
+          SettingsMetric("节点", if (isNodeConnected) "在线" else "Not paired"),
           SettingsMetric("网关", serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"),
           SettingsMetric("Address", remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"),
           SettingsMetric("状态", gatewayStatusLabel(statusText = statusText, isConnected = isConnected)),
@@ -689,29 +689,29 @@ private fun GatewaySettingsScreen(
     }
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(text = "Pair New Gateway", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+        Text(text = "配对新网关", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         Text(text = "Clear this phone's saved gateway access and scan a fresh setup code.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
-        ClawSecondaryButton(text = "Pair New Gateway", onClick = viewModel::pairNewGateway, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.QrCode2)
+        ClawSecondaryButton(text = "配对新网关", onClick = viewModel::pairNewGateway, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.QrCode2)
       }
     }
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = "Connection Setup", style = ClawTheme.type.section, color = ClawTheme.colors.text)
-        ClawTextField(value = setupCode, onValueChange = { setupCode = it }, placeholder = "Setup code")
+        Text(text = "连接设置", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+        ClawTextField(value = setupCode, onValueChange = { setupCode = it }, placeholder = "配置码")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           ClawTextField(value = hostInput, onValueChange = { hostInput = it }, placeholder = "主机", modifier = Modifier.weight(1f))
           ClawTextField(value = portInput, onValueChange = { portInput = it }, placeholder = "端口", modifier = Modifier.weight(0.55f))
         }
         ClawSegmentedControl(
-          options = listOf("Local", "TLS"),
-          selected = if (tlsInput) "TLS" else "Local",
+          options = listOf("本地", "TLS"),
+          selected = if (tlsInput) "TLS" else "本地",
           onSelect = { selected -> tlsInput = selected == "TLS" },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          ClawTextField(value = tokenInput, onValueChange = { tokenInput = it }, placeholder = "Token", modifier = Modifier.weight(1f))
-          ClawTextField(value = bootstrapTokenInput, onValueChange = { bootstrapTokenInput = it }, placeholder = "Bootstrap", modifier = Modifier.weight(1f))
+          ClawTextField(value = tokenInput, onValueChange = { tokenInput = it }, placeholder = "令牌", modifier = Modifier.weight(1f))
+          ClawTextField(value = bootstrapTokenInput, onValueChange = { bootstrapTokenInput = it }, placeholder = "引导", modifier = Modifier.weight(1f))
         }
-        ClawTextField(value = passwordInput, onValueChange = { passwordInput = it }, placeholder = "Password")
+        ClawTextField(value = passwordInput, onValueChange = { passwordInput = it }, placeholder = "密码")
         validationText?.let {
           Text(text = it, style = ClawTheme.type.caption, color = ClawTheme.colors.warning)
         }
@@ -775,9 +775,9 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Theme", "深色"),
-          SettingsMetric("Contrast", "高"),
-          SettingsMetric("Typography", "Readable"),
+          SettingsMetric("主题", "深色"),
+          SettingsMetric("对比度", "高"),
+          SettingsMetric("排版", "Readable"),
         ),
     )
     ClawPanel {
@@ -798,8 +798,8 @@ private fun gatewayStatusLabel(
     status.contains("auth") -> "Authentication needed"
     status.contains("certificate") || status.contains("tls") -> "Certificate review needed"
     status.contains("failed") || status.contains("error") || status.contains("offline") || status.contains("not connected") -> "Cannot reach gateway"
-    status.isBlank() -> "Not connected"
-    else -> "Not connected"
+    status.isBlank() -> "未连接"
+    else -> "未连接"
   }
 }
 
@@ -819,17 +819,17 @@ private fun AboutSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Android App", BuildConfig.VERSION_NAME),
-          SettingsMetric("Build", BuildConfig.VERSION_CODE.toString()),
+          SettingsMetric("Android应用", BuildConfig.VERSION_NAME),
+          SettingsMetric("构建", BuildConfig.VERSION_CODE.toString()),
           SettingsMetric("频道", "Play"),
-          SettingsMetric("网关", currentGatewayVersion ?: "Not connected"),
+          SettingsMetric("网关", currentGatewayVersion ?: "未连接"),
         ),
     )
     ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
       Column {
         AboutStatusRow(title = "网关", value = serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway", healthy = isConnected)
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-        AboutStatusRow(title = "Runtime", value = currentGatewayVersion ?: "Waiting", healthy = currentGatewayVersion != null)
+        AboutStatusRow(title = "运行时", value = currentGatewayVersion ?: "等待中", healthy = currentGatewayVersion != null)
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         AboutStatusRow(
           title = "更新",
@@ -985,7 +985,7 @@ private fun AgentListRow(
 ) {
   ClawDetailRow(
     title = agent.name?.takeIf { it.isNotBlank() } ?: agent.id,
-    subtitle = if (isDefault) "Default assistant" else "就绪",
+    subtitle = if (isDefault) "默认助手" else "就绪",
     leading = { ClawTextBadge(text = agentBadge(agent)) },
     trailing = { ClawStatusPill(text = if (isDefault) "默认" else "就绪", status = ClawStatus.Success) },
   )
@@ -1026,7 +1026,7 @@ private fun approvalActionName(name: String): String {
     .split(' ')
     .filter { it.isNotBlank() }
     .joinToString(" ") { word -> word.replaceFirstChar { it.uppercaseChar() } }
-    .ifBlank { "Action Request" }
+    .ifBlank { "操作请求" }
 }
 
 private fun approvalSubtitle(
@@ -1036,7 +1036,7 @@ private fun approvalSubtitle(
   if (hasIssue) return "Needs attention"
   val ageMs = (System.currentTimeMillis() - toolCall.startedAtMs).coerceAtLeast(0L)
   val minutes = ageMs / 60_000L
-  return if (minutes < 1) "Waiting for review" else "Waiting ${minutes}m"
+  return if (minutes < 1) "等待审查" else "Waiting ${minutes}m"
 }
 
 private fun cronJobSubtitle(job: GatewayCronJobSummary): String = "${job.scheduleLabel} · ${formatCronWake(job.nextRunAtMs)} · ${job.promptPreview}"
@@ -1049,12 +1049,12 @@ private fun usageProviderSubtitle(provider: GatewayUsageProviderSummary): String
 }
 
 private fun formatUsageUpdated(updatedAtMs: Long?): String {
-  val updated = updatedAtMs ?: return "Never"
+  val updated = updatedAtMs ?: return "从不"
   val deltaMs = (System.currentTimeMillis() - updated).coerceAtLeast(0L)
   val minutes = deltaMs / 60_000L
   val hours = minutes / 60L
   return when {
-    minutes < 1 -> "Now"
+    minutes < 1 -> "现在"
     hours < 1 -> "${minutes}m"
     hours < 24 -> "${hours}h"
     else -> "${hours / 24L}d"
@@ -1083,7 +1083,7 @@ private fun cronJobStatus(job: GatewayCronJobSummary): ClawStatus {
 private fun formatCronWake(timeMs: Long?): String {
   val target = timeMs ?: return "无"
   val deltaMs = target - System.currentTimeMillis()
-  if (deltaMs <= 0) return "Due"
+  if (deltaMs <= 0) return "到期"
   val minutes = deltaMs / 60_000L
   val hours = minutes / 60L
   val days = hours / 24L
@@ -1091,7 +1091,7 @@ private fun formatCronWake(timeMs: Long?): String {
     days > 0 -> "${days}d"
     hours > 0 -> "${hours}h"
     minutes > 0 -> "${minutes}m"
-    else -> "Soon"
+    else -> "即将"
   }
 }
 

@@ -7,8 +7,8 @@ private const val RECENT_WINDOW_MS = 24 * 60 * 60 * 1000L
 /**
  * Derive a human-friendly label from a raw session key.
  * Examples:
- *   "telegram:g-agent-main-main" -> "Main"
- *   "agent:main:main" -> "Main"
+ *   "telegram:g-agent-main-main" -> "主页"
+ *   "agent:main:main" -> "主页"
  *   "discord:g-server-channel" -> "Server Channel"
  *   "my-custom-session" -> "My Custom Session"
  */
@@ -19,7 +19,7 @@ fun friendlySessionName(key: String): String {
   // Remove leading "g-" prefix (gateway artifact)
   val cleaned = if (stripped.startsWith("g-")) stripped.removePrefix("g-") else stripped
 
-  // Split on hyphens/underscores, title-case each word, collapse "main main" -> "Main"
+  // Split on hyphens/underscores, title-case each word, collapse "main main" -> "主页"
   val words =
     cleaned
       .split('-', '_')

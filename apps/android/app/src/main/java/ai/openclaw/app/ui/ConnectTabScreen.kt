@@ -391,7 +391,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         }
         Icon(
           imageVector = if (advancedOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-          contentDescription = if (advancedOpen) "Collapse advanced controls" else "Expand advanced controls",
+          contentDescription = if (advancedOpen) "收起高级控制" else "Expand advanced controls",
           tint = mobileTextSecondary,
         )
       }

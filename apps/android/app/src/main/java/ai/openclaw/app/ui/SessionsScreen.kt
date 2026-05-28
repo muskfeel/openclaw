@@ -95,13 +95,13 @@ internal fun SessionsScreen(
         ) {
           Text(text = "会话列表", style = ClawTheme.type.display.copy(fontSize = 17.4.sp, lineHeight = 21.sp), color = ClawTheme.colors.text, modifier = Modifier.weight(1f))
           SessionPlainIconButton(icon = Icons.Default.Search, contentDescription = "搜索会话", onClick = onOpenCommand)
-          SessionPlainIconButton(icon = Icons.Default.SwapVert, contentDescription = "Reverse session sort", onClick = { recentFirst = !recentFirst })
+          SessionPlainIconButton(icon = Icons.Default.SwapVert, contentDescription = "反转会话排序", onClick = { recentFirst = !recentFirst })
         }
       }
 
       item {
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-          FilterPill(text = "Recent", icon = Icons.Outlined.AccessTime, active = filter == SessionFilter.Recent, onClick = { filter = SessionFilter.Recent })
+          FilterPill(text = "最近", icon = Icons.Outlined.AccessTime, active = filter == SessionFilter.Recent, onClick = { filter = SessionFilter.Recent })
           FilterPill(text = "在线", icon = Icons.Outlined.MicNone, active = filter == SessionFilter.Live, live = sessions.any { it.key == chatSessionKey }, onClick = { filter = SessionFilter.Live })
         }
       }
@@ -120,7 +120,7 @@ internal fun SessionsScreen(
             Text(text = "Sort: ${if (recentFirst) "Newest" else "Oldest"}", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
             Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(11.dp), tint = ClawTheme.colors.textMuted)
           }
-          SessionOutlineIconButton(icon = Icons.Default.Storage, contentDescription = "Toggle session layout", onClick = { compactLayout = !compactLayout })
+          SessionOutlineIconButton(icon = Icons.Default.Storage, contentDescription = "切换会话布局", onClick = { compactLayout = !compactLayout })
         }
       }
 
@@ -133,7 +133,7 @@ internal fun SessionsScreen(
           ClawEmptyState(
             title = emptySessionTitle(filter),
             body = emptySessionBody(filter),
-            action = { ClawPrimaryButton(text = "Start Chat", onClick = onOpenChat) },
+            action = { ClawPrimaryButton(text = "开始聊天", onClick = onOpenChat) },
           )
         }
       } else {
@@ -141,7 +141,7 @@ internal fun SessionsScreen(
           val active = session.key == chatSessionKey
           SessionRow(
             title = displaySessionTitle(session.displayName),
-            subtitle = if (active) "Current session" else "OpenClaw session",
+            subtitle = if (active) "当前会话" else "OpenClaw session",
             metadata = session.updatedAtMs?.let(::relativeSessionTime) ?: "now",
             active = active,
             compact = compactLayout,
@@ -243,7 +243,7 @@ private fun SessionRow(
           if (!compact) {
             Text(text = subtitle, style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-              SessionMiniTag(text = "Workspace")
+              SessionMiniTag(text = "工作区")
               SessionMiniTag(text = if (active) "活跃" else "OpenClaw")
             }
           }
@@ -311,8 +311,8 @@ private enum class SessionFilter {
 
 private fun emptySessionTitle(filter: SessionFilter): String =
   when (filter) {
-    SessionFilter.Recent -> "No sessions yet"
-    SessionFilter.Live -> "No live session"
+    SessionFilter.Recent -> "还没有会话"
+    SessionFilter.Live -> "没有实时会话"
   }
 
 private fun emptySessionBody(filter: SessionFilter): String =

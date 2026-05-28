@@ -12,7 +12,7 @@ data class ParsedInvokeError(
 fun parseInvokeErrorMessage(raw: String): ParsedInvokeError {
   val trimmed = raw.trim()
   if (trimmed.isEmpty()) {
-    return ParsedInvokeError(code = "UNAVAILABLE", message = "error", hadExplicitCode = false)
+    return ParsedInvokeError(code = "不可用", message = "error", hadExplicitCode = false)
   }
 
   val parts = trimmed.split(":", limit = 2)
@@ -27,7 +27,7 @@ fun parseInvokeErrorMessage(raw: String): ParsedInvokeError {
       )
     }
   }
-  return ParsedInvokeError(code = "UNAVAILABLE", message = trimmed, hadExplicitCode = false)
+  return ParsedInvokeError(code = "不可用", message = trimmed, hadExplicitCode = false)
 }
 
 fun parseInvokeErrorFromThrowable(

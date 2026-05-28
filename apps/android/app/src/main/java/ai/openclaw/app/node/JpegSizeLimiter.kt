@@ -24,8 +24,8 @@ internal object JpegSizeLimiter {
     maxQualityAttempts: Int = 6,
     encode: (width: Int, height: Int, quality: Int) -> ByteArray,
   ): JpegSizeLimiterResult {
-    require(initialWidth > 0 && initialHeight > 0) { "Invalid image size" }
-    require(maxBytes > 0) { "Invalid maxBytes" }
+    require(initialWidth > 0 && initialHeight > 0) { "图片大小无效" }
+    require(maxBytes > 0) { "最大字节数无效" }
 
     val clampedStartQuality = startQuality.coerceIn(minQuality, 100)
     var width = initialWidth

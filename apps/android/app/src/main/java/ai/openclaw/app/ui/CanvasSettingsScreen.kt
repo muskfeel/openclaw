@@ -43,7 +43,7 @@ internal fun CanvasSettingsScreen(
   val rehydrateErrorText by viewModel.canvasRehydrateErrorText.collectAsState()
   val hasLivePage = currentUrl?.isNotBlank() == true
   val showCanvasSurface = isConnected
-  val canvasLabel = if (hasLivePage) "Live page" else "Home canvas"
+  val canvasLabel = if (hasLivePage) "实时页面" else "Home canvas"
 
   LaunchedEffect(isConnected) {
     if (isConnected) {
@@ -60,9 +60,9 @@ internal fun CanvasSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Connection", if (isConnected) "Online" else "离线"),
-          SettingsMetric("Surface", canvasLabel),
-          SettingsMetric("Bridge", if (hasLivePage && hydrated) "就绪" else "Standby"),
+          SettingsMetric("连接", if (isConnected) "在线" else "离线"),
+          SettingsMetric("表面", canvasLabel),
+          SettingsMetric("桥接", if (hasLivePage && hydrated) "就绪" else "Standby"),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -124,7 +124,7 @@ private fun CanvasStandbyPanel(isConnected: Boolean) {
       }
     }
     Text(
-      text = if (isConnected) "Screen surface ready" else "Connect the gateway",
+      text = if (isConnected) "屏幕表面就绪" else "Connect the gateway",
       style = ClawTheme.type.title,
       color = ClawTheme.colors.text,
       modifier = Modifier.padding(top = 18.dp),

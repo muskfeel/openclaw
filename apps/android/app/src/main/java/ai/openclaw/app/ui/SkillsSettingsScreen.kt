@@ -126,7 +126,7 @@ private fun skillSubtitle(skill: GatewaySkillSummary): String {
   val issue =
     when {
       skill.disabled -> "已禁用"
-      skill.blockedByAllowlist -> "Blocked"
+      skill.blockedByAllowlist -> "已阻止"
       skill.missingCount > 0 -> "${skill.missingCount} missing"
       !skill.eligible -> "Needs setup"
       else -> null
@@ -138,9 +138,9 @@ private fun skillSourceLabel(skill: GatewaySkillSummary): String =
   when (skill.source) {
     "openclaw-bundled" -> if (skill.bundled) "Built-in" else "Bundled"
     "openclaw-managed" -> "已安装"
-    "openclaw-workspace" -> "Workspace"
+    "openclaw-workspace" -> "工作区"
     "openclaw-extra" -> "Extra"
-    else -> "Skill"
+    else -> "技能"
   }
 
 private fun skillBadge(skill: GatewaySkillSummary): String {

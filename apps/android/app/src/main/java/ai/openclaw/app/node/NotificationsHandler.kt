@@ -106,7 +106,7 @@ class NotificationsHandler private constructor(
       )
     if (!result.ok) {
       return GatewaySession.InvokeResult.error(
-        code = result.code ?: "UNAVAILABLE",
+        code = result.code ?: "不可用",
         message = result.message ?: "notification action failed",
       )
     }

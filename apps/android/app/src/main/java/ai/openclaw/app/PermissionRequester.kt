@@ -198,10 +198,10 @@ class PermissionRequester internal constructor(
         dialog =
           AlertDialog
             .Builder(activity)
-            .setTitle("Permission required")
+            .setTitle("需要权限")
             .setMessage(buildRationaleMessage(permissions))
-            .setPositiveButton("Continue") { _, _ -> finish(true) }
-            .setNegativeButton("Not now") { _, _ -> finish(false) }
+            .setPositiveButton("继续") { _, _ -> finish(true) }
+            .setNegativeButton("暂不") { _, _ -> finish(false) }
             .setOnCancelListener { finish(false) }
             .show()
       }
@@ -228,9 +228,9 @@ class PermissionRequester internal constructor(
       dialog =
         AlertDialog
           .Builder(activity)
-          .setTitle("Enable permission in Settings")
+          .setTitle("在设置中启用权限")
           .setMessage(buildSettingsMessage(permissions))
-          .setPositiveButton("Open Settings") { _, _ ->
+          .setPositiveButton("打开设置") { _, _ ->
             if (activity.isFinishing || activity.isDestroyed) return@setPositiveButton
             val intent =
               Intent(
@@ -255,18 +255,18 @@ class PermissionRequester internal constructor(
 
   private fun permissionLabel(permission: String): String =
     when (permission) {
-      Manifest.permission.CAMERA -> "Camera"
-      Manifest.permission.RECORD_AUDIO -> "Microphone"
+      Manifest.permission.CAMERA -> "相机"
+      Manifest.permission.RECORD_AUDIO -> "麦克风"
       Manifest.permission.SEND_SMS -> "Send SMS"
       Manifest.permission.READ_SMS -> "Read SMS"
-      Manifest.permission.READ_CONTACTS -> "Read Contacts"
-      Manifest.permission.WRITE_CONTACTS -> "Write Contacts"
-      Manifest.permission.READ_CALENDAR -> "Read Calendar"
-      Manifest.permission.WRITE_CALENDAR -> "Write Calendar"
-      Manifest.permission.READ_CALL_LOG -> "Read Call Log"
+      Manifest.permission.READ_CONTACTS -> "读取联系人"
+      Manifest.permission.WRITE_CONTACTS -> "写入联系人"
+      Manifest.permission.READ_CALENDAR -> "读取日历"
+      Manifest.permission.WRITE_CALENDAR -> "写入日历"
+      Manifest.permission.READ_CALL_LOG -> "读取通话记录"
       Manifest.permission.ACTIVITY_RECOGNITION -> "Motion Activity"
-      Manifest.permission.READ_MEDIA_IMAGES -> "Photos"
-      Manifest.permission.READ_EXTERNAL_STORAGE -> "Photos"
+      Manifest.permission.READ_MEDIA_IMAGES -> "照片"
+      Manifest.permission.READ_EXTERNAL_STORAGE -> "照片"
       else -> permission
     }
 }

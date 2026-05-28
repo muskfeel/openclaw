@@ -173,7 +173,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
                 tint = mobileTextTertiary,
               )
               Text(
-                "Tap mic or Talk",
+                "点击麦克风或对话",
                 style = mobileHeadline,
                 color = mobileTextSecondary,
               )
@@ -243,7 +243,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
             )
           }
           Text(
-            if (speakerEnabled) "Speaker" else "已静音",
+            if (speakerEnabled) "扬声器" else "已静音",
             style = mobileCaption2,
             color = if (speakerEnabled) mobileTextTertiary else mobileDanger,
           )
@@ -300,7 +300,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(
               imageVector = if (micEnabled) Icons.Default.MicOff else Icons.Default.Mic,
-              contentDescription = if (micEnabled) "Turn microphone off" else "Turn microphone on",
+              contentDescription = if (micEnabled) "关闭麦克风" else "Turn microphone on",
               modifier = Modifier.size(24.dp),
             )
           }
@@ -328,14 +328,14 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(
               imageVector = Icons.Default.RecordVoiceOver,
-              contentDescription = if (talkModeEnabled) "Turn Talk Mode off" else "Turn Talk Mode on",
+              contentDescription = if (talkModeEnabled) "关闭对话模式" else "Turn Talk Mode on",
               modifier = Modifier.size(22.dp),
               tint = if (talkModeEnabled) mobileSuccess else mobileTextSecondary,
             )
           }
           Spacer(modifier = Modifier.height(4.dp))
           Text(
-            if (talkModeEnabled) "Talk on" else "对话",
+            if (talkModeEnabled) "对话开启" else "对话",
             style = mobileCaption2,
             color = if (talkModeEnabled) mobileSuccess else mobileTextTertiary,
           )
@@ -346,9 +346,9 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
       val queueCount = micQueuedMessages.size
       val stateText =
         when {
-          voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeSpeaking -> "Talk speaking"
-          voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeListening -> "Talk listening"
-          voiceCaptureMode == VoiceCaptureMode.TalkMode -> "Talk on"
+          voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeSpeaking -> "对话说话中"
+          voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeListening -> "对话监听中"
+          voiceCaptureMode == VoiceCaptureMode.TalkMode -> "对话开启"
           micEnabled || micIsSending || micCooldown -> micStatusText
           queueCount > 0 -> "$queueCount queued"
           else -> "麦克风关闭"

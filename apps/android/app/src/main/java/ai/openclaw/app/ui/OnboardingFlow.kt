@@ -370,7 +370,7 @@ private fun WelcomeScreen(
         Surface(onClick = onConnect, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text(text = "Already have a setup?  ", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
-            Text(text = "Sign in", style = ClawTheme.type.body.copy(fontWeight = FontWeight.SemiBold), color = ClawTheme.colors.text)
+            Text(text = "登录", style = ClawTheme.type.body.copy(fontWeight = FontWeight.SemiBold), color = ClawTheme.colors.text)
           }
         }
       }
@@ -443,12 +443,12 @@ private fun GatewaySetupScreen(
     Column(modifier = Modifier.fillMaxSize().imePadding(), verticalArrangement = Arrangement.SpaceBetween) {
       LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         item {
-          OnboardingHeader(title = "Gateway Setup", subtitle = "Connect to your Gateway", onBack = onBack)
+          OnboardingHeader(title = "网关设置", subtitle = "Connect to your Gateway", onBack = onBack)
         }
         item {
           GatewayOption(
             icon = Icons.Default.QrCode2,
-            title = "Scan setup code",
+            title = "扫描配置码",
             subtitle = "Use your Gateway QR or setup code",
             onClick = onScan,
           )
@@ -456,17 +456,17 @@ private fun GatewaySetupScreen(
         item {
           GatewayOption(
             icon = Icons.Default.WifiTethering,
-            title = "Nearby gateway",
-            subtitle = nearbyGatewayName ?: "Discovery ready",
-            status = nearbyGatewayName?.let { "Found" },
+            title = "附近网关",
+            subtitle = nearbyGatewayName ?: "发现就绪",
+            status = nearbyGatewayName?.let { "已找到" },
             onClick = onUseNearby,
           )
         }
         item {
           GatewayOption(
             icon = Icons.Default.Link,
-            title = "Enter gateway URL",
-            subtitle = "Connect using a manual URL",
+            title = "输入网关URL",
+            subtitle = "使用手动URL连接",
             onClick = { advancedOpen = true },
           )
         }
@@ -482,7 +482,7 @@ private fun GatewaySetupScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
-                Text(text = "Advanced", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+                Text(text = "高级", style = ClawTheme.type.section, color = ClawTheme.colors.text)
                 Icon(
                   imageVector = if (advancedOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                   contentDescription = null,
@@ -491,17 +491,17 @@ private fun GatewaySetupScreen(
               }
             }
             if (advancedOpen) {
-              ClawTextField(value = setupCode, onValueChange = onSetupCodeChange, placeholder = "Setup code")
+              ClawTextField(value = setupCode, onValueChange = onSetupCodeChange, placeholder = "配置码")
               Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ClawTextField(value = manualHost, onValueChange = onManualHostChange, placeholder = "主机", modifier = Modifier.weight(1f))
                 ClawTextField(value = manualPort, onValueChange = onManualPortChange, placeholder = "端口", modifier = Modifier.width(104.dp))
               }
               Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TogglePill(text = if (manualTls) "TLS on" else "TLS off", selected = manualTls, onClick = { onManualTlsChange(!manualTls) })
-                TogglePill(text = "Local", selected = !manualTls, onClick = { onManualTlsChange(false) })
+                TogglePill(text = if (manualTls) "TLS已开启" else "TLS off", selected = manualTls, onClick = { onManualTlsChange(!manualTls) })
+                TogglePill(text = "本地", selected = !manualTls, onClick = { onManualTlsChange(false) })
               }
-              ClawTextField(value = token, onValueChange = onTokenChange, placeholder = "Token optional")
-              ClawTextField(value = password, onValueChange = onPasswordChange, placeholder = "Password optional")
+              ClawTextField(value = token, onValueChange = onTokenChange, placeholder = "令牌（可选）")
+              ClawTextField(value = password, onValueChange = onPasswordChange, placeholder = "密码（可选）")
               error?.let {
                 Text(text = it, style = ClawTheme.type.caption, color = ClawTheme.colors.warning)
               }
@@ -509,7 +509,7 @@ private fun GatewaySetupScreen(
           }
         }
       }
-      ClawPrimaryButton(text = "Pair with Gateway", icon = Icons.Default.Security, onClick = onPair, modifier = Modifier.fillMaxWidth())
+      ClawPrimaryButton(text = "与网关配对", icon = Icons.Default.Security, onClick = onPair, modifier = Modifier.fillMaxWidth())
     }
   }
 }
@@ -535,7 +535,7 @@ private fun GatewayRecoveryScreen(
 
   ClawScaffold(modifier = modifier, contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-      OnboardingHeader(title = "Gateway Recovery", onBack = onBack)
+      OnboardingHeader(title = "网关恢复", onBack = onBack)
       Spacer(modifier = Modifier.height(12.dp))
       Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(
@@ -567,14 +567,14 @@ private fun GatewayRecoveryScreen(
 
       ClawPanel {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-          Text(text = "Last gateway", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
+          Text(text = "上次网关", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
           Text(text = serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway", style = ClawTheme.type.section, color = ClawTheme.colors.text)
           Text(text = recoveryGatewayDetail(ready = ready, remoteAddress = remoteAddress, statusText = statusText), style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
           ClawStatusPill(
             text =
               when (recoveryState) {
-                GatewayRecoveryUiState.Connected -> "Healthy"
-                GatewayRecoveryUiState.Pairing -> "Pairing"
+                GatewayRecoveryUiState.Connected -> "健康"
+                GatewayRecoveryUiState.Pairing -> "配对"
                 GatewayRecoveryUiState.Finishing -> "连接中"
                 GatewayRecoveryUiState.Failed -> "Needs attention"
               },
@@ -591,13 +591,13 @@ private fun GatewayRecoveryScreen(
 
       Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ClawPrimaryButton(
-          text = if (ready) "Continue" else "Retry connection",
+          text = if (ready) "继续" else "Retry connection",
           icon = if (ready) Icons.Default.CheckCircle else Icons.Default.Refresh,
           onClick = if (ready) onContinue else onRetry,
           modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedAction(title = "Edit connection", icon = Icons.Default.Edit, onClick = onEdit)
-        OutlinedAction(title = "Copy diagnostic", icon = Icons.Default.ContentCopy, onClick = { copyGatewayDiagnostic(context, statusText, serverName, remoteAddress, ready) })
+        OutlinedAction(title = "编辑连接", icon = Icons.Default.Edit, onClick = onEdit)
+        OutlinedAction(title = "复制诊断", icon = Icons.Default.ContentCopy, onClick = { copyGatewayDiagnostic(context, statusText, serverName, remoteAddress, ready) })
       }
     }
   }
@@ -623,7 +623,7 @@ private fun PermissionSetupScreen(
         item {
           Column(modifier = Modifier.padding(top = 10.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-              text = "Allow permissions",
+              text = "允许权限",
               style = ClawTheme.type.title.copy(fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold),
               color = ClawTheme.colors.text,
             )
@@ -760,7 +760,7 @@ private fun PermissionTopBar(onBack: () -> Unit) {
     AlertDialog(
       onDismissRequest = { showHelp = false },
       containerColor = ClawTheme.colors.surfaceRaised,
-      title = { Text("Permissions", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
+      title = { Text("权限", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
       text = {
         Text(
           "Choose what this phone can share with OpenClaw. You can change these later in Settings.",
@@ -787,7 +787,7 @@ private fun PermissionTopBar(onBack: () -> Unit) {
       }
     }
     Text(
-      text = "Permission Setup",
+      text = "权限设置",
       style = ClawTheme.type.title.copy(fontSize = 15.2.sp, lineHeight = 19.sp),
       color = ClawTheme.colors.text,
       maxLines = 1,
@@ -842,7 +842,7 @@ private fun PermissionRow(row: PermissionRowModel) {
         )
       }
       Text(
-        text = if (row.granted) "Granted" else "Not granted",
+        text = if (row.granted) "已授予" else "Not granted",
         style = ClawTheme.type.body,
         color = if (row.granted) ClawTheme.colors.success else ClawTheme.colors.textMuted,
         maxLines = 1,
@@ -867,7 +867,7 @@ private fun PermissionContinueButton(onClick: () -> Unit) {
     contentColor = ClawTheme.colors.primaryText,
   ) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-      Text(text = "Continue", style = ClawTheme.type.title.copy(fontSize = 18.sp, lineHeight = 23.sp), color = ClawTheme.colors.primaryText)
+      Text(text = "继续", style = ClawTheme.type.title.copy(fontSize = 18.sp, lineHeight = 23.sp), color = ClawTheme.colors.primaryText)
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
@@ -889,17 +889,17 @@ internal enum class GatewayRecoveryUiState(
     canAutoRetry = false,
   ),
   Pairing(
-    title = "Pairing Gateway",
+    title = "配对网关",
     message = "Approval is in progress.\nOpenClaw will reconnect automatically.",
     canAutoRetry = true,
   ),
   Finishing(
-    title = "Finishing Setup",
+    title = "完成设置",
     message = "Gateway approved this phone.\nOpenClaw is bringing the node online.",
     canAutoRetry = true,
   ),
   Failed(
-    title = "Connection issue",
+    title = "连接问题",
     message = "We could not reach your Gateway.\nLet's fix this.",
     canAutoRetry = false,
   ),
@@ -982,13 +982,13 @@ private fun recoveryGatewayDetail(
   remoteAddress
     ?.takeIf { it.isNotBlank() }
     ?: if (ready) {
-      "Ready for chat and voice"
+      "准备聊天和语音"
     } else if (statusText.contains("operator offline", ignoreCase = true)) {
       "Gateway paired. Waiting for operator access."
     } else if (gatewayStatusLooksLikePairing(statusText)) {
       "Gateway approval is in progress. OpenClaw will retry automatically."
     } else {
-      "Gateway unreachable"
+      "网关不可达"
     }
 
 private fun copyGatewayDiagnostic(
@@ -1000,15 +1000,15 @@ private fun copyGatewayDiagnostic(
 ) {
   val diagnostic =
     listOf(
-      "OpenClaw Android gateway diagnostic",
+      "OpenClaw Android网关诊断",
       "Status: $statusText",
       "Gateway: ${serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"}",
       "Address: ${remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"}",
       "Ready: ${if (ready) "yes" else "no"}",
     ).joinToString("\n")
   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-  clipboard.setPrimaryClip(ClipData.newPlainText("OpenClaw gateway diagnostic", diagnostic))
-  Toast.makeText(context, "Diagnostic copied", Toast.LENGTH_SHORT).show()
+  clipboard.setPrimaryClip(ClipData.newPlainText("OpenClaw网关诊断", diagnostic))
+  Toast.makeText(context, "诊断已复制", Toast.LENGTH_SHORT).show()
 }
 
 private data class PermissionRowModel(
@@ -1107,29 +1107,29 @@ private fun rememberPermissionState(
       PermissionRowModel("语音", "Record and transcribe audio", Icons.Default.Mic, microphoneGranted) {
         request(Manifest.permission.RECORD_AUDIO)
       },
-      PermissionRowModel("Camera", "Capture photos and video", Icons.Default.CameraAlt, cameraGranted) {
+      PermissionRowModel("相机", "Capture photos and video", Icons.Default.CameraAlt, cameraGranted) {
         request(Manifest.permission.CAMERA)
       },
-      PermissionRowModel("Location", "Use location when needed", Icons.Default.LocationOn, locationGranted) {
+      PermissionRowModel("位置", "Use location when needed", Icons.Default.LocationOn, locationGranted) {
         request(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
       },
       if (photosAvailable) {
-        PermissionRowModel("Photos", "Attach photos and media", Icons.Default.Image, photosGranted) {
+        PermissionRowModel("照片", "Attach photos and media", Icons.Default.Image, photosGranted) {
           request(photosPermission)
         }
       } else {
         null
       },
-      PermissionRowModel("Contacts", "Read contacts securely", Icons.Default.Person, contactsGranted) {
+      PermissionRowModel("联系人", "Read contacts securely", Icons.Default.Person, contactsGranted) {
         request(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)
       },
-      PermissionRowModel("Calendar", "Read events and schedules", Icons.Default.CalendarMonth, calendarGranted) {
+      PermissionRowModel("日历", "Read events and schedules", Icons.Default.CalendarMonth, calendarGranted) {
         request(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
       },
       PermissionRowModel("通知", "Send important alerts", Icons.Default.Notifications, notificationsGranted) {
         if (Build.VERSION.SDK_INT >= 33) request(Manifest.permission.POST_NOTIFICATIONS)
       },
-      PermissionRowModel("Notification listener", "Forward selected app alerts", Icons.Default.Sensors, notificationListenerGranted) {
+      PermissionRowModel("通知监听器", "Forward selected app alerts", Icons.Default.Sensors, notificationListenerGranted) {
         context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       },
       if (motionAvailable) {
@@ -1147,7 +1147,7 @@ private fun rememberPermissionState(
         null
       },
       if (callLogAvailable) {
-        PermissionRowModel("Call Log", "Read recent call context", Icons.Default.Person, callLogGranted) {
+        PermissionRowModel("通话记录", "Read recent call context", Icons.Default.Person, callLogGranted) {
           request(Manifest.permission.READ_CALL_LOG)
         }
       } else {

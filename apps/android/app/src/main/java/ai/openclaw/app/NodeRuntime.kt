@@ -2408,7 +2408,7 @@ class NodeRuntime(
         .joinToString(" ")
         .replace(Regex("\\s+"), " ")
         .takeIf { it.isNotEmpty() }
-    return text?.let { GatewayDreamDiaryEntry(date = date ?: "Dream", text = it) }
+    return text?.let { GatewayDreamDiaryEntry(date = date ?: "梦境", text = it) }
   }
 
   private fun parseStringArray(items: JsonArray?): List<String> =
@@ -2419,14 +2419,14 @@ class NodeRuntime(
   private fun cronScheduleLabel(schedule: JsonObject?): String =
     when (schedule?.get("kind").asStringOrNull()) {
       "at" -> "One time"
-      "every" -> schedule.long("everyMs")?.let(::formatEverySchedule) ?: "Repeating"
+      "every" -> schedule.long("everyMs")?.let(::formatEverySchedule) ?: "重复"
       "cron" ->
         schedule
           ?.get("expr")
           .asStringOrNull()
           ?.trim()
           ?.takeIf { it.isNotEmpty() } ?: "Cron"
-      else -> "Scheduled"
+      else -> "已计划"
     }
 
   private fun cronPayloadPreview(payload: JsonObject?): String {
@@ -2447,7 +2447,7 @@ class NodeRuntime(
       days >= 1 && hours % 24L == 0L -> "Every ${days}d"
       hours >= 1 && minutes % 60L == 0L -> "Every ${hours}h"
       minutes >= 1 -> "Every ${minutes}m"
-      else -> "Repeating"
+      else -> "重复"
     }
   }
 
@@ -2474,13 +2474,13 @@ class NodeRuntime(
         HomeCanvasPayload(
           gatewayState = "connected",
           eyebrow = "Connected to $gatewayLabel",
-          title = "Your agents are ready",
+          title = "您的智能体已就绪",
           subtitle =
             "This phone stays dormant until the gateway needs it, then wakes, syncs, and goes back to sleep.",
           gatewayLabel = gatewayLabel,
           activeAgentName = resolveActiveAgentName(activeAgentId),
           activeAgentBadge = agents.firstOrNull { it.isActive }?.badge ?: "OC",
-          activeAgentCaption = "Selected on this phone",
+          activeAgentCaption = "在此手机上选择",
           agentCount = agents.size,
           agents = agents.take(6),
           footer = "The overview refreshes on reconnect and when this screen opens.",
@@ -2488,14 +2488,14 @@ class NodeRuntime(
       HomeCanvasGatewayState.Connecting ->
         HomeCanvasPayload(
           gatewayState = "connecting",
-          eyebrow = "Reconnecting",
-          title = "OpenClaw is syncing back up",
+          eyebrow = "重新连接中",
+          title = "OpenClaw正在同步",
           subtitle =
             "The gateway session is coming back online. Agent shortcuts should settle automatically in a moment.",
           gatewayLabel = gatewayLabel,
           activeAgentName = resolveActiveAgentName(activeAgentId),
           activeAgentBadge = "OC",
-          activeAgentCaption = "Gateway session in progress",
+          activeAgentCaption = "网关会话进行中",
           agentCount = agents.size,
           agents = agents.take(4),
           footer = "If the gateway is reachable, reconnect should complete without intervention.",
@@ -2504,13 +2504,13 @@ class NodeRuntime(
         HomeCanvasPayload(
           gatewayState = if (state == HomeCanvasGatewayState.Error) "error" else "offline",
           eyebrow = "欢迎使用 OpenClaw",
-          title = "Your phone stays quiet until it is needed",
+          title = "您的手机将保持安静直到需要时",
           subtitle =
             "Pair this device to your gateway to wake it only for real work, keep a live agent overview handy, and avoid battery-draining background loops.",
           gatewayLabel = gatewayLabel,
-          activeAgentName = "Main",
+          activeAgentName = "主页",
           activeAgentBadge = "OC",
-          activeAgentCaption = "Connect to load your agents",
+          activeAgentCaption = "连接以加载智能体",
           agentCount = agents.size,
           agents = agents.take(4),
           footer = "When connected, the gateway can wake the phone with a silent push instead of holding an always-on session.",
@@ -2544,7 +2544,7 @@ class NodeRuntime(
       }
       return activeAgentId
     }
-    return gatewayAgents.value.firstOrNull()?.let { normalized(it.name) ?: it.id } ?: "Main"
+    return gatewayAgents.value.firstOrNull()?.let { normalized(it.name) ?: it.id } ?: "主页"
   }
 
   private fun homeCanvasAgents(activeAgentId: String): List<HomeCanvasAgentCard> {
@@ -2559,8 +2559,8 @@ class NodeRuntime(
           badge = homeCanvasBadge(agent),
           caption =
             when {
-              isActive -> "Active on this phone"
-              isDefault -> "Default agent"
+              isActive -> "在此手机上活跃"
+              isDefault -> "默认智能体"
               else -> "就绪"
             },
           isActive = isActive,

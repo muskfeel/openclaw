@@ -246,12 +246,12 @@ private fun DictationScreen(
     verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-      VoicePlainIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to voice", onClick = onCancel)
+      VoicePlainIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回语音", onClick = onCancel)
       Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(text = "听写", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text)
-        Text(text = "Transcribe then send", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+        Text(text = "转写后发送", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       }
-      VoicePlainIconButton(icon = Icons.Default.Settings, contentDescription = "Dictation settings", onClick = onOpenVoiceSettings)
+      VoicePlainIconButton(icon = Icons.Default.Settings, contentDescription = "听写设置", onClick = onOpenVoiceSettings)
     }
 
     Surface(
@@ -291,7 +291,7 @@ private fun DictationScreen(
           }
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-          Text(text = "Speech provider", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+          Text(text = "语音提供商", style = ClawTheme.type.section, color = ClawTheme.colors.text)
           Text(text = gatewayStatus.voiceGatewayLabel(), style = ClawTheme.type.body, color = ClawTheme.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -374,17 +374,17 @@ private fun TalkSessionScreen(
     verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      VoicePlainIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to voice", onClick = onEndTalk)
+      VoicePlainIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回语音", onClick = onEndTalk)
       Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(text = "Realtime Talk", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text)
+        Text(text = "实时对话", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
           Box(modifier = Modifier.size(4.5.dp).clip(CircleShape).background(if (speaking || listening) ClawTheme.colors.success else ClawTheme.colors.textSubtle))
           Text(
             text =
               if (speaking) {
-                "OpenClaw speaking"
+                "OpenClaw说话中"
               } else if (listening) {
-                "Realtime voice"
+                "实时语音"
               } else {
                 "已连接"
               },
@@ -393,7 +393,7 @@ private fun TalkSessionScreen(
           )
         }
       }
-      VoicePlainIconButton(icon = Icons.Default.Info, contentDescription = "Talk settings", onClick = onOpenVoiceSettings)
+      VoicePlainIconButton(icon = Icons.Default.Info, contentDescription = "对话设置", onClick = onOpenVoiceSettings)
     }
 
     Surface(
@@ -408,7 +408,7 @@ private fun TalkSessionScreen(
     }
 
     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text(text = "Live transcript", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
+      Text(text = "实时转录", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
       TalkTranscript(entries = entries, modifier = Modifier.weight(1f))
     }
 
@@ -523,7 +523,7 @@ private fun VoiceHeader(
         color = ClawTheme.colors.text,
         modifier = Modifier.weight(1f),
       )
-      VoicePlainIconButton(icon = Icons.Default.Search, contentDescription = "Search voice", onClick = onOpenCommand)
+      VoicePlainIconButton(icon = Icons.Default.Search, contentDescription = "搜索语音", onClick = onOpenCommand)
       VoiceAvatar(text = "OC")
     }
     Row(
@@ -610,12 +610,12 @@ private fun VoiceHero(
       Text(
         text =
           when {
-            talkModeSpeaking -> "OpenClaw is replying"
+            talkModeSpeaking -> "OpenClaw正在回复"
             talkModeListening -> "监听中"
-            talkModeEnabled -> "Talk is live"
-            micEnabled -> "Dictation is listening"
+            talkModeEnabled -> "对话正在进行"
+            micEnabled -> "听写监听中"
             !gatewayReady -> "网关离线"
-            else -> "Ready to talk"
+            else -> "准备对话"
           },
         style = ClawTheme.type.body,
         color = ClawTheme.colors.textMuted,
@@ -641,12 +641,12 @@ private fun VoiceHero(
 
     ClawPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)) {
       VoiceModeRow(
-        title = if (talkModeEnabled) "End Talk" else "Realtime Talk",
+        title = if (talkModeEnabled) "结束对话" else "实时对话",
         subtitle =
           when {
-            talkModeEnabled -> "Conversation is live"
-            gatewayReady -> "Natural conversation in real time"
-            else -> "Connect gateway to start"
+            talkModeEnabled -> "对话正在进行"
+            gatewayReady -> "自然实时对话"
+            else -> "连接网关以开始"
           },
         icon = if (talkModeEnabled) Icons.Default.PhoneDisabled else Icons.Default.RecordVoiceOver,
         onClick = onStartTalk,
@@ -656,9 +656,9 @@ private fun VoiceHero(
         title = if (micEnabled) "停止听写" else "听写",
         subtitle =
           when {
-            micEnabled -> "Listening for one turn"
-            gatewayReady -> "Convert speech to text"
-            else -> "Connect gateway to start"
+            micEnabled -> "监听一轮"
+            gatewayReady -> "将语音转换为文字"
+            else -> "连接网关以开始"
           },
         icon = if (micEnabled) Icons.Default.MicOff else Icons.Default.TextFields,
         onClick = onStartDictation,
@@ -671,8 +671,8 @@ private fun VoiceHero(
     VoicePrimaryAction(
       text =
         when {
-          talkModeEnabled -> "End Talk"
-          gatewayReady -> "Start Talk"
+          talkModeEnabled -> "结束对话"
+          gatewayReady -> "开始对话"
           else -> "连接网关"
         },
       icon =
@@ -874,10 +874,10 @@ private fun VoiceTranscript(
     if (entries.isEmpty() && !showThinking) {
       item {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(text = "Live transcript", style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle)
+          Text(text = "实时转录", style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle)
           ClawPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-              Text(text = "No transcript yet", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+              Text(text = "还没有转录", style = ClawTheme.type.section, color = ClawTheme.colors.text)
               Text(
                 text = "Your words and OpenClaw replies will appear here.",
                 style = ClawTheme.type.body,
@@ -932,14 +932,14 @@ private fun VoiceThinkingCard() {
 private fun VoicePermissionPanel(onRequestPermission: () -> Unit) {
   ClawPanel {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawStatusPill(text = "Permission needed", status = ClawStatus.Warning)
+      ClawStatusPill(text = "需要权限", status = ClawStatus.Warning)
       Text(text = "Microphone access is needed.", style = ClawTheme.type.section, color = ClawTheme.colors.text)
       Text(
         text = "OpenClaw only listens when you start Talk or Dictation.",
         style = ClawTheme.type.body,
         color = ClawTheme.colors.textMuted,
       )
-      ClawSecondaryButton(text = "Enable Microphone", icon = Icons.Default.Mic, onClick = onRequestPermission)
+      ClawSecondaryButton(text = "启用麦克风", icon = Icons.Default.Mic, onClick = onRequestPermission)
     }
   }
 }
@@ -972,14 +972,14 @@ private fun voiceStatusLabel(
   talkModeSpeaking: Boolean,
 ): String =
   when {
-    voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeSpeaking -> "OpenClaw is speaking"
+    voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeSpeaking -> "OpenClaw正在说话"
     voiceCaptureMode == VoiceCaptureMode.TalkMode && talkModeListening -> "监听中"
-    voiceCaptureMode == VoiceCaptureMode.TalkMode -> "Talk is live"
-    micIsSending -> "Sending dictation"
+    voiceCaptureMode == VoiceCaptureMode.TalkMode -> "对话正在进行"
+    micIsSending -> "发送听写"
     voiceCaptureMode == VoiceCaptureMode.ManualMic -> micStatusText.ifBlank { "监听中" }
     micQueuedMessages > 0 -> "$micQueuedMessages queued"
     !gatewayStatus.isVoiceGatewayReady() -> "网关离线"
-    else -> "Ready to talk"
+    else -> "准备对话"
   }
 
 private fun String.isVoiceGatewayReady(): Boolean {
@@ -987,6 +987,6 @@ private fun String.isVoiceGatewayReady(): Boolean {
   return !status.contains("offline") && !status.contains("not connected") && !status.contains("failed") && !status.contains("error")
 }
 
-private fun String.voiceGatewayLabel(): String = if (isVoiceGatewayReady()) "Connected and ready" else "Gateway not connected"
+private fun String.voiceGatewayLabel(): String = if (isVoiceGatewayReady()) "已连接并就绪" else "网关未连接"
 
 private fun Context.hasRecordAudioPermission(): Boolean = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

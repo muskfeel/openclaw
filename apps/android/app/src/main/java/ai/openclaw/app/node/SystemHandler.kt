@@ -131,7 +131,7 @@ class SystemHandler private constructor(
       )
     } catch (err: Throwable) {
       GatewaySession.InvokeResult.error(
-        code = "UNAVAILABLE",
+        code = "不可用",
         message = "NOTIFICATION_FAILED: ${err.message ?: "notification post failed"}",
       )
     }

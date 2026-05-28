@@ -297,7 +297,7 @@ class GatewaySession(
         ?: return RpcResult(
           ok = false,
           payloadJson = null,
-          error = ErrorShape("UNAVAILABLE", "not connected"),
+          error = ErrorShape("不可用", "not connected"),
         )
     val params = buildNodeEventParams(event = event, payloadJson = payloadJson)
     try {
@@ -308,7 +308,7 @@ class GatewaySession(
       return RpcResult(
         ok = false,
         payloadJson = null,
-        error = ErrorShape("UNAVAILABLE", "node.event failed"),
+        error = ErrorShape("不可用", "node.event failed"),
       )
     }
   }
@@ -330,7 +330,7 @@ class GatewaySession(
     val res = requestDetailed(method = method, paramsJson = paramsJson, timeoutMs = timeoutMs)
     if (res.ok) return res.payloadJson ?: ""
     val err = res.error
-    throw IllegalStateException("${err?.code ?: "UNAVAILABLE"}: ${err?.message ?: "request failed"}")
+    throw IllegalStateException("${err?.code ?: "不可用"}: ${err?.message ?: "request failed"}")
   }
 
   suspend fun requestDetailed(
@@ -460,11 +460,11 @@ class GatewaySession(
             withTimeout(timeoutMs) { deferred.await() }
           } catch (_: TimeoutCancellationException) {
             pending.remove(id)
-            onError(ErrorShape("UNAVAILABLE", "request timeout"))
+            onError(ErrorShape("不可用", "request timeout"))
             return@launch
           }
         if (!response.ok) {
-          onError(response.error ?: ErrorShape("UNAVAILABLE", "request failed"))
+          onError(response.error ?: ErrorShape("不可用", "request failed"))
         }
       }
     }
@@ -605,7 +605,7 @@ class GatewaySession(
         )
       val res = request("connect", payload, timeoutMs = CONNECT_RPC_TIMEOUT_MS)
       if (!res.ok) {
-        val error = res.error ?: ErrorShape("UNAVAILABLE", "connect failed")
+        val error = res.error ?: ErrorShape("不可用", "connect failed")
         val shouldRetryWithDeviceToken =
           shouldRetryWithStoredDeviceToken(
             error = error,
@@ -876,7 +876,7 @@ class GatewaySession(
       val payloadJson = frame["payload"]?.let { payload -> payload.toString() }
       val error =
         frame["error"]?.asObjectOrNull()?.let { obj ->
-          val code = obj["code"].asStringOrNull() ?: "UNAVAILABLE"
+          val code = obj["code"].asStringOrNull() ?: "不可用"
           val msg = obj["message"].asStringOrNull() ?: "request failed"
           val detailObj = obj["details"].asObjectOrNull()
           val details =
@@ -943,7 +943,7 @@ class GatewaySession(
         val result =
           try {
             onInvoke?.invoke(InvokeRequest(id, nodeId, command, params, timeoutMs))
-              ?: InvokeResult.error("UNAVAILABLE", "invoke handler missing")
+              ?: InvokeResult.error("不可用", "invoke handler missing")
           } catch (err: Throwable) {
             invokeErrorFromThrowable(err)
           }

@@ -88,7 +88,7 @@ internal fun ProvidersModelsScreen(
               horizontalArrangement = Arrangement.SpaceBetween,
             ) {
               ProviderHeaderIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", onClick = onBack)
-              ProviderHeaderIconButton(icon = Icons.Default.Add, contentDescription = "Add provider", outlined = true, onClick = onAddProvider)
+              ProviderHeaderIconButton(icon = Icons.Default.Add, contentDescription = "添加提供商", outlined = true, onClick = onAddProvider)
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
               Text(text = "Providers & Models", style = ClawTheme.type.display.copy(fontSize = 14.8.sp, lineHeight = 18.sp), color = ClawTheme.colors.text, maxLines = 1)
@@ -113,7 +113,7 @@ internal fun ProvidersModelsScreen(
         }
 
         item {
-          ProviderSectionLabel(title = "Provider setup")
+          ProviderSectionLabel(title = "提供商设置")
         }
 
         item {
@@ -121,7 +121,7 @@ internal fun ProvidersModelsScreen(
         }
 
         item {
-          ProviderSectionLabel(title = "Connected providers")
+          ProviderSectionLabel(title = "已连接提供商")
         }
 
         item {
@@ -141,13 +141,13 @@ internal fun ProvidersModelsScreen(
         }
 
         item {
-          ProviderSectionLabel(title = "Model catalog")
+          ProviderSectionLabel(title = "模型目录")
         }
 
         if (modelGroups.isEmpty()) {
           item {
             ModelCatalogEmpty(
-              title = if (refreshing) "Loading models" else "No models loaded",
+              title = if (refreshing) "加载模型中" else "No models loaded",
               body = if (isConnected) "Refresh after configuring a provider on the Gateway." else "Connect the Gateway to browse models.",
             )
           }
@@ -242,7 +242,7 @@ private fun providerSetupSubtitle(
     row?.ready == true -> if (row.modelCount > 0) "${row.modelCount} models available" else "就绪"
     row != null -> "Finish setup to use ${row.name}"
     id == "ollama" -> "Use models running on your network"
-    else -> "Add provider credentials on your Gateway"
+    else -> "在网关上添加提供商凭据"
   }
 
 internal fun modelProviderReady(status: String): Boolean {
@@ -321,7 +321,7 @@ private fun ProviderOverviewPanel(
       )
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ClawSecondaryButton(text = if (refreshing) "刷新中" else "刷新", onClick = onRefresh, enabled = isConnected && !refreshing, modifier = Modifier.weight(1f))
-        ClawPrimaryButton(text = "Setup Provider", onClick = onSetup, enabled = isConnected, modifier = Modifier.weight(1f))
+        ClawPrimaryButton(text = "设置提供商", onClick = onSetup, enabled = isConnected, modifier = Modifier.weight(1f))
       }
     }
   }
@@ -395,7 +395,7 @@ private fun ProviderListRow(row: ProviderRow) {
     ProviderBadge(text = row.name)
     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
       Text(text = row.name, style = ClawTheme.type.body, color = ClawTheme.colors.text, maxLines = 1)
-      Text(text = if (row.modelCount > 0) "${row.modelCount} models" else "Provider setup", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
+      Text(text = if (row.modelCount > 0) "${row.modelCount} models" else "提供商设置", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
       Box(modifier = Modifier.size(4.5.dp).clip(CircleShape).background(if (row.ready) ClawTheme.colors.success else ClawTheme.colors.warning))
@@ -463,8 +463,8 @@ private fun ModelGroup(
       if (models.size > visibleModels.size) {
         Surface(onClick = onToggle, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
           Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "View all models", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, modifier = Modifier.weight(1f))
-            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "View all models", modifier = Modifier.size(14.dp), tint = ClawTheme.colors.text)
+            Text(text = "查看所有模型", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, modifier = Modifier.weight(1f))
+            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "查看所有模型", modifier = Modifier.size(14.dp), tint = ClawTheme.colors.text)
           }
         }
       }
@@ -485,11 +485,11 @@ private fun ModelRow(model: GatewayModelSummary) {
 
 private fun modelCapabilityLabels(model: GatewayModelSummary): List<String> =
   buildList {
-    if (model.supportsReasoning) add("Reasoning")
-    if (model.supportsVision) add("Vision")
+    if (model.supportsReasoning) add("推理")
+    if (model.supportsVision) add("视觉")
     if (model.supportsAudio) add("语音")
-    if (model.supportsDocuments) add("Docs")
-    if ((model.contextTokens ?: 0L) >= 100_000L) add("Long context")
+    if (model.supportsDocuments) add("文档")
+    if ((model.contextTokens ?: 0L) >= 100_000L) add("长上下文")
     if (isEmpty()) add("Fast")
   }
 
@@ -540,7 +540,7 @@ private fun ProviderAddButton(
     ) {
       Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(17.dp))
       Spacer(modifier = Modifier.width(7.dp))
-      Text(text = "Open Gateway Setup", style = ClawTheme.type.label, maxLines = 1)
+      Text(text = "打开网关设置", style = ClawTheme.type.label, maxLines = 1)
     }
   }
 }
