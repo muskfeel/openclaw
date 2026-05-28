@@ -1,6 +1,4 @@
 package ai.openclaw.app.ui
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.gateway.GatewayEndpoint
@@ -119,7 +117,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           onClick = { viewModel.acceptGatewayTrustPrompt() },
           colors = ButtonDefaults.textButtonColors(contentColor = mobileAccent),
         ) {
-          Text(stringResource(R.string.trust_and_continue))
+          Text("信任并继续")
         }
       },
       dismissButton = {
@@ -127,7 +125,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           onClick = { viewModel.declineGatewayTrustPrompt() },
           colors = ButtonDefaults.textButtonColors(contentColor = mobileTextSecondary),
         ) {
-          Text(stringResource(R.string.cancel))
+          Text("取消")
         }
       },
     )
@@ -139,7 +137,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput)?.let { parseGatewayEndpoint(it)?.displayUrl }
     }
 
-  val notSetLabel = stringResource(R.string.not_set)
+  val notSetLabel = "未设置"
   val activeEndpoint =
     remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode, notSetLabel) {
       when {
@@ -162,7 +160,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      Text(stringResource(R.string.gateway_connection), style = mobileTitle1, color = mobileText)
+      Text("网关连接", style = mobileTitle1, color = mobileText)
       Text(
         if (isConnected) "Your gateway is active and ready." else "Connect to your gateway to get started.",
         style = mobileCallout,
@@ -195,7 +193,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             )
           }
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.endpoint), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text("端点", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Text(activeEndpoint, style = mobileBody.copy(fontFamily = FontFamily.Monospace), color = mobileText)
           }
         }
@@ -217,7 +215,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             )
           }
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.status), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text("状态", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Text(statusText, style = mobileBody, color = if (isConnected) mobileSuccess else mobileText)
           }
         }
@@ -242,7 +240,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       ) {
         Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(stringResource(R.string.disconnect), style = mobileHeadline.copy(fontWeight = FontWeight.SemiBold))
+        Text("断开连接", style = mobileHeadline.copy(fontWeight = FontWeight.SemiBold))
       }
     } else {
       Button(
@@ -322,7 +320,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             contentColor = Color.White,
           ),
       ) {
-        Text(stringResource(R.string.connect_gateway), style = mobileHeadline.copy(fontWeight = FontWeight.Bold))
+        Text("连接网关", style = mobileHeadline.copy(fontWeight = FontWeight.Bold))
       }
     }
 
@@ -337,7 +335,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
           verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          Text(if (pairingRequired) stringResource(R.string.pairing_required) else stringResource(R.string.last_gateway_error), style = mobileHeadline, color = mobileWarning)
+          Text(if (pairingRequired) "需要配对" else "上次网关错误", style = mobileHeadline, color = mobileWarning)
           Text(statusLabel, style = mobileBody.copy(fontFamily = FontFamily.Monospace), color = mobileText)
           if (pairingRequired) {
             Text(
@@ -369,7 +367,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.copy_report_for_claw), style = mobileCallout.copy(fontWeight = FontWeight.Bold))
+            Text("复制报告给 Claw", style = mobileCallout.copy(fontWeight = FontWeight.Bold))
           }
         }
       }
@@ -388,7 +386,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         horizontalArrangement = Arrangement.SpaceBetween,
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-          Text(stringResource(R.string.advanced_controls), style = mobileHeadline, color = mobileText)
+          Text("高级控制", style = mobileHeadline, color = mobileText)
           Text("Setup code, endpoint, TLS, token, password, onboarding.", style = mobileCaption1, color = mobileTextSecondary)
         }
         Icon(
@@ -410,7 +408,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-          Text(stringResource(R.string.connection_method), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+          Text("连接方式", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MethodChip(
               label = "配置码",
@@ -434,7 +432,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           )
 
           if (inputMode == ConnectInputMode.SetupCode) {
-            Text(stringResource(R.string.setup_code), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text("配置码", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             OutlinedTextField(
               value = setupCode,
               onValueChange = {
@@ -456,7 +454,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               QuickFillChip(
-                label = stringResource(R.string.android_emulator),
+                label = "Android 模拟器",
                 onClick = {
                   manualHostInput = "10.0.2.2"
                   manualPortInput = "18789"
@@ -465,7 +463,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 },
               )
               QuickFillChip(
-                label = stringResource(R.string.localhost),
+                label = "本地主机",
                 onClick = {
                   manualHostInput = "127.0.0.1"
                   manualPortInput = "18789"
@@ -578,7 +576,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           HorizontalDivider(color = mobileBorder)
 
           TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
-            Text(stringResource(R.string.run_onboarding_again), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
+            Text("重新运行引导", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
           }
         }
       }

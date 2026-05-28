@@ -1,6 +1,4 @@
 package ai.openclaw.app.ui
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 import ai.openclaw.app.BuildConfig
 import ai.openclaw.app.GatewayAgentSummary
@@ -163,7 +161,7 @@ private fun UsageSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.usage), subtitle = "提供商限制和配额健康", icon = Icons.Default.Storage, onBack = onBack) {
+  SettingsDetailFrame(title = "用量", subtitle = "提供商限制和配额健康", icon = Icons.Default.Storage, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -173,7 +171,7 @@ private fun UsageSettingsScreen(
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawSecondaryButton(text = if (usageRefreshing) stringResource(R.string.refreshing) else stringResource(R.string.refresh), onClick = viewModel::refreshUsage, enabled = isConnected && !usageRefreshing, modifier = Modifier.weight(1f))
+      ClawSecondaryButton(text = if (usageRefreshing) "刷新中" else "刷新", onClick = viewModel::refreshUsage, enabled = isConnected && !usageRefreshing, modifier = Modifier.weight(1f))
     }
     usageErrorText?.let { errorText ->
       ClawPanel {
@@ -214,7 +212,7 @@ private fun CronJobsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.cron_jobs), subtitle = "网关计划任务", icon = Icons.Default.Bolt, onBack = onBack) {
+  SettingsDetailFrame(title = "定时任务", subtitle = "网关计划任务", icon = Icons.Default.Bolt, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -223,7 +221,7 @@ private fun CronJobsSettingsScreen(
           SettingsMetric("下次唤醒", formatCronWake(cronStatus.nextWakeAtMs)),
         ),
     )
-    ClawSecondaryButton(text = if (cronRefreshing) stringResource(R.string.refreshing) else stringResource(R.string.refresh), onClick = viewModel::refreshCronJobs, enabled = isConnected && !cronRefreshing, modifier = Modifier.fillMaxWidth())
+    ClawSecondaryButton(text = if (cronRefreshing) "刷新中" else "刷新", onClick = viewModel::refreshCronJobs, enabled = isConnected && !cronRefreshing, modifier = Modifier.fillMaxWidth())
     ClawPanel {
       Text(text = "Android shows scheduled work status. Create and edit schedules from the desktop app.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
     }
@@ -264,7 +262,7 @@ private fun AgentsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.agents), subtitle = "选择和检查网关上的助手", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = "智能体", subtitle = "选择和检查网关上的助手", icon = Icons.Default.Person, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -296,7 +294,7 @@ private fun ApprovalsSettingsScreen(
   val waitingCount = pendingToolCalls.count { it.isError != true }
   val issueCount = pendingToolCalls.count { it.isError == true }
 
-  SettingsDetailFrame(title = stringResource(R.string.approvals), subtitle = "审查需要关注的操作", icon = Icons.Default.Lock, onBack = onBack) {
+  SettingsDetailFrame(title = "审批", subtitle = "审查需要关注的操作", icon = Icons.Default.Lock, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
@@ -326,11 +324,11 @@ private fun ProfileSettingsScreen(
   val displayName by viewModel.displayName.collectAsState()
   var draft by remember(displayName) { mutableStateOf(displayName.ifBlank { "OpenClaw" }) }
 
-  SettingsDetailFrame(title = stringResource(R.string.profile), subtitle = "此手机在 OpenClaw 中的显示方式", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = "个人资料", subtitle = "此手机在 OpenClaw 中的显示方式", icon = Icons.Default.Person, onBack = onBack) {
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        ClawTextField(value = draft, onValueChange = { draft = it }, placeholder = stringResource(R.string.device_name))
-        ClawPrimaryButton(text = stringResource(R.string.save_profile), onClick = { viewModel.setDisplayName(draft) }, enabled = draft.isNotBlank())
+        ClawTextField(value = draft, onValueChange = { draft = it }, placeholder = "设备名称")
+        ClawPrimaryButton(text = "保存资料", onClick = { viewModel.setDisplayName(draft) }, enabled = draft.isNotBlank())
       }
     }
   }
@@ -345,23 +343,23 @@ private fun VoiceSettingsScreen(
   val micEnabled by viewModel.micEnabled.collectAsState()
   val talkModeEnabled by viewModel.talkModeEnabled.collectAsState()
 
-  SettingsDetailFrame(title = stringResource(R.string.talk_provider_setup), subtitle = "配置语音、传输和播放", icon = Icons.Default.Mic, onBack = onBack) {
+  SettingsDetailFrame(title = "语音提供商设置", subtitle = "配置语音、传输和播放", icon = Icons.Default.Mic, onBack = onBack) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       VoiceSetupPanel(
         voiceActive = micEnabled || talkModeEnabled,
       )
-      Text(text = stringResource(R.string.audio_test), style = ClawTheme.type.section, color = ClawTheme.colors.text)
+      Text(text = "音频测试", style = ClawTheme.type.section, color = ClawTheme.colors.text)
       Text(text = "Check that OpenClaw can speak clearly on this phone.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       SettingsWaveformPanel(active = speakerEnabled, onClick = ::playVoiceSetupTone)
       VoiceSetupActionRow(
-        title = if (speakerEnabled) stringResource(R.string.mute_speaker) else stringResource(R.string.enable_speaker),
-        subtitle = if (speakerEnabled) stringResource(R.string.replies_play_aloud) else stringResource(R.string.assistant_speech_muted),
+        title = if (speakerEnabled) "静音扬声器" else "启用扬声器",
+        subtitle = if (speakerEnabled) "回复大声播放" else "助手语音已静音",
         icon = Icons.AutoMirrored.Filled.VolumeUp,
         statusText = if (speakerEnabled) "开启" else "已静音",
         ready = speakerEnabled,
         onClick = { viewModel.setSpeakerEnabled(!speakerEnabled) },
       )
-      ClawPrimaryButton(text = stringResource(R.string.done), onClick = onBack, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.GraphicEq)
+      ClawPrimaryButton(text = "完成", onClick = onBack, modifier = Modifier.fillMaxWidth(), icon = Icons.Default.GraphicEq)
     }
   }
 }
@@ -373,23 +371,23 @@ private fun VoiceSetupPanel(
   Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
     VoiceSetupActionRow(
       title = "实时提供商",
-      subtitle = stringResource(R.string.gateway_voice_relay),
+      subtitle = "网关语音中继",
       icon = Icons.Default.GraphicEq,
-      statusText = if (voiceActive) stringResource(R.string.live) else "就绪",
+      statusText = if (voiceActive) "在线" else "就绪",
       ready = true,
     )
     VoiceSetupActionRow(
       title = "语音",
-      subtitle = stringResource(R.string.voice_input),
+      subtitle = "语音输入",
       icon = Icons.Default.Mic,
-      statusText = stringResource(R.string.configured),
+      statusText = "已配置",
       ready = true,
     )
     VoiceSetupActionRow(
-      title = stringResource(R.string.transport),
-      subtitle = stringResource(R.string.socket_relay),
+      title = "传输",
+      subtitle = "套接字中继",
       icon = Icons.Default.Bolt,
-      statusText = stringResource(R.string.configured),
+      statusText = "已配置",
       ready = true,
     )
   }
@@ -502,7 +500,7 @@ private fun NotificationSettingsScreen(
   val quietStart by viewModel.notificationForwardingQuietStart.collectAsState()
   val quietEnd by viewModel.notificationForwardingQuietEnd.collectAsState()
   val maxEventsPerMinute by viewModel.notificationForwardingMaxEventsPerMinute.collectAsState()
-  val modeLabel = if (mode == NotificationPackageFilterMode.Blocklist) stringResource(R.string.blocklist) else stringResource(R.string.allowlist)
+  val modeLabel = if (mode == NotificationPackageFilterMode.Blocklist) "黑名单" else "白名单"
   var listenerEnabled by remember { mutableStateOf(DeviceNotificationListenerService.isAccessEnabled(context)) }
   val notificationPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -522,12 +520,12 @@ private fun NotificationSettingsScreen(
     listenerEnabled = DeviceNotificationListenerService.isAccessEnabled(context)
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.notifications), subtitle = "选择哪些内容到达 OpenClaw", icon = Icons.Default.Notifications, onBack = onBack) {
+  SettingsDetailFrame(title = "通知", subtitle = "选择哪些内容到达 OpenClaw", icon = Icons.Default.Notifications, onBack = onBack) {
     SettingsTogglePanel(
       rows =
         listOf(
-          SettingsToggleRow(stringResource(R.string.forward_notifications), if (enabled) "OpenClaw 可以接收选定的提醒" else "提醒保留在手机上", Icons.Default.Notifications, enabled, ::setForwarding),
-          SettingsToggleRow(stringResource(R.string.quiet_hours), "$quietStart to $quietEnd", Icons.Default.Bolt, quietEnabled) { checked ->
+          SettingsToggleRow("转发通知", if (enabled) "OpenClaw 可以接收选定的提醒" else "提醒保留在手机上", Icons.Default.Notifications, enabled, ::setForwarding),
+          SettingsToggleRow("免打扰时段", "$quietStart to $quietEnd", Icons.Default.Bolt, quietEnabled) { checked ->
             viewModel.setNotificationForwardingQuietHours(enabled = checked, start = quietStart, end = quietEnd)
           },
         ),
@@ -554,8 +552,8 @@ private fun NotificationSettingsScreen(
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = "转发模式", style = ClawTheme.type.section, color = ClawTheme.colors.text)
-        val blocklistLabel = stringResource(R.string.blocklist)
-        val allowlistLabel = stringResource(R.string.allowlist)
+        val blocklistLabel = "黑名单"
+        val allowlistLabel = "白名单"
         ClawSegmentedControl(
           options = listOf(blocklistLabel, allowlistLabel),
           selected = modeLabel,
