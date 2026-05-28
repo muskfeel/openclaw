@@ -103,6 +103,8 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 private enum class OnboardingStep {
   Welcome,
@@ -193,7 +195,7 @@ fun OnboardingFlow(
         },
         dismissButton = {
           TextButton(onClick = viewModel::declineGatewayTrustPrompt) {
-            Text("Cancel")
+            Text("取消")
           }
         },
       )
@@ -365,8 +367,8 @@ private fun WelcomeScreen(
       WelcomeHorizon()
       Spacer(modifier = Modifier.height(30.dp))
       Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HeroPrimaryAction(title = "Connect Gateway", onClick = onConnect)
-        OutlinedAction(title = "Enter setup code", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onConnect)
+        HeroPrimaryAction(title = "连接网关", onClick = onConnect)
+        OutlinedAction(title = "输入配置码", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onConnect)
         Surface(onClick = onConnect, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text(text = "Already have a setup?  ", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
@@ -493,8 +495,8 @@ private fun GatewaySetupScreen(
             if (advancedOpen) {
               ClawTextField(value = setupCode, onValueChange = onSetupCodeChange, placeholder = "Setup code")
               Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ClawTextField(value = manualHost, onValueChange = onManualHostChange, placeholder = "Host", modifier = Modifier.weight(1f))
-                ClawTextField(value = manualPort, onValueChange = onManualPortChange, placeholder = "Port", modifier = Modifier.width(104.dp))
+                ClawTextField(value = manualHost, onValueChange = onManualHostChange, placeholder = "主机", modifier = Modifier.weight(1f))
+                ClawTextField(value = manualPort, onValueChange = onManualPortChange, placeholder = "端口", modifier = Modifier.width(104.dp))
               }
               Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TogglePill(text = if (manualTls) "TLS on" else "TLS off", selected = manualTls, onClick = { onManualTlsChange(!manualTls) })
@@ -575,7 +577,7 @@ private fun GatewayRecoveryScreen(
               when (recoveryState) {
                 GatewayRecoveryUiState.Connected -> "Healthy"
                 GatewayRecoveryUiState.Pairing -> "Pairing"
-                GatewayRecoveryUiState.Finishing -> "Connecting"
+                GatewayRecoveryUiState.Finishing -> "连接中"
                 GatewayRecoveryUiState.Failed -> "Needs attention"
               },
             status =
@@ -678,7 +680,7 @@ private fun OnboardingHeader(
     onBack?.let {
       Surface(onClick = it, modifier = Modifier.size(34.dp), color = Color.Transparent, contentColor = ClawTheme.colors.text) {
         Box(contentAlignment = Alignment.Center) {
-          Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(23.dp))
+          Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(23.dp))
         }
       }
     }
@@ -770,7 +772,7 @@ private fun PermissionTopBar(onBack: () -> Unit) {
       },
       confirmButton = {
         TextButton(onClick = { showHelp = false }) {
-          Text("Done")
+          Text("完成")
         }
       },
     )
@@ -783,7 +785,7 @@ private fun PermissionTopBar(onBack: () -> Unit) {
       contentColor = ClawTheme.colors.text,
     ) {
       Box(contentAlignment = Alignment.Center) {
-        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(22.dp))
+        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(22.dp))
       }
     }
     Text(
@@ -884,7 +886,7 @@ internal enum class GatewayRecoveryUiState(
   val canAutoRetry: Boolean,
 ) {
   Connected(
-    title = "Connected",
+    title = "已连接",
     message = "Your Gateway is ready.",
     canAutoRetry = false,
   ),
@@ -1003,7 +1005,7 @@ private fun copyGatewayDiagnostic(
       "OpenClaw Android gateway diagnostic",
       "Status: $statusText",
       "Gateway: ${serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"}",
-      "Address: ${remoteAddress?.takeIf { it.isNotBlank() } ?: "Not available"}",
+      "Address: ${remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"}",
       "Ready: ${if (ready) "yes" else "no"}",
     ).joinToString("\n")
   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -1104,7 +1106,7 @@ private fun rememberPermissionState(
 
   val rows =
     listOfNotNull(
-      PermissionRowModel("Voice", "Record and transcribe audio", Icons.Default.Mic, microphoneGranted) {
+      PermissionRowModel("语音", "Record and transcribe audio", Icons.Default.Mic, microphoneGranted) {
         request(Manifest.permission.RECORD_AUDIO)
       },
       PermissionRowModel("Camera", "Capture photos and video", Icons.Default.CameraAlt, cameraGranted) {
@@ -1126,7 +1128,7 @@ private fun rememberPermissionState(
       PermissionRowModel("Calendar", "Read events and schedules", Icons.Default.CalendarMonth, calendarGranted) {
         request(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
       },
-      PermissionRowModel("Notifications", "Send important alerts", Icons.Default.Notifications, notificationsGranted) {
+      PermissionRowModel("通知", "Send important alerts", Icons.Default.Notifications, notificationsGranted) {
         if (Build.VERSION.SDK_INT >= 33) request(Manifest.permission.POST_NOTIFICATIONS)
       },
       PermissionRowModel("Notification listener", "Forward selected app alerts", Icons.Default.Sensors, notificationListenerGranted) {

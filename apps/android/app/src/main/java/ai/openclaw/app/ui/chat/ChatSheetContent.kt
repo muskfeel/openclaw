@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 internal fun resolvePendingAssistantAutoSend(
   pendingPrompt: String?,

@@ -25,7 +25,7 @@ class VoiceWakeManager(
   private val _isListening = MutableStateFlow(false)
   val isListening: StateFlow<Boolean> = _isListening
 
-  private val _statusText = MutableStateFlow("Off")
+  private val _statusText = MutableStateFlow("关闭")
   val statusText: StateFlow<String> = _statusText
 
   var triggerWords: List<String> = emptyList()
@@ -47,7 +47,7 @@ class VoiceWakeManager(
 
       if (!SpeechRecognizer.isRecognitionAvailable(context)) {
         _isListening.value = false
-        _statusText.value = "Speech recognizer unavailable"
+        _statusText.value = "语音识别器不可用"
         return@post
       }
 
@@ -62,7 +62,7 @@ class VoiceWakeManager(
     }
   }
 
-  fun stop(statusText: String = "Off") {
+  fun stop(statusText: String = "关闭") {
     stopRequested = true
     restartJob?.cancel()
     restartJob = null
@@ -85,7 +85,7 @@ class VoiceWakeManager(
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
       }
 
-    _statusText.value = "Listening"
+    _statusText.value = "监听中"
     _isListening.value = true
     r.startListening(intent)
   }
@@ -114,7 +114,7 @@ class VoiceWakeManager(
     lastCycleDispatched = command
 
     scope.launch { onCommand(command) }
-    _statusText.value = "Triggered"
+    _statusText.value = "已触发"
     scheduleRestart(delayMs = 650)
   }
 
@@ -122,7 +122,7 @@ class VoiceWakeManager(
     object : RecognitionListener {
       override fun onReadyForSpeech(params: Bundle?) {
         lastCycleDispatched = null
-        _statusText.value = "Listening"
+        _statusText.value = "监听中"
       }
 
       override fun onBeginningOfSpeech() {}
@@ -139,20 +139,20 @@ class VoiceWakeManager(
         if (stopRequested) return
         _isListening.value = false
         if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-          _statusText.value = "Microphone permission required"
+          _statusText.value = "需要麦克风权限"
           return
         }
 
         _statusText.value =
           when (error) {
-            SpeechRecognizer.ERROR_AUDIO -> "Audio error"
+            SpeechRecognizer.ERROR_AUDIO -> "音频错误"
             SpeechRecognizer.ERROR_CLIENT -> "Client error"
-            SpeechRecognizer.ERROR_NETWORK -> "Network error"
+            SpeechRecognizer.ERROR_NETWORK -> "网络错误"
             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-            SpeechRecognizer.ERROR_NO_MATCH -> "Listening"
+            SpeechRecognizer.ERROR_NO_MATCH -> "监听中"
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
             SpeechRecognizer.ERROR_SERVER -> "Server error"
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "监听中"
             else -> "Speech error ($error)"
           }
         scheduleRestart(delayMs = 600)

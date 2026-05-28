@@ -73,6 +73,8 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun ChatScreen(
@@ -165,7 +167,7 @@ fun ChatScreen(
     )
 
     errorText?.takeIf { it.isNotBlank() }?.let { error ->
-      ChatNotice(title = "Chat needs attention", body = userFacingChatError(error))
+      ChatNotice(title = "聊天需要关注", body = userFacingChatError(error))
     }
 
     ChatMessageList(
@@ -227,7 +229,7 @@ private fun ChatHeader(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
-    HeaderIcon(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", onClick = onBack)
+    HeaderIcon(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", onClick = onBack)
 
     Column(
       modifier = Modifier.weight(1f),
@@ -245,7 +247,7 @@ private fun ChatHeader(
       ModelPill(
         text =
           when {
-            pendingRunCount > 0 -> "Working"
+            pendingRunCount > 0 -> "处理中"
             healthOk -> "auto"
             else -> "offline"
           },
@@ -258,7 +260,7 @@ private fun ChatHeader(
       )
     }
 
-    HeaderIcon(icon = Icons.Default.Refresh, contentDescription = "Refresh chat", onClick = onMore)
+    HeaderIcon(icon = Icons.Default.Refresh, contentDescription = "刷新聊天", onClick = onMore)
   }
 }
 
@@ -364,7 +366,7 @@ private fun ChatMessageList(
 
     if (messages.isEmpty() && pendingRunCount == 0 && pendingToolCalls.isEmpty() && stream.isNullOrBlank()) {
       if (historyLoading) {
-        ClawLoadingState(title = "Loading session", modifier = Modifier.align(Alignment.Center))
+        ClawLoadingState(title = "加载会话", modifier = Modifier.align(Alignment.Center))
       } else {
         EmptyChatHint(healthOk = healthOk, onStarterPrompt = onStarterPrompt, modifier = Modifier.align(Alignment.Center))
       }
@@ -384,7 +386,7 @@ private fun EmptyChatHint(
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-      Text(text = if (healthOk) "Ready when you are" else "Gateway offline", style = ClawTheme.type.title.copy(fontSize = 18.sp, lineHeight = 23.sp), color = ClawTheme.colors.text)
+      Text(text = if (healthOk) "随时待命" else "网关离线", style = ClawTheme.type.title.copy(fontSize = 18.sp, lineHeight = 23.sp), color = ClawTheme.colors.text)
       Text(
         text =
           if (healthOk) {
@@ -454,9 +456,9 @@ private data class StarterPrompt(
 
 private val starterPrompts =
   listOf(
-    StarterPrompt(mark = "1", title = "Catch me up", subtitle = "Summarize recent sessions and next steps.", message = "Catch me up on my recent OpenClaw sessions and suggest next steps."),
-    StarterPrompt(mark = "2", title = "Plan the work", subtitle = "Turn a goal into an actionable checklist.", message = "Help me turn this goal into a practical checklist: "),
-    StarterPrompt(mark = "3", title = "Use this phone", subtitle = "Ask OpenClaw to use Android capabilities.", message = "What can you help me do from this phone right now?"),
+    StarterPrompt(mark = "1", title = "跟进一下", subtitle = "总结最近的会话和下一步", message = "Catch me up on my recent OpenClaw sessions and suggest next steps."),
+    StarterPrompt(mark = "2", title = "规划工作", subtitle = "把目标变成可执行清单", message = "Help me turn this goal into a practical checklist: "),
+    StarterPrompt(mark = "3", title = "用这部手机", subtitle = "让 OpenClaw 使用 Android 功能", message = "What can you help me do from this phone right now?"),
   )
 
 @Composable
@@ -494,8 +496,8 @@ private fun ChatBubble(
           text =
             when {
               live -> "OpenClaw · Live"
-              isUser -> "You"
-              normalizedRole == "system" -> "System"
+              isUser -> "你"
+              normalizedRole == "system" -> "系统"
               else -> "OpenClaw"
             },
           style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold),
@@ -505,7 +507,7 @@ private fun ChatBubble(
           if (part.type == "text") {
             ChatText(text = part.text.orEmpty(), textColor = ClawTheme.colors.text)
           } else {
-            Text(text = part.fileName ?: "Attachment", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+            Text(text = part.fileName ?: "附件", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
           }
         }
         timestampMs?.let {
@@ -541,9 +543,9 @@ private fun ChatText(
 private fun ToolBubble(toolCalls: List<ChatPendingToolCall>) {
   ClawPanel {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawStatusPill(text = "Tools running", status = ClawStatus.Warning)
+      ClawStatusPill(text = "工具运行中", status = ClawStatus.Warning)
       toolCalls.take(4).forEach { tool ->
-        ClawListItem(title = tool.name, subtitle = "OpenClaw is working")
+        ClawListItem(title = tool.name, subtitle = "OpenClaw 正在工作")
       }
       if (toolCalls.size > 4) {
         Text(text = "+${toolCalls.size - 4} more", style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle)
@@ -556,7 +558,7 @@ private fun ToolBubble(toolCalls: List<ChatPendingToolCall>) {
 private fun ChatThinkingBubble() {
   ClawPanel {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      ClawStatusPill(text = "Thinking", status = ClawStatus.Warning)
+      ClawStatusPill(text = "思考中", status = ClawStatus.Warning)
       Text(text = "OpenClaw is preparing a response.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
     }
   }
@@ -633,7 +635,7 @@ private fun ChatComposer(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             Box(modifier = Modifier.size(8.dp).background(ClawTheme.colors.danger, RoundedCornerShape(2.dp)))
-            Text(text = "Stop", style = ClawTheme.type.label)
+            Text(text = "停止", style = ClawTheme.type.label)
           }
         }
       }
@@ -707,7 +709,7 @@ private fun ChatInputPill(
     ) {
       Surface(onClick = onPickImages, modifier = Modifier.size(ClawTheme.spacing.touchTarget), shape = CircleShape, color = ClawTheme.colors.surfaceRaised, contentColor = ClawTheme.colors.text) {
         Box(contentAlignment = Alignment.Center) {
-          Icon(imageVector = Icons.Default.AttachFile, contentDescription = "Attach image", modifier = Modifier.size(16.dp))
+          Icon(imageVector = Icons.Default.AttachFile, contentDescription = "添加图片", modifier = Modifier.size(16.dp))
         }
       }
       Box(modifier = Modifier.weight(1f)) {
@@ -722,7 +724,7 @@ private fun ChatInputPill(
           decorationBox = { innerTextField ->
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
               if (value.isEmpty()) {
-                Text(text = "Message OpenClaw", style = ClawTheme.type.body, color = ClawTheme.colors.textSubtle)
+                Text(text = "给 OpenClaw 发消息", style = ClawTheme.type.body, color = ClawTheme.colors.textSubtle)
               }
               innerTextField()
             }
@@ -737,7 +739,7 @@ private fun ChatInputPill(
         contentColor = ClawTheme.colors.text,
       ) {
         Box(contentAlignment = Alignment.Center) {
-          Icon(imageVector = Icons.Default.Mic, contentDescription = "Voice", modifier = Modifier.size(18.dp))
+          Icon(imageVector = Icons.Default.Mic, contentDescription = "语音", modifier = Modifier.size(18.dp))
         }
       }
     }
@@ -775,7 +777,7 @@ private fun AttachmentChip(
       Text(text = fileName, style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Surface(onClick = onRemove, modifier = Modifier.size(22.dp), shape = CircleShape, color = ClawTheme.colors.canvas, contentColor = ClawTheme.colors.text) {
         Box(contentAlignment = Alignment.Center) {
-          Icon(imageVector = Icons.Default.Close, contentDescription = "Remove attachment", modifier = Modifier.size(13.dp))
+          Icon(imageVector = Icons.Default.Close, contentDescription = "移除附件", modifier = Modifier.size(13.dp))
         }
       }
     }
@@ -787,7 +789,7 @@ private fun currentSessionTitle(
   sessions: List<ai.openclaw.app.chat.ChatSessionEntry>,
 ): String {
   val entry = sessions.firstOrNull { it.key == sessionKey }
-  val name = entry?.displayName?.takeIf { it.isNotBlank() } ?: return "New chat"
+  val name = entry?.displayName?.takeIf { it.isNotBlank() } ?: return "新对话"
   return friendlySessionName(name)
 }
 
@@ -806,7 +808,7 @@ private fun SendButton(
     border = BorderStroke(1.dp, if (enabled) ClawTheme.colors.primary else ClawTheme.colors.border),
   ) {
     Box(contentAlignment = Alignment.Center) {
-      Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
+      Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "发送", modifier = Modifier.size(18.dp))
     }
   }
 }
@@ -822,10 +824,10 @@ private fun userFacingChatError(error: String): String {
 
 private fun thinkingDisplay(value: String): String =
   when (value.lowercase(Locale.US)) {
-    "low" -> "Low"
-    "medium" -> "Medium"
-    "high" -> "High"
-    else -> "Off"
+    "low" -> "低"
+    "medium" -> "中"
+    "high" -> "高"
+    else -> "关闭"
   }
 
 private fun thinkingValue(display: String): String =

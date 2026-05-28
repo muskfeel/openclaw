@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun OpenClawTheme(content: @Composable () -> Unit) {

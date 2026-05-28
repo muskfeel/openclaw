@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun CommandPalette(
@@ -74,7 +76,7 @@ internal fun CommandPalette(
       CommandItem("Start Voice", "Talk or dictate with OpenClaw", Icons.Outlined.MicNone, onOpenVoice),
       CommandItem("Browse Sessions", "Find previous conversations", Icons.Outlined.AccessTime, onOpenSessions),
       CommandItem("Providers & Models", providerCommandSubtitle(isConnected, providers, models), Icons.Outlined.Inventory2, onOpenProviders),
-      CommandItem("Settings", "Gateway, voice, notifications, privacy", Icons.Outlined.Settings, onOpenSettings),
+      CommandItem("设置", "Gateway, voice, notifications, privacy", Icons.Outlined.Settings, onOpenSettings),
     )
   val actionRows = quickActions.filter { it.matches(normalizedQuery) }
   val sessionRows =
@@ -94,7 +96,7 @@ internal fun CommandPalette(
             horizontalArrangement = Arrangement.spacedBy(9.dp),
           ) {
             CommandIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search", onClick = onDismiss)
-            Text(text = "Search", style = ClawTheme.type.title, color = ClawTheme.colors.text, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Text(text = "搜索", style = ClawTheme.type.title, color = ClawTheme.colors.text, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
             CommandAvatar(text = "OC")
           }
         }
@@ -118,7 +120,7 @@ internal fun CommandPalette(
         }
 
         item {
-          CommandSectionLabel(title = "Sessions")
+          CommandSectionLabel(title = "会话列表")
         }
 
         if (sessionRows.isEmpty()) {

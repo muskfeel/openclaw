@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun CanvasSettingsScreen(
@@ -52,7 +54,7 @@ internal fun CanvasSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Canvas",
+    title = "画布",
     subtitle = "Current screen output and interactive app surface.",
     icon = Icons.AutoMirrored.Filled.ScreenShare,
     onBack = onBack,
@@ -62,18 +64,18 @@ internal fun CanvasSettingsScreen(
         listOf(
           SettingsMetric("Connection", if (isConnected) "Online" else "Offline"),
           SettingsMetric("Surface", canvasLabel),
-          SettingsMetric("Bridge", if (hasLivePage && hydrated) "Ready" else "Standby"),
+          SettingsMetric("Bridge", if (hasLivePage && hydrated) "就绪" else "Standby"),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawPrimaryButton(
-        text = if (rehydratePending) "Refreshing" else "Refresh Screen",
+        text = if (rehydratePending) "刷新中" else "Refresh Screen",
         onClick = { viewModel.requestCanvasRehydrate(source = "settings_canvas") },
         enabled = isConnected && !rehydratePending,
         modifier = Modifier.weight(1f),
       )
       ClawSecondaryButton(
-        text = "Reconnect",
+        text = "重新连接",
         onClick = viewModel::refreshGatewayConnection,
         modifier = Modifier.weight(1f),
       )

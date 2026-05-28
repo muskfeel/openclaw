@@ -74,6 +74,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.max
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun VoiceTabScreen(viewModel: MainViewModel) {
@@ -237,13 +239,13 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(
               imageVector = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-              contentDescription = if (speakerEnabled) "Mute speaker" else "Unmute speaker",
+              contentDescription = if (speakerEnabled) "静音扬声器" else "Unmute speaker",
               modifier = Modifier.size(22.dp),
               tint = if (speakerEnabled) mobileTextSecondary else mobileDanger,
             )
           }
           Text(
-            if (speakerEnabled) "Speaker" else "Muted",
+            if (speakerEnabled) "Speaker" else "已静音",
             style = mobileCaption2,
             color = if (speakerEnabled) mobileTextTertiary else mobileDanger,
           )
@@ -335,7 +337,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           }
           Spacer(modifier = Modifier.height(4.dp))
           Text(
-            if (talkModeEnabled) "Talk on" else "Talk",
+            if (talkModeEnabled) "Talk on" else "对话",
             style = mobileCaption2,
             color = if (talkModeEnabled) mobileSuccess else mobileTextTertiary,
           )
@@ -351,7 +353,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           voiceCaptureMode == VoiceCaptureMode.TalkMode -> "Talk on"
           micEnabled || micIsSending || micCooldown -> micStatusText
           queueCount > 0 -> "$queueCount queued"
-          else -> "Mic off"
+          else -> "麦克风关闭"
         }
       val stateColor =
         when {
@@ -395,7 +397,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           shape = RoundedCornerShape(12.dp),
           colors = ButtonDefaults.buttonColors(containerColor = mobileSurfaceStrong, contentColor = mobileText),
         ) {
-          Text("Open settings", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold))
+          Text("打开设置", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold))
         }
       }
     }
@@ -425,7 +427,7 @@ private fun VoiceTurnBubble(entry: VoiceConversationEntry) {
         verticalArrangement = Arrangement.spacedBy(3.dp),
       ) {
         Text(
-          if (isUser) "You" else "OpenClaw",
+          if (isUser) "你" else "OpenClaw",
           style = mobileCaption2.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp),
           color = if (isUser) mobileAccent else mobileTextSecondary,
         )

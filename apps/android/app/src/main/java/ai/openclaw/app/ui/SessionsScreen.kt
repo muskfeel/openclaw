@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun SessionsScreen(
@@ -93,8 +95,8 @@ internal fun SessionsScreen(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          Text(text = "Sessions", style = ClawTheme.type.display.copy(fontSize = 17.4.sp, lineHeight = 21.sp), color = ClawTheme.colors.text, modifier = Modifier.weight(1f))
-          SessionPlainIconButton(icon = Icons.Default.Search, contentDescription = "Search sessions", onClick = onOpenCommand)
+          Text(text = "会话列表", style = ClawTheme.type.display.copy(fontSize = 17.4.sp, lineHeight = 21.sp), color = ClawTheme.colors.text, modifier = Modifier.weight(1f))
+          SessionPlainIconButton(icon = Icons.Default.Search, contentDescription = "搜索会话", onClick = onOpenCommand)
           SessionPlainIconButton(icon = Icons.Default.SwapVert, contentDescription = "Reverse session sort", onClick = { recentFirst = !recentFirst })
         }
       }
@@ -102,7 +104,7 @@ internal fun SessionsScreen(
       item {
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
           FilterPill(text = "Recent", icon = Icons.Outlined.AccessTime, active = filter == SessionFilter.Recent, onClick = { filter = SessionFilter.Recent })
-          FilterPill(text = "Live", icon = Icons.Outlined.MicNone, active = filter == SessionFilter.Live, live = sessions.any { it.key == chatSessionKey }, onClick = { filter = SessionFilter.Live })
+          FilterPill(text = "在线", icon = Icons.Outlined.MicNone, active = filter == SessionFilter.Live, live = sessions.any { it.key == chatSessionKey }, onClick = { filter = SessionFilter.Live })
         }
       }
 
@@ -244,7 +246,7 @@ private fun SessionRow(
             Text(text = subtitle, style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
               SessionMiniTag(text = "Workspace")
-              SessionMiniTag(text = if (active) "Active" else "OpenClaw")
+              SessionMiniTag(text = if (active) "活跃" else "OpenClaw")
             }
           }
         }

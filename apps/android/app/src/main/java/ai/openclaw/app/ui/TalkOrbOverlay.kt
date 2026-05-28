@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun TalkOrbOverlay(
@@ -48,12 +50,12 @@ fun TalkOrbOverlay(
     )
 
   val trimmed = statusText.trim()
-  val showStatus = trimmed.isNotEmpty() && trimmed != "Off"
+  val showStatus = trimmed.isNotEmpty() && trimmed != "关闭"
   val phase =
     when {
-      isSpeaking -> "Speaking"
-      isListening -> "Listening"
-      else -> "Thinking"
+      isSpeaking -> "发言中"
+      isListening -> "监听中"
+      else -> "思考中"
     }
 
   Column(

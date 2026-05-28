@@ -54,6 +54,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun ProvidersModelsScreen(
@@ -87,7 +89,7 @@ internal fun ProvidersModelsScreen(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-              ProviderHeaderIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", onClick = onBack)
+              ProviderHeaderIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", onClick = onBack)
               ProviderHeaderIconButton(icon = Icons.Default.Add, contentDescription = "Add provider", outlined = true, onClick = onAddProvider)
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -126,7 +128,7 @@ internal fun ProvidersModelsScreen(
 
         item {
           if (!isConnected && providerRows.isEmpty()) {
-            ClawEmptyState(title = "Gateway offline", body = "Connect your Gateway to load provider readiness and model catalog.")
+            ClawEmptyState(title = "网关离线", body = "Connect your Gateway to load provider readiness and model catalog.")
           } else {
             ProviderList(rows = providerRows, refreshing = refreshing)
           }
@@ -201,7 +203,7 @@ private fun providerRows(
       ProviderRow(
         id = provider.id,
         name = provider.displayName,
-        status = if (ready) "Ready" else "Needs setup",
+        status = if (ready) "就绪" else "Needs setup",
         ready = ready,
         modelCount = modelCounts[provider.id] ?: 0,
       )
@@ -213,7 +215,7 @@ private fun providerRows(
         ProviderRow(
           id = provider,
           name = providerDisplayName(provider),
-          status = "Ready",
+          status = "就绪",
           ready = true,
           modelCount = modelCounts[provider] ?: 0,
         )
@@ -239,7 +241,7 @@ private fun providerSetupSubtitle(
   row: ProviderRow?,
 ): String =
   when {
-    row?.ready == true -> if (row.modelCount > 0) "${row.modelCount} models available" else "Ready"
+    row?.ready == true -> if (row.modelCount > 0) "${row.modelCount} models available" else "就绪"
     row != null -> "Finish setup to use ${row.name}"
     id == "ollama" -> "Use models running on your network"
     else -> "Add provider credentials on your Gateway"
@@ -282,7 +284,7 @@ private fun ProviderList(
   ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
     Column {
       if (rows.isEmpty()) {
-        ProviderListRow(ProviderRow(id = "loading", name = "Provider catalog", status = if (refreshing) "Loading" else "No providers", ready = false, modelCount = 0))
+        ProviderListRow(ProviderRow(id = "loading", name = "Provider catalog", status = if (refreshing) "加载中" else "No providers", ready = false, modelCount = 0))
       } else {
         val visibleRows = rows.take(5)
         visibleRows.forEachIndexed { index, row ->
@@ -310,8 +312,8 @@ private fun ProviderOverviewPanel(
   ClawPanel(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ProviderMetricTile(label = "Ready", value = readyCount.toString(), modifier = Modifier.weight(1f))
-        ProviderMetricTile(label = "Models", value = modelCount.toString(), modifier = Modifier.weight(1f))
+        ProviderMetricTile(label = "就绪", value = readyCount.toString(), modifier = Modifier.weight(1f))
+        ProviderMetricTile(label = "模型", value = modelCount.toString(), modifier = Modifier.weight(1f))
         ProviderMetricTile(label = "Setup", value = needsSetupCount.toString(), modifier = Modifier.weight(1f))
       }
       Text(
@@ -320,7 +322,7 @@ private fun ProviderOverviewPanel(
         color = ClawTheme.colors.textMuted,
       )
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ClawSecondaryButton(text = if (refreshing) "Refreshing" else "Refresh", onClick = onRefresh, enabled = isConnected && !refreshing, modifier = Modifier.weight(1f))
+        ClawSecondaryButton(text = if (refreshing) "刷新中" else "刷新", onClick = onRefresh, enabled = isConnected && !refreshing, modifier = Modifier.weight(1f))
         ClawPrimaryButton(text = "Setup Provider", onClick = onSetup, enabled = isConnected, modifier = Modifier.weight(1f))
       }
     }
@@ -382,7 +384,7 @@ private fun ProviderSetupListRow(
       }
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (row.ready) ClawTheme.colors.success else ClawTheme.colors.warning))
-        Text(text = if (row.ready) "Ready" else "Setup", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
+        Text(text = if (row.ready) "就绪" else "Setup", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
         Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Open ${row.name}", modifier = Modifier.size(17.dp), tint = ClawTheme.colors.text)
       }
     }
@@ -487,7 +489,7 @@ private fun modelCapabilityLabels(model: GatewayModelSummary): List<String> =
   buildList {
     if (model.supportsReasoning) add("Reasoning")
     if (model.supportsVision) add("Vision")
-    if (model.supportsAudio) add("Voice")
+    if (model.supportsAudio) add("语音")
     if (model.supportsDocuments) add("Docs")
     if ((model.contextTokens ?: 0L) >= 100_000L) add("Long context")
     if (isEmpty()) add("Fast")

@@ -27,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun ChatMessageListCard(
@@ -112,7 +114,7 @@ private fun LoadingChatHint(modifier: Modifier = Modifier) {
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       CircularProgressIndicator(color = mobileText, strokeWidth = 2.dp)
-      Text("Loading session", style = mobileCallout, color = mobileTextSecondary)
+      Text("加载会话", style = mobileCallout, color = mobileTextSecondary)
     }
   }
 }
@@ -132,7 +134,7 @@ private fun EmptyChatHint(
       modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      Text("No messages yet", style = mobileHeadline, color = mobileText)
+      Text("暂无消息", style = mobileHeadline, color = mobileText)
       Text(
         text =
           if (healthOk) {

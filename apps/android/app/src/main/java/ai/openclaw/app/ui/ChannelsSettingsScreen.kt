@@ -24,6 +24,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun ChannelsSettingsScreen(
@@ -43,7 +45,7 @@ internal fun ChannelsSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Channels",
+    title = "频道",
     subtitle = "Messaging surfaces connected to this gateway.",
     icon = Icons.Default.Notifications,
     onBack = onBack,
@@ -51,15 +53,15 @@ internal fun ChannelsSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Channels", channels.size.toString()),
-          SettingsMetric("Connected", channels.count { it.connected }.toString()),
-          SettingsMetric("Configured", channels.count { it.configured }.toString()),
-          SettingsMetric("Issues", channels.count { it.error != null }.toString()),
+          SettingsMetric("频道", channels.size.toString()),
+          SettingsMetric("已连接", channels.count { it.connected }.toString()),
+          SettingsMetric("已配置", channels.count { it.configured }.toString()),
+          SettingsMetric("问题", channels.count { it.error != null }.toString()),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (refreshing) "Refreshing" else "Refresh",
+        text = if (refreshing) "刷新中" else "刷新",
         onClick = viewModel::refreshChannels,
         enabled = isConnected && !refreshing,
         modifier = Modifier.weight(1f),
@@ -118,12 +120,12 @@ private fun channelSubtitle(channel: GatewayChannelSummary): String {
     }
   val lifecycle =
     when {
-      channel.connected -> "Connected"
+      channel.connected -> "已连接"
       channel.running -> "Running"
       channel.linked -> "Linked"
-      channel.configured -> "Configured"
-      channel.enabled -> "Enabled"
-      else -> "Off"
+      channel.configured -> "已配置"
+      channel.enabled -> "已启用"
+      else -> "关闭"
     }
   return listOfNotNull(accounts, lifecycle, channel.error).joinToString(" · ")
 }
@@ -131,11 +133,11 @@ private fun channelSubtitle(channel: GatewayChannelSummary): String {
 private fun channelStatusText(channel: GatewayChannelSummary): String =
   when {
     channel.error != null -> "Issue"
-    channel.connected -> "Connected"
+    channel.connected -> "已连接"
     channel.running -> "Running"
-    channel.linked || channel.configured -> "Ready"
+    channel.linked || channel.configured -> "就绪"
     channel.enabled -> "Setup"
-    else -> "Off"
+    else -> "关闭"
   }
 
 private fun channelStatus(channel: GatewayChannelSummary): ClawStatus =

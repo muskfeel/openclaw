@@ -78,7 +78,7 @@ class MicCaptureManager(
   private val _isListening = MutableStateFlow(false)
   val isListening: StateFlow<Boolean> = _isListening
 
-  private val _statusText = MutableStateFlow("Mic off")
+  private val _statusText = MutableStateFlow("麦克风关闭")
   val statusText: StateFlow<String> = _statusText
 
   private val _liveTranscript = MutableStateFlow<String?>(null)
@@ -160,7 +160,7 @@ class MicCaptureManager(
           }
         }
       if (pausedForTts) {
-        _statusText.value = if (_isSending.value) "Speaking · waiting for reply" else "Speaking…"
+        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "Speaking…"
         return
       }
       transcriptionDrainJob?.cancel()
@@ -209,7 +209,7 @@ class MicCaptureManager(
         _isListening.value = false
         _inputLevel.value = 0f
         _liveTranscript.value = null
-        _statusText.value = if (_isSending.value) "Speaking · waiting for reply" else "Speaking…"
+        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "Speaking…"
         true
       }
     if (!shouldPause) return
@@ -227,10 +227,10 @@ class MicCaptureManager(
         if (!resume) {
           _statusText.value =
             when {
-              _micEnabled.value && _isSending.value -> "Listening · sending queued voice"
-              _micEnabled.value -> "Listening"
+              _micEnabled.value && _isSending.value -> "监听中 · 发送排队语音"
+              _micEnabled.value -> "监听中"
               _isSending.value -> "Mic off · sending…"
-              else -> "Mic off"
+              else -> "麦克风关闭"
             }
         }
         resume
@@ -318,12 +318,12 @@ class MicCaptureManager(
             .asStringOrNull()
             ?.trim()
             .orEmpty()
-            .ifEmpty { "Voice request failed" }
+            .ifEmpty { "语音请求失败" }
         upsertPendingAssistant(text = errorMessage, isStreaming = false)
         completePendingTurn()
       }
       "aborted" -> {
-        upsertPendingAssistant(text = "Response aborted", isStreaming = false)
+        upsertPendingAssistant(text = "回复已中止", isStreaming = false)
         completePendingTurn()
       }
     }
@@ -332,12 +332,12 @@ class MicCaptureManager(
   private fun start() {
     stopRequested = false
     if (!hasMicPermission()) {
-      _statusText.value = "Microphone permission required"
+      _statusText.value = "需要麦克风权限"
       _micEnabled.value = false
       return
     }
     if (!gatewayConnected) {
-      _statusText.value = "Mic on · waiting for gateway"
+      _statusText.value = "麦克风开启 · 等待网关"
       return
     }
     if (transcriptionSessionId != null || transcriptionStartJob?.isActive == true) return
@@ -400,7 +400,7 @@ class MicCaptureManager(
     _isListening.value = false
     _inputLevel.value = 0f
     if (!preserveStatus) {
-      _statusText.value = if (_isSending.value) "Mic off · sending…" else "Mic off"
+      _statusText.value = if (_isSending.value) "Mic off · sending…" else "麦克风关闭"
     } else {
       _statusText.value = status
     }
@@ -451,9 +451,9 @@ class MicCaptureManager(
     if (_isSending.value) return
     if (!hasQueuedMessages()) {
       if (_micEnabled.value) {
-        _statusText.value = "Listening"
+        _statusText.value = "监听中"
       } else {
-        _statusText.value = "Mic off"
+        _statusText.value = "麦克风关闭"
       }
       return
     }
@@ -466,7 +466,7 @@ class MicCaptureManager(
     _isSending.value = true
     pendingRunTimeoutJob?.cancel()
     pendingRunTimeoutJob = null
-    _statusText.value = if (_micEnabled.value) "Listening · sending queued voice" else "Sending queued voice"
+    _statusText.value = if (_micEnabled.value) "监听中 · 发送排队语音" else "Sending queued voice"
 
     scope.launch {
       try {
@@ -741,9 +741,9 @@ class MicCaptureManager(
 
   private fun listeningStatus(): String =
     when {
-      _isSending.value -> "Listening · sending queued voice"
+      _isSending.value -> "监听中 · 发送排队语音"
       hasQueuedMessages() -> "Listening · ${queuedMessageCount()} queued"
-      else -> "Listening"
+      else -> "监听中"
     }
 
   private fun pcm16Level(

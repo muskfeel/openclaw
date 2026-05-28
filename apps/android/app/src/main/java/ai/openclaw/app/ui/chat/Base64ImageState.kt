@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 internal data class Base64ImageState(
   val image: ImageBitmap?,

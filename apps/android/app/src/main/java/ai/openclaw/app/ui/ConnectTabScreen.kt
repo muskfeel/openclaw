@@ -413,12 +413,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           Text(stringResource(R.string.connection_method), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MethodChip(
-              label = "Setup Code",
+              label = "配置码",
               active = inputMode == ConnectInputMode.SetupCode,
               onClick = { inputMode = ConnectInputMode.SetupCode },
             )
             MethodChip(
-              label = "Manual",
+              label = "手动",
               active = inputMode == ConnectInputMode.Manual,
               onClick = { inputMode = ConnectInputMode.Manual },
             )
@@ -441,7 +441,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 setupCode = it
                 validationText = null
               },
-              placeholder = { Text("Paste setup code", style = mobileBody, color = mobileTextTertiary) },
+              placeholder = { Text("粘贴配置码", style = mobileBody, color = mobileTextTertiary) },
               modifier = Modifier.fillMaxWidth(),
               minLines = 3,
               maxLines = 5,
@@ -475,7 +475,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               )
             }
 
-            Text("Host", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text("主机", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             OutlinedTextField(
               value = manualHostInput,
               onValueChange = {
@@ -492,7 +492,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             )
 
             Text(
-              if (manualTlsInput) "Port (optional, defaults to 443)" else "Port",
+              if (manualTlsInput) "Port (optional, defaults to 443)" else "端口",
               style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold),
               color = mobileTextSecondary,
             )
@@ -517,7 +517,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               horizontalArrangement = Arrangement.SpaceBetween,
             ) {
               Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Use TLS", style = mobileHeadline, color = mobileText)
+                Text("使用 TLS", style = mobileHeadline, color = mobileText)
                 Text(
                   "Turn this on for Tailscale or public hosts. Private LAN ws:// remains supported.",
                   style = mobileCallout,
@@ -656,7 +656,7 @@ private fun CommandBlock(command: String) {
 private fun EndpointPreview(endpoint: String) {
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     HorizontalDivider(color = mobileBorder)
-    Text("Resolved endpoint", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+    Text("解析端点", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
     Text(endpoint, style = mobileCallout.copy(fontFamily = FontFamily.Monospace), color = mobileText)
     HorizontalDivider(color = mobileBorder)
   }

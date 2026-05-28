@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun HealthLogsSettingsScreen(
@@ -50,7 +52,7 @@ internal fun HealthLogsSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Health",
+    title = "健康状态",
     subtitle = "Gateway status, phone node readiness, and recent log stream.",
     icon = Icons.Default.Settings,
     onBack = onBack,
@@ -60,14 +62,14 @@ internal fun HealthLogsSettingsScreen(
         listOf(
           SettingsMetric("Gateway", if (isConnected) "Online" else "Offline"),
           SettingsMetric("Node", if (isNodeConnected) "Online" else "Waiting"),
-          SettingsMetric("Models", modelCount.size.toString()),
+          SettingsMetric("模型", modelCount.size.toString()),
           SettingsMetric("Logs", logsSummary.entries.size.toString()),
         ),
     )
     HealthStatusPanel(
       gateway = statusText,
       node = if (isNodeConnected) "Online" else "Waiting",
-      chat = if (chatHealthOk) "Ready" else "Needs connection",
+      chat = if (chatHealthOk) "就绪" else "Needs connection",
       models = "${modelCount.size} available",
       voice = talkStatus,
       runs = if (pendingRunCount > 0) "$pendingRunCount active" else "Idle",
@@ -79,7 +81,7 @@ internal fun HealthLogsSettingsScreen(
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (logsRefreshing) "Refreshing" else "Refresh Logs",
+        text = if (logsRefreshing) "刷新中" else "Refresh Logs",
         onClick = viewModel::refreshHealthLogs,
         enabled = isConnected && !logsRefreshing,
         modifier = Modifier.weight(1f),
@@ -116,9 +118,9 @@ private fun HealthStatusPanel(
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "Chat", value = chat, healthy = chatHealthOk)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-      HealthStatusRow(title = "Models", value = models, healthy = modelsReady)
+      HealthStatusRow(title = "模型", value = models, healthy = modelsReady)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-      HealthStatusRow(title = "Voice", value = voice, healthy = voiceReady)
+      HealthStatusRow(title = "语音", value = voice, healthy = voiceReady)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "Runs", value = runs, healthy = true)
     }

@@ -73,6 +73,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 private enum class Tab(
   val key: String,
@@ -80,10 +82,10 @@ private enum class Tab(
 ) {
   Overview(key = "overview", label = "Home"),
   Chat(key = "chat", label = "Chat"),
-  Voice(key = "voice", label = "Voice"),
-  Sessions(key = "sessions", label = "Sessions"),
-  Settings(key = "settings", label = "Settings"),
-  ProvidersModels(key = "providers-models", label = "Providers"),
+  Voice(key = "voice", label = "语音"),
+  Sessions(key = "sessions", label = "会话列表"),
+  Settings(key = "settings", label = "设置"),
+  ProvidersModels(key = "providers-models", label = "提供商"),
 }
 
 @Composable
@@ -267,7 +269,7 @@ private fun GatewayTrustDialog(
     },
     dismissButton = {
       TextButton(onClick = onDecline) {
-        Text("Cancel")
+        Text("取消")
       }
     },
   )
@@ -322,7 +324,7 @@ private fun OverviewScreen(
               color = ClawTheme.colors.text,
               modifier = Modifier.weight(1f),
             )
-            PlainIconButton(icon = Icons.Default.Search, contentDescription = "Search", onClick = onOpenCommand)
+            PlainIconButton(icon = Icons.Default.Search, contentDescription = "搜索", onClick = onOpenCommand)
             OverviewAvatar(text = "OC")
           }
         }
@@ -336,8 +338,8 @@ private fun OverviewScreen(
             rows =
               listOf(
                 ModuleRow("Chat", null, null, Icons.Outlined.ChatBubbleOutline, Tab.Chat),
-                ModuleRow("Sessions", null, if (sessions.isEmpty()) "Empty" else "${sessions.size} recent", Icons.Outlined.AccessTime, Tab.Sessions),
-                ModuleRow("Voice", null, if (isConnected) "Ready" else "Offline", Icons.Outlined.MicNone, Tab.Voice),
+                ModuleRow("会话列表", null, if (sessions.isEmpty()) "Empty" else "${sessions.size} recent", Icons.Outlined.AccessTime, Tab.Sessions),
+                ModuleRow("语音", null, if (isConnected) "就绪" else "Offline", Icons.Outlined.MicNone, Tab.Voice),
                 ModuleRow(
                   title = "Providers & Models",
                   subtitle = null,
@@ -351,14 +353,14 @@ private fun OverviewScreen(
                   icon = Icons.Outlined.Inventory2,
                   tab = Tab.ProvidersModels,
                 ),
-                ModuleRow("Channels", null, channelsSummaryText(channelsSummary), Icons.Default.Notifications, Tab.Settings, SettingsRoute.Channels),
-                ModuleRow("Agents", null, if (agents.isEmpty()) "Load" else "${agents.size} ready", Icons.Default.Person, Tab.Settings, SettingsRoute.Agents),
-                ModuleRow("Approvals", null, approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, Tab.Settings, SettingsRoute.Approvals),
-                ModuleRow("Cron Jobs", null, cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, Tab.Settings, SettingsRoute.CronJobs),
-                ModuleRow("Skills", null, skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, Tab.Settings, SettingsRoute.Skills),
+                ModuleRow("频道", null, channelsSummaryText(channelsSummary), Icons.Default.Notifications, Tab.Settings, SettingsRoute.Channels),
+                ModuleRow("智能体", null, if (agents.isEmpty()) "Load" else "${agents.size} ready", Icons.Default.Person, Tab.Settings, SettingsRoute.Agents),
+                ModuleRow("审批", null, approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, Tab.Settings, SettingsRoute.Approvals),
+                ModuleRow("定时任务", null, cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, Tab.Settings, SettingsRoute.CronJobs),
+                ModuleRow("技能", null, skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, Tab.Settings, SettingsRoute.Skills),
                 ModuleRow("Nodes & Devices", null, nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, Tab.Settings, SettingsRoute.NodesDevices),
-                ModuleRow("Usage", null, usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, Tab.Settings, SettingsRoute.Usage),
-                ModuleRow("Settings", null, null, Icons.Outlined.Settings, Tab.Settings, SettingsRoute.Home),
+                ModuleRow("用量", null, usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, Tab.Settings, SettingsRoute.Usage),
+                ModuleRow("设置", null, null, Icons.Outlined.Settings, Tab.Settings, SettingsRoute.Home),
               ),
             onSelectTab = onSelectTab,
             onOpenSettingsRoute = onOpenSettingsRoute,
@@ -707,7 +709,7 @@ private fun SettingsShellScreen(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-          Text(text = "Settings", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text, modifier = Modifier.weight(1f))
+          Text(text = "设置", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text, modifier = Modifier.weight(1f))
           SettingsSearchButton(onClick = onOpenCommand)
         }
       }
@@ -720,23 +722,23 @@ private fun SettingsShellScreen(
         SettingsGroup(
           rows =
             listOf(
-              SettingsRow("Profile", displayName.ifBlank { "Local device" }, Icons.Default.Person, route = SettingsRoute.Profile),
-              SettingsRow("Voice", if (speakerEnabled) "Speaker on" else "Speaker muted", Icons.Default.Mic, route = SettingsRoute.Voice),
-              SettingsRow("Agents", if (agents.isEmpty()) "Load from gateway" else "${agents.size} available", Icons.Default.Person, status = agents.isNotEmpty(), route = SettingsRoute.Agents),
-              SettingsRow("Approvals", approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, status = approvalsStatus(pendingToolCalls.size), route = SettingsRoute.Approvals),
-              SettingsRow("Cron Jobs", cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, status = if (cronStatus.jobs > 0) cronStatus.enabled else null, route = SettingsRoute.CronJobs),
-              SettingsRow("Usage", usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, status = if (usageSummary.providers.isNotEmpty()) true else null, route = SettingsRoute.Usage),
-              SettingsRow("Skills", skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, status = skillsStatus(skillsSummary.skills), route = SettingsRoute.Skills),
+              SettingsRow("个人资料", displayName.ifBlank { "Local device" }, Icons.Default.Person, route = SettingsRoute.Profile),
+              SettingsRow("语音", if (speakerEnabled) "Speaker on" else "Speaker muted", Icons.Default.Mic, route = SettingsRoute.Voice),
+              SettingsRow("智能体", if (agents.isEmpty()) "Load from gateway" else "${agents.size} available", Icons.Default.Person, status = agents.isNotEmpty(), route = SettingsRoute.Agents),
+              SettingsRow("审批", approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, status = approvalsStatus(pendingToolCalls.size), route = SettingsRoute.Approvals),
+              SettingsRow("定时任务", cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, status = if (cronStatus.jobs > 0) cronStatus.enabled else null, route = SettingsRoute.CronJobs),
+              SettingsRow("用量", usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, status = if (usageSummary.providers.isNotEmpty()) true else null, route = SettingsRoute.Usage),
+              SettingsRow("技能", skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, status = skillsStatus(skillsSummary.skills), route = SettingsRoute.Skills),
               SettingsRow("Nodes & Devices", nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, status = nodesDevicesStatus(nodesDevicesSummary), route = SettingsRoute.NodesDevices),
-              SettingsRow("Channels", channelsSummaryText(channelsSummary), Icons.Default.Notifications, status = channelsStatus(channelsSummary), route = SettingsRoute.Channels),
-              SettingsRow("Dreaming", dreamingSummaryText(dreamingSummary), Icons.Default.Storage, status = dreamingStatus(dreamingSummary), route = SettingsRoute.Dreaming),
-              SettingsRow("Canvas", "Screen surface", Icons.AutoMirrored.Filled.ScreenShare, status = isConnected, route = SettingsRoute.Canvas),
-              SettingsRow("Notifications", if (notificationForwardingEnabled) "Smart delivery" else "Off", Icons.Default.Notifications, route = SettingsRoute.Notifications),
+              SettingsRow("频道", channelsSummaryText(channelsSummary), Icons.Default.Notifications, status = channelsStatus(channelsSummary), route = SettingsRoute.Channels),
+              SettingsRow("梦境模式", dreamingSummaryText(dreamingSummary), Icons.Default.Storage, status = dreamingStatus(dreamingSummary), route = SettingsRoute.Dreaming),
+              SettingsRow("画布", "Screen surface", Icons.AutoMirrored.Filled.ScreenShare, status = isConnected, route = SettingsRoute.Canvas),
+              SettingsRow("通知", if (notificationForwardingEnabled) "Smart delivery" else "关闭", Icons.Default.Notifications, route = SettingsRoute.Notifications),
               SettingsRow("Phone Capabilities", if (cameraEnabled) "Camera enabled" else "Locked", Icons.Default.Lock, status = !cameraEnabled, route = SettingsRoute.PhoneCapabilities),
               SettingsRow("Gateway", gatewaySummary(statusText, isConnected), Icons.Default.Cloud, status = isConnected, route = SettingsRoute.Gateway),
               SettingsRow("Appearance", "Dark", Icons.Default.Palette, route = SettingsRoute.Appearance),
-              SettingsRow("Health", "Diagnostics", Icons.Default.Settings, status = isConnected, route = SettingsRoute.Health),
-              SettingsRow("About", "Version and update", Icons.Default.Storage, route = SettingsRoute.About),
+              SettingsRow("健康状态", "Diagnostics", Icons.Default.Settings, status = isConnected, route = SettingsRoute.Health),
+              SettingsRow("关于", "Version and update", Icons.Default.Storage, route = SettingsRoute.About),
             ),
           onOpen = onRouteChange,
         )
@@ -744,7 +746,7 @@ private fun SettingsShellScreen(
 
       item {
         SettingsGroup(
-          rows = listOf(SettingsRow("Sign Out", "Disconnect", Icons.AutoMirrored.Filled.ExitToApp)),
+          rows = listOf(SettingsRow("Sign Out", "断开连接", Icons.AutoMirrored.Filled.ExitToApp)),
           onOpen = { },
           onAction = { viewModel.disconnect() },
         )
@@ -773,7 +775,7 @@ private fun SettingsShellScreen(
 
 private fun approvalsSummary(count: Int): String =
   when (count) {
-    0 -> "No pending approvals"
+    0 -> "没有待处理的审批"
     1 -> "1 pending"
     else -> "$count pending"
   }
@@ -846,7 +848,7 @@ private fun dreamingSummaryText(summary: GatewayDreamingSummary): String =
   when {
     !summary.storeHealthy || !summary.phaseSignalHealthy -> "Needs attention"
     summary.enabled -> "${summary.shortTermCount} waiting"
-    else -> "Off"
+    else -> "关闭"
   }
 
 private fun dreamingStatus(summary: GatewayDreamingSummary): Boolean? =

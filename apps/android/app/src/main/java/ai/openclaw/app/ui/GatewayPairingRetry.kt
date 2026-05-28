@@ -11,6 +11,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 internal const val PAIRING_INITIAL_AUTO_RETRY_MS = 1_500L
 internal const val PAIRING_AUTO_RETRY_MS = 4_000L

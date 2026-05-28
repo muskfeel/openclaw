@@ -48,6 +48,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 private enum class HomeTab(
   val label: String,
@@ -55,9 +57,9 @@ private enum class HomeTab(
 ) {
   Connect(label = "Connect", icon = Icons.Default.CheckCircle),
   Chat(label = "Chat", icon = Icons.Default.ChatBubble),
-  Voice(label = "Voice", icon = Icons.Default.RecordVoiceOver),
+  Voice(label = "语音", icon = Icons.Default.RecordVoiceOver),
   Screen(label = "Screen", icon = Icons.AutoMirrored.Filled.ScreenShare),
-  Settings(label = "Settings", icon = Icons.Default.Settings),
+  Settings(label = "设置", icon = Icons.Default.Settings),
 }
 
 private enum class StatusVisual {

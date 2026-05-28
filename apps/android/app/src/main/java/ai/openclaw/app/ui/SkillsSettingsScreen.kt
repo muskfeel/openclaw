@@ -23,6 +23,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun SkillsSettingsScreen(
@@ -44,7 +46,7 @@ internal fun SkillsSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Skills",
+    title = "技能",
     subtitle = "Installed capabilities available to OpenClaw.",
     icon = Icons.Default.Settings,
     onBack = onBack,
@@ -53,13 +55,13 @@ internal fun SkillsSettingsScreen(
       rows =
         listOf(
           SettingsMetric("Installed", skills.size.toString()),
-          SettingsMetric("Ready", readyCount.toString()),
+          SettingsMetric("就绪", readyCount.toString()),
           SettingsMetric("Needs Setup", needsSetupCount.toString()),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (skillsRefreshing) "Refreshing" else "Refresh",
+        text = if (skillsRefreshing) "刷新中" else "刷新",
         onClick = viewModel::refreshSkills,
         enabled = isConnected && !skillsRefreshing,
         modifier = Modifier.weight(1f),
@@ -110,9 +112,9 @@ private fun skillNeedsSetup(skill: GatewaySkillSummary): Boolean = !skill.disabl
 
 private fun skillStatusText(skill: GatewaySkillSummary): String =
   when {
-    skill.disabled -> "Off"
+    skill.disabled -> "关闭"
     skillNeedsSetup(skill) -> "Setup"
-    else -> "Ready"
+    else -> "就绪"
   }
 
 private fun skillStatus(skill: GatewaySkillSummary): ClawStatus =

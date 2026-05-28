@@ -121,7 +121,7 @@ class TalkModeManager internal constructor(
   private val _isSpeaking = MutableStateFlow(false)
   val isSpeaking: StateFlow<Boolean> = _isSpeaking
 
-  private val _statusText = MutableStateFlow("Off")
+  private val _statusText = MutableStateFlow("关闭")
   val statusText: StateFlow<String> = _statusText
 
   private val _lastAssistantText = MutableStateFlow<String?>(null)
@@ -254,11 +254,11 @@ class TalkModeManager internal constructor(
       ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
         PackageManager.PERMISSION_GRANTED
     if (!micOk) {
-      _statusText.value = "Microphone permission required"
+      _statusText.value = "需要麦克风权限"
       throw IllegalStateException("MIC_PERMISSION_REQUIRED: grant Microphone permission")
     }
     if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-      _statusText.value = "Speech recognizer unavailable"
+      _statusText.value = "语音识别器不可用"
       throw IllegalStateException("UNAVAILABLE: Speech recognizer unavailable")
     }
 
@@ -286,7 +286,7 @@ class TalkModeManager internal constructor(
     lastHeardAtMs = null
 
     if (transcript.isEmpty()) {
-      _statusText.value = if (_isEnabled.value) "Listening" else "Ready"
+      _statusText.value = if (_isEnabled.value) "监听中" else "就绪"
       if (_isEnabled.value) {
         start()
       }
@@ -317,7 +317,7 @@ class TalkModeManager internal constructor(
     clearPushToTalkRecognition()
     lastTranscript = ""
     lastHeardAtMs = null
-    _statusText.value = if (_isEnabled.value) "Listening" else "Ready"
+    _statusText.value = if (_isEnabled.value) "监听中" else "就绪"
     if (_isEnabled.value) {
       start()
     }
@@ -554,7 +554,7 @@ class TalkModeManager internal constructor(
     lastTranscript = ""
     lastHeardAtMs = null
     _isListening.value = false
-    _statusText.value = "Off"
+    _statusText.value = "关闭"
     stopRealtimeRelay()
     stopSpeaking()
     pendingRunId = null
@@ -578,7 +578,7 @@ class TalkModeManager internal constructor(
       while (true) {
         realtimeSessionId?.let { return@withTimeout it }
         val status = _statusText.value
-        if (!_isEnabled.value && status != "Off") {
+        if (!_isEnabled.value && status != "关闭") {
           throw IllegalStateException(status)
         }
         delay(100L)
@@ -598,7 +598,7 @@ class TalkModeManager internal constructor(
       ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
         PackageManager.PERMISSION_GRANTED
     if (!micOk) {
-      _statusText.value = "Microphone permission required"
+      _statusText.value = "需要麦克风权限"
       Log.w(tag, "realtime start: microphone permission required")
       disableRealtimeModeAndNotifyOwner()
       return
@@ -636,7 +636,7 @@ class TalkModeManager internal constructor(
     realtimeSessionId = sessionId
     realtimeOutputSuppressed = false
     _isListening.value = true
-    _statusText.value = "Listening"
+    _statusText.value = "监听中"
     startRealtimeCapture(sessionId)
     Log.d(tag, "realtime session started relaySessionId=$sessionId")
   }
@@ -766,7 +766,7 @@ class TalkModeManager internal constructor(
     when (val type = obj["type"].asStringOrNull()) {
       "ready" -> {
         _isListening.value = true
-        _statusText.value = "Listening"
+        _statusText.value = "监听中"
       }
       "inputAudio" -> {
         _isListening.value = true
@@ -831,7 +831,7 @@ class TalkModeManager internal constructor(
         stopRealtimeRelay(closeSession = false)
         if (_isEnabled.value) {
           _isEnabled.value = false
-          _statusText.value = "Off"
+          _statusText.value = "关闭"
           onStoppedByRelay()
         }
       }
@@ -956,7 +956,7 @@ class TalkModeManager internal constructor(
             playbackIdle
           }
         if (idle && _isEnabled.value && realtimeSessionId != null) {
-          _statusText.value = "Listening"
+          _statusText.value = "监听中"
         }
       }
   }
@@ -985,7 +985,7 @@ class TalkModeManager internal constructor(
     }
     _isSpeaking.value = false
     if (_isEnabled.value) {
-      _statusText.value = "Listening"
+      _statusText.value = "监听中"
     }
   }
 
@@ -1465,7 +1465,7 @@ class TalkModeManager internal constructor(
       }
 
     if (markListening) {
-      _statusText.value = "Listening"
+      _statusText.value = "监听中"
       _isListening.value = true
     }
     r.startListening(intent)
@@ -2000,7 +2000,7 @@ class TalkModeManager internal constructor(
     cancelRealtimeOutput(reason = "android-stop-tts")
     stopSpeaking(resetInterrupt = true)
     _isSpeaking.value = false
-    _statusText.value = "Listening"
+    _statusText.value = "监听中"
   }
 
   private fun cancelRealtimeOutput(reason: String) {
@@ -2258,7 +2258,7 @@ class TalkModeManager internal constructor(
     object : RecognitionListener {
       override fun onReadyForSpeech(params: Bundle?) {
         if (_isEnabled.value) {
-          _statusText.value = if (_isListening.value) "Listening" else _statusText.value
+          _statusText.value = if (_isListening.value) "监听中" else _statusText.value
         }
       }
 
@@ -2281,20 +2281,20 @@ class TalkModeManager internal constructor(
         if (stopRequested) return
         _isListening.value = false
         if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-          _statusText.value = "Microphone permission required"
+          _statusText.value = "需要麦克风权限"
           return
         }
 
         _statusText.value =
           when (error) {
-            SpeechRecognizer.ERROR_AUDIO -> "Audio error"
+            SpeechRecognizer.ERROR_AUDIO -> "音频错误"
             SpeechRecognizer.ERROR_CLIENT -> "Client error"
-            SpeechRecognizer.ERROR_NETWORK -> "Network error"
+            SpeechRecognizer.ERROR_NETWORK -> "网络错误"
             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-            SpeechRecognizer.ERROR_NO_MATCH -> "Listening"
+            SpeechRecognizer.ERROR_NO_MATCH -> "监听中"
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
             SpeechRecognizer.ERROR_SERVER -> "Server error"
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "监听中"
             else -> "Speech error ($error)"
           }
         scheduleRestart(delayMs = 600)

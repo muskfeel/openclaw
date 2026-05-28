@@ -71,6 +71,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 fun SettingsSheet(viewModel: MainViewModel) {
@@ -839,7 +841,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
         ListItem(
           modifier = Modifier.settingsRowModifier().alpha(notificationForwardingControlsAlpha),
           colors = listItemColors,
-          headlineContent = { Text("Quiet Hours", style = mobileHeadline) },
+          headlineContent = { Text("免打扰时段", style = mobileHeadline) },
           supportingContent = {
             Text("Suppress forwarding during a local time window.", style = mobileCallout)
           },
@@ -1140,7 +1142,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Off", style = mobileHeadline) },
+            headlineContent = { Text("关闭", style = mobileHeadline) },
             supportingContent = { Text("Disable location sharing.", style = mobileCallout) },
             trailingContent = {
               RadioButton(

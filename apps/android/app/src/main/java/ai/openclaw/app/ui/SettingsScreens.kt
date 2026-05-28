@@ -163,13 +163,13 @@ private fun UsageSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.usage), subtitle = "Provider limits and quota health.", icon = Icons.Default.Storage, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.usage), subtitle = "提供商限制和配额健康", icon = Icons.Default.Storage, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Providers", providerCount.toString()),
-          SettingsMetric("Issues", issueCount.toString()),
-          SettingsMetric("Updated", formatUsageUpdated(usageSummary.updatedAtMs)),
+          SettingsMetric("提供商", providerCount.toString()),
+          SettingsMetric("问题", issueCount.toString()),
+          SettingsMetric("更新时间", formatUsageUpdated(usageSummary.updatedAtMs)),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -214,13 +214,13 @@ private fun CronJobsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.cron_jobs), subtitle = "Scheduled OpenClaw work from your gateway.", icon = Icons.Default.Bolt, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.cron_jobs), subtitle = "网关计划任务", icon = Icons.Default.Bolt, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Status", if (cronStatus.enabled) "Enabled" else "Off"),
-          SettingsMetric("Jobs", cronStatus.jobs.toString()),
-          SettingsMetric("Next Wake", formatCronWake(cronStatus.nextWakeAtMs)),
+          SettingsMetric("状态", if (cronStatus.enabled) "已启用" else "关闭"),
+          SettingsMetric("任务数", cronStatus.jobs.toString()),
+          SettingsMetric("下次唤醒", formatCronWake(cronStatus.nextWakeAtMs)),
         ),
     )
     ClawSecondaryButton(text = if (cronRefreshing) stringResource(R.string.refreshing) else stringResource(R.string.refresh), onClick = viewModel::refreshCronJobs, enabled = isConnected && !cronRefreshing, modifier = Modifier.fillMaxWidth())
@@ -264,12 +264,12 @@ private fun AgentsSettingsScreen(
     }
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.agents), subtitle = "Choose and inspect the assistants available on this gateway.", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.agents), subtitle = "选择和检查网关上的助手", icon = Icons.Default.Person, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Available", agents.size.toString()),
-          SettingsMetric("Default", defaultAgentName(agents, defaultAgentId)),
+          SettingsMetric("可用", agents.size.toString()),
+          SettingsMetric("默认", defaultAgentName(agents, defaultAgentId)),
         ),
     )
     when {
@@ -296,13 +296,13 @@ private fun ApprovalsSettingsScreen(
   val waitingCount = pendingToolCalls.count { it.isError != true }
   val issueCount = pendingToolCalls.count { it.isError == true }
 
-  SettingsDetailFrame(title = stringResource(R.string.approvals), subtitle = "Review actions that need your attention.", icon = Icons.Default.Lock, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.approvals), subtitle = "审查需要关注的操作", icon = Icons.Default.Lock, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Pending", waitingCount.toString()),
-          SettingsMetric("Issues", issueCount.toString()),
-          SettingsMetric("Active Runs", pendingRunCount.toString()),
+          SettingsMetric("待处理", waitingCount.toString()),
+          SettingsMetric("问题", issueCount.toString()),
+          SettingsMetric("活跃运行", pendingRunCount.toString()),
         ),
     )
     if (pendingToolCalls.isEmpty()) {
@@ -326,7 +326,7 @@ private fun ProfileSettingsScreen(
   val displayName by viewModel.displayName.collectAsState()
   var draft by remember(displayName) { mutableStateOf(displayName.ifBlank { "OpenClaw" }) }
 
-  SettingsDetailFrame(title = stringResource(R.string.profile), subtitle = "How this phone appears to OpenClaw.", icon = Icons.Default.Person, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.profile), subtitle = "此手机在 OpenClaw 中的显示方式", icon = Icons.Default.Person, onBack = onBack) {
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         ClawTextField(value = draft, onValueChange = { draft = it }, placeholder = stringResource(R.string.device_name))
@@ -345,7 +345,7 @@ private fun VoiceSettingsScreen(
   val micEnabled by viewModel.micEnabled.collectAsState()
   val talkModeEnabled by viewModel.talkModeEnabled.collectAsState()
 
-  SettingsDetailFrame(title = stringResource(R.string.talk_provider_setup), subtitle = "Configure voice, transport, and playback.", icon = Icons.Default.Mic, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.talk_provider_setup), subtitle = "配置语音、传输和播放", icon = Icons.Default.Mic, onBack = onBack) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       VoiceSetupPanel(
         voiceActive = micEnabled || talkModeEnabled,
@@ -357,7 +357,7 @@ private fun VoiceSettingsScreen(
         title = if (speakerEnabled) stringResource(R.string.mute_speaker) else stringResource(R.string.enable_speaker),
         subtitle = if (speakerEnabled) stringResource(R.string.replies_play_aloud) else stringResource(R.string.assistant_speech_muted),
         icon = Icons.AutoMirrored.Filled.VolumeUp,
-        statusText = if (speakerEnabled) "On" else "Muted",
+        statusText = if (speakerEnabled) "开启" else "已静音",
         ready = speakerEnabled,
         onClick = { viewModel.setSpeakerEnabled(!speakerEnabled) },
       )
@@ -372,14 +372,14 @@ private fun VoiceSetupPanel(
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
     VoiceSetupActionRow(
-      title = "Realtime Provider",
+      title = "实时提供商",
       subtitle = stringResource(R.string.gateway_voice_relay),
       icon = Icons.Default.GraphicEq,
-      statusText = if (voiceActive) stringResource(R.string.live) else "Ready",
+      statusText = if (voiceActive) stringResource(R.string.live) else "就绪",
       ready = true,
     )
     VoiceSetupActionRow(
-      title = "Voice",
+      title = "语音",
       subtitle = stringResource(R.string.voice_input),
       icon = Icons.Default.Mic,
       statusText = stringResource(R.string.configured),
@@ -522,11 +522,11 @@ private fun NotificationSettingsScreen(
     listenerEnabled = DeviceNotificationListenerService.isAccessEnabled(context)
   }
 
-  SettingsDetailFrame(title = stringResource(R.string.notifications), subtitle = "Choose what reaches OpenClaw.", icon = Icons.Default.Notifications, onBack = onBack) {
+  SettingsDetailFrame(title = stringResource(R.string.notifications), subtitle = "选择哪些内容到达 OpenClaw", icon = Icons.Default.Notifications, onBack = onBack) {
     SettingsTogglePanel(
       rows =
         listOf(
-          SettingsToggleRow(stringResource(R.string.forward_notifications), if (enabled) "OpenClaw can receive selected alerts." else "Alerts stay on this phone.", Icons.Default.Notifications, enabled, ::setForwarding),
+          SettingsToggleRow(stringResource(R.string.forward_notifications), if (enabled) "OpenClaw 可以接收选定的提醒" else "提醒保留在手机上", Icons.Default.Notifications, enabled, ::setForwarding),
           SettingsToggleRow(stringResource(R.string.quiet_hours), "$quietStart to $quietEnd", Icons.Default.Bolt, quietEnabled) { checked ->
             viewModel.setNotificationForwardingQuietHours(enabled = checked, start = quietStart, end = quietEnd)
           },
@@ -553,7 +553,7 @@ private fun NotificationSettingsScreen(
     }
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = "Forwarding Mode", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+        Text(text = "转发模式", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         val blocklistLabel = stringResource(R.string.blocklist)
         val allowlistLabel = stringResource(R.string.allowlist)
         ClawSegmentedControl(
@@ -641,8 +641,8 @@ private fun PhoneCapabilitiesScreen(
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = "Location", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         ClawSegmentedControl(
-          options = listOf("Off", "While Using"),
-          selected = if (locationMode == LocationMode.WhileUsing) "While Using" else "Off",
+          options = listOf("关闭", "While Using"),
+          selected = if (locationMode == LocationMode.WhileUsing) "While Using" else "关闭",
           onSelect = { selected -> setLocationAccess(if (selected == "While Using") LocationMode.WhileUsing else LocationMode.Off) },
         )
       }
@@ -678,16 +678,16 @@ private fun GatewaySettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Connection", if (isConnected) "Connected" else "Offline"),
+          SettingsMetric("Connection", if (isConnected) "已连接" else "Offline"),
           SettingsMetric("Node", if (isNodeConnected) "Online" else "Not paired"),
           SettingsMetric("Gateway", serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"),
-          SettingsMetric("Address", remoteAddress?.takeIf { it.isNotBlank() } ?: "Not available"),
-          SettingsMetric("Status", gatewayStatusLabel(statusText = statusText, isConnected = isConnected)),
+          SettingsMetric("Address", remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"),
+          SettingsMetric("状态", gatewayStatusLabel(statusText = statusText, isConnected = isConnected)),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawPrimaryButton(text = "Reconnect", onClick = viewModel::refreshGatewayConnection, modifier = Modifier.weight(1f))
-      ClawSecondaryButton(text = "Disconnect", onClick = viewModel::disconnect, modifier = Modifier.weight(1f))
+      ClawPrimaryButton(text = "重新连接", onClick = viewModel::refreshGatewayConnection, modifier = Modifier.weight(1f))
+      ClawSecondaryButton(text = "断开连接", onClick = viewModel::disconnect, modifier = Modifier.weight(1f))
     }
     ClawPanel {
       Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -701,8 +701,8 @@ private fun GatewaySettingsScreen(
         Text(text = "Connection Setup", style = ClawTheme.type.section, color = ClawTheme.colors.text)
         ClawTextField(value = setupCode, onValueChange = { setupCode = it }, placeholder = "Setup code")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          ClawTextField(value = hostInput, onValueChange = { hostInput = it }, placeholder = "Host", modifier = Modifier.weight(1f))
-          ClawTextField(value = portInput, onValueChange = { portInput = it }, placeholder = "Port", modifier = Modifier.weight(0.55f))
+          ClawTextField(value = hostInput, onValueChange = { hostInput = it }, placeholder = "主机", modifier = Modifier.weight(1f))
+          ClawTextField(value = portInput, onValueChange = { portInput = it }, placeholder = "端口", modifier = Modifier.weight(0.55f))
         }
         ClawSegmentedControl(
           options = listOf("Local", "TLS"),
@@ -778,7 +778,7 @@ private fun AppearanceSettingsScreen(onBack: () -> Unit) {
       rows =
         listOf(
           SettingsMetric("Theme", "Dark"),
-          SettingsMetric("Contrast", "High"),
+          SettingsMetric("Contrast", "高"),
           SettingsMetric("Typography", "Readable"),
         ),
     )
@@ -792,7 +792,7 @@ private fun gatewayStatusLabel(
   statusText: String,
   isConnected: Boolean,
 ): String {
-  if (isConnected) return "Ready"
+  if (isConnected) return "就绪"
   val status = statusText.trim().lowercase()
   return when {
     status.contains("connecting") || status.contains("reconnecting") -> "Connecting..."
@@ -817,13 +817,13 @@ private fun AboutSettingsScreen(
   val latestVersion = updateAvailable?.latestVersion?.takeIf { it.isNotBlank() }
   val currentGatewayVersion = updateAvailable?.currentVersion?.takeIf { it.isNotBlank() } ?: gatewayVersion
 
-  SettingsDetailFrame(title = "About", subtitle = "OpenClaw for Android.", icon = Icons.Default.Info, onBack = onBack) {
+  SettingsDetailFrame(title = "关于", subtitle = "OpenClaw for Android.", icon = Icons.Default.Info, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
           SettingsMetric("Android App", BuildConfig.VERSION_NAME),
           SettingsMetric("Build", BuildConfig.VERSION_CODE.toString()),
-          SettingsMetric("Channel", "Play"),
+          SettingsMetric("频道", "Play"),
           SettingsMetric("Gateway", currentGatewayVersion ?: "Not connected"),
         ),
     )
@@ -861,7 +861,7 @@ private fun AboutStatusRow(
       Text(text = title, style = ClawTheme.type.body, color = ClawTheme.colors.text, maxLines = 1)
       Text(text = value, style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    ClawStatusPill(text = if (healthy) "OK" else "Check", status = if (healthy) ClawStatus.Success else ClawStatus.Warning)
+    ClawStatusPill(text = if (healthy) "确定" else "Check", status = if (healthy) ClawStatus.Success else ClawStatus.Warning)
   }
 }
 
@@ -956,7 +956,7 @@ private fun UsageProviderListRow(provider: GatewayUsageProviderSummary) {
     title = provider.displayName,
     subtitle = usageProviderSubtitle(provider),
     leading = { ClawTextBadge(text = provider.displayName.firstOrNull()?.uppercase() ?: "U") },
-    trailing = { ClawStatusPill(text = if (hasIssue) "Issue" else "OK", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
+    trailing = { ClawStatusPill(text = if (hasIssue) "Issue" else "确定", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
   )
 }
 
@@ -987,9 +987,9 @@ private fun AgentListRow(
 ) {
   ClawDetailRow(
     title = agent.name?.takeIf { it.isNotBlank() } ?: agent.id,
-    subtitle = if (isDefault) "Default assistant" else "Ready",
+    subtitle = if (isDefault) "Default assistant" else "就绪",
     leading = { ClawTextBadge(text = agentBadge(agent)) },
-    trailing = { ClawStatusPill(text = if (isDefault) "Default" else "Ready", status = ClawStatus.Success) },
+    trailing = { ClawStatusPill(text = if (isDefault) "默认" else "就绪", status = ClawStatus.Success) },
   )
 }
 
@@ -999,7 +999,7 @@ private fun defaultAgentName(
 ): String {
   val defaultId = defaultAgentId?.trim().orEmpty()
   val agent = agents.firstOrNull { it.id == defaultId } ?: agents.firstOrNull()
-  return agent?.name?.takeIf { it.isNotBlank() } ?: agent?.id ?: "None"
+  return agent?.name?.takeIf { it.isNotBlank() } ?: agent?.id ?: "无"
 }
 
 private fun agentBadge(agent: GatewayAgentSummary): String {
@@ -1064,12 +1064,12 @@ private fun formatUsageUpdated(updatedAtMs: Long?): String {
 }
 
 private fun cronJobStatusText(job: GatewayCronJobSummary): String {
-  if (!job.enabled) return "Off"
+  if (!job.enabled) return "关闭"
   return when (job.lastRunStatus?.lowercase()) {
     "error" -> "Issue"
-    "ok" -> "OK"
+    "ok" -> "确定"
     "skipped" -> "Skipped"
-    else -> "Ready"
+    else -> "就绪"
   }
 }
 
@@ -1083,7 +1083,7 @@ private fun cronJobStatus(job: GatewayCronJobSummary): ClawStatus {
 }
 
 private fun formatCronWake(timeMs: Long?): String {
-  val target = timeMs ?: return "None"
+  val target = timeMs ?: return "无"
   val deltaMs = target - System.currentTimeMillis()
   if (deltaMs <= 0) return "Due"
   val minutes = deltaMs / 60_000L
@@ -1143,7 +1143,7 @@ internal fun SettingsMetricPanel(rows: List<SettingsMetric>) {
 private fun SettingsBackButton(onClick: () -> Unit) {
   Surface(onClick = onClick, modifier = Modifier.size(ClawTheme.spacing.touchTarget), shape = CircleShape, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
     Box(contentAlignment = Alignment.Center) {
-      Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(18.dp))
+      Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(18.dp))
     }
   }
 }

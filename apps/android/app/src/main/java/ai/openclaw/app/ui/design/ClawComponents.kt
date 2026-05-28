@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 internal enum class ClawStatus {
   Neutral,
@@ -473,7 +475,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
         subtitle = "Local command center",
         navigation = { ClawAvatarMark(text = "OC") },
         actions = {
-          ClawIconButton(icon = Icons.Default.Search, contentDescription = "Search", onClick = {})
+          ClawIconButton(icon = Icons.Default.Search, contentDescription = "搜索", onClick = {})
         },
       )
 
@@ -486,18 +488,18 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
           Text(text = "OpenClaw", style = ClawTheme.type.display, color = ClawTheme.colors.text)
           Text(text = "Design system prototype", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
-        ClawStatusPill(text = "Connected", status = ClawStatus.Success)
+        ClawStatusPill(text = "已连接", status = ClawStatus.Success)
       }
 
       ClawSegmentedControl(
-        options = listOf("Chat", "Voice", "Sessions"),
+        options = listOf("Chat", "语音", "会话列表"),
         selected = selected,
         onSelect = { selected = it },
         modifier = Modifier.fillMaxWidth(),
       )
 
       Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ClawSectionHeader(title = "Sessions")
+        ClawSectionHeader(title = "会话列表")
         ClawListItem(
           title = "Testing testing 1 2 3",
           subtitle = "14 messages · Android",
@@ -514,7 +516,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
 
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ClawPrimaryButton(text = "Start Chat", onClick = {}, modifier = Modifier.weight(1f))
-        ClawSecondaryButton(text = "Voice", onClick = {}, modifier = Modifier.weight(1f))
+        ClawSecondaryButton(text = "语音", onClick = {}, modifier = Modifier.weight(1f))
       }
 
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -533,8 +535,8 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
           listOf(
             ClawNavItem(key = "overview", label = "Home", icon = Icons.Default.Home),
             ClawNavItem(key = "chat", label = "Chat", icon = Icons.Default.ChatBubble),
-            ClawNavItem(key = "voice", label = "Voice", icon = Icons.Default.Mic),
-            ClawNavItem(key = "settings", label = "Settings", icon = Icons.Default.Settings),
+            ClawNavItem(key = "voice", label = "语音", icon = Icons.Default.Mic),
+            ClawNavItem(key = "settings", label = "设置", icon = Icons.Default.Settings),
           ),
         selectedKey = "chat",
         onSelect = {},

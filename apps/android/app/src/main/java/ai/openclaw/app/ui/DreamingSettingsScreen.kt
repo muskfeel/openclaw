@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun DreamingSettingsScreen(
@@ -49,7 +51,7 @@ internal fun DreamingSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Dreaming",
+    title = "梦境模式",
     subtitle = "Memory consolidation and dream diary.",
     icon = Icons.Default.Storage,
     onBack = onBack,
@@ -57,7 +59,7 @@ internal fun DreamingSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Status", if (summary.enabled) "On" else "Off"),
+          SettingsMetric("状态", if (summary.enabled) "开启" else "关闭"),
           SettingsMetric("Waiting", summary.shortTermCount.toString()),
           SettingsMetric("Signals", summary.totalSignalCount.toString()),
           SettingsMetric("Next Cycle", formatDreamingNextRun(summary.nextRunAtMs)),
@@ -65,7 +67,7 @@ internal fun DreamingSettingsScreen(
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (refreshing) "Refreshing" else "Refresh",
+        text = if (refreshing) "刷新中" else "刷新",
         onClick = viewModel::refreshDreaming,
         enabled = isConnected && !refreshing,
         modifier = Modifier.weight(1f),

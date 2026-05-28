@@ -28,6 +28,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 @Composable
 internal fun NodesDevicesSettingsScreen(
@@ -54,15 +56,15 @@ internal fun NodesDevicesSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Nodes", summary.nodes.size.toString()),
+          SettingsMetric("节点", summary.nodes.size.toString()),
           SettingsMetric("Online", summary.nodes.count { it.connected }.toString()),
-          SettingsMetric("Devices", if (summary.devicePairingAvailable) summary.pairedDevices.size.toString() else "Admin"),
-          SettingsMetric("Pending", summary.pendingDevices.size.toString()),
+          SettingsMetric("设备", if (summary.devicePairingAvailable) summary.pairedDevices.size.toString() else "Admin"),
+          SettingsMetric("待处理", summary.pendingDevices.size.toString()),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (refreshing) "Refreshing" else "Refresh",
+        text = if (refreshing) "刷新中" else "刷新",
         onClick = viewModel::refreshNodesDevices,
         enabled = isConnected && !refreshing,
         modifier = Modifier.weight(1f),
@@ -109,7 +111,7 @@ private fun NodesDevicesPanel(summary: GatewayNodesDevicesSummary) {
       }
     }
     if (summary.nodes.isNotEmpty()) {
-      NodesSection(title = "Nodes") {
+      NodesSection(title = "节点") {
         summary.nodes.forEachIndexed { index, node ->
           NodeRow(node = node)
           if (index != summary.nodes.lastIndex) {
@@ -226,7 +228,7 @@ private fun pairedDeviceSubtitle(device: GatewayPairedDeviceSummary): String {
 private fun pairedDeviceStatusText(tokens: List<GatewayDeviceTokenSummary>): String =
   when {
     tokens.isEmpty() -> "Paired"
-    tokens.any { !it.revoked } -> "Active"
+    tokens.any { !it.revoked } -> "活跃"
     else -> "Needs Token"
   }
 

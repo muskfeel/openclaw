@@ -59,6 +59,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import ai.openclaw.app.R
 
 internal data class DraftApplication(
   val input: String,
@@ -202,7 +204,7 @@ fun ChatComposer(
       )
 
       SecondaryActionButton(
-        label = "Refresh",
+        label = "刷新",
         icon = Icons.Default.Refresh,
         enabled = true,
         compact = true,
@@ -245,7 +247,7 @@ fun ChatComposer(
         }
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-          text = "Send",
+          text = "发送",
           style = mobileHeadline.copy(fontWeight = FontWeight.Bold),
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
@@ -315,10 +317,10 @@ private fun ThinkingMenuItem(
 
 private fun thinkingLabel(raw: String): String =
   when (raw.trim().lowercase()) {
-    "low" -> "Low"
-    "medium" -> "Medium"
-    "high" -> "High"
-    else -> "Off"
+    "low" -> "低"
+    "medium" -> "中"
+    "high" -> "高"
+    else -> "关闭"
   }
 
 @Composable

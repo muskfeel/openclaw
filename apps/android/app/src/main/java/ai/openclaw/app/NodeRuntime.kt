@@ -400,7 +400,7 @@ class NodeRuntime(
       deviceAuthStore = deviceAuthStore,
       onConnected = { hello ->
         operatorConnected = true
-        operatorStatusText = "Connected"
+        operatorStatusText = "已连接"
         _serverName.value = hello.serverName
         _remoteAddress.value = hello.remoteAddress
         _gatewayVersion.value = hello.serverVersion
@@ -458,7 +458,7 @@ class NodeRuntime(
       deviceAuthStore = deviceAuthStore,
       onConnected = {
         _nodeConnected.value = true
-        nodeStatusText = "Connected"
+        nodeStatusText = "已连接"
         didAutoRequestCanvasRehydrate = false
         _canvasA2uiHydrated.value = false
         _canvasRehydratePending.value = false
@@ -662,7 +662,7 @@ class NodeRuntime(
     val node = nodeStatusText.trim()
     _statusText.value =
       when {
-        operatorConnected && _nodeConnected.value -> "Connected"
+        operatorConnected && _nodeConnected.value -> "已连接"
         operatorConnected && !_nodeConnected.value -> "Connected (node offline)"
         !operatorConnected && _nodeConnected.value ->
           if (operator.isNotEmpty() && operator != "Offline") {
@@ -2503,7 +2503,7 @@ class NodeRuntime(
       HomeCanvasGatewayState.Error, HomeCanvasGatewayState.Offline ->
         HomeCanvasPayload(
           gatewayState = if (state == HomeCanvasGatewayState.Error) "error" else "offline",
-          eyebrow = "Welcome to OpenClaw",
+          eyebrow = "欢迎使用 OpenClaw",
           title = "Your phone stays quiet until it is needed",
           subtitle =
             "Pair this device to your gateway to wake it only for real work, keep a live agent overview handy, and avoid battery-draining background loops.",
@@ -2561,7 +2561,7 @@ class NodeRuntime(
             when {
               isActive -> "Active on this phone"
               isDefault -> "Default agent"
-              else -> "Ready"
+              else -> "就绪"
             },
           isActive = isActive,
         )
@@ -2881,7 +2881,7 @@ fun providerDisplayName(provider: String): String =
         .filter { it.isNotBlank() }
         .joinToString(" ") { token -> token.replaceFirstChar { it.uppercase() } }
         .replace(" Ai", " AI")
-        .ifBlank { "Provider" }
+        .ifBlank { "提供商" }
   }
 
 fun channelDisplayLabel(channel: String): String =
@@ -2896,7 +2896,7 @@ fun channelDisplayLabel(channel: String): String =
         .split(' ')
         .filter { it.isNotBlank() }
         .joinToString(" ") { token -> token.replaceFirstChar { it.uppercase() } }
-        .ifBlank { "Channel" }
+        .ifBlank { "频道" }
   }
 
 @Serializable

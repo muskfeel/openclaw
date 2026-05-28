@@ -144,7 +144,7 @@ class MainViewModel(
   val micEnabled: StateFlow<Boolean> = runtimeState(initial = false) { it.micEnabled }
 
   val micCooldown: StateFlow<Boolean> = runtimeState(initial = false) { it.micCooldown }
-  val micStatusText: StateFlow<String> = runtimeState(initial = "Mic off") { it.micStatusText }
+  val micStatusText: StateFlow<String> = runtimeState(initial = "麦克风关闭") { it.micStatusText }
   val micLiveTranscript: StateFlow<String?> = runtimeState(initial = null) { it.micLiveTranscript }
   val micIsListening: StateFlow<Boolean> = runtimeState(initial = false) { it.micIsListening }
   val micQueuedMessages: StateFlow<List<String>> = runtimeState(initial = emptyList()) { it.micQueuedMessages }
@@ -154,7 +154,7 @@ class MainViewModel(
   val talkModeEnabled: StateFlow<Boolean> = runtimeState(initial = false) { it.talkModeEnabled }
   val talkModeListening: StateFlow<Boolean> = runtimeState(initial = false) { it.talkModeListening }
   val talkModeSpeaking: StateFlow<Boolean> = runtimeState(initial = false) { it.talkModeSpeaking }
-  val talkModeStatusText: StateFlow<String> = runtimeState(initial = "Off") { it.talkModeStatusText }
+  val talkModeStatusText: StateFlow<String> = runtimeState(initial = "关闭") { it.talkModeStatusText }
   val talkModeConversation: StateFlow<List<VoiceConversationEntry>> =
     runtimeState(initial = emptyList()) { it.talkModeConversation }
 
