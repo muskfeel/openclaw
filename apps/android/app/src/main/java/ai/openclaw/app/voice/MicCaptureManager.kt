@@ -689,7 +689,7 @@ class MicCaptureManager(
     if (currentSessionId == null || sessionId != currentSessionId) return
 
     when (obj["type"].asStringOrNull()) {
-      "ready", "inputAudio", "speechStart" -> {
+      "就绪", "inputAudio", "speechStart" -> {
         _isListening.value = true
         _statusText.value = listeningStatus()
       }

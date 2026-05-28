@@ -16,7 +16,7 @@ internal fun openClawAndroidVersionLabel(): String {
   }
 }
 
-internal fun gatewayStatusForDisplay(statusText: String): String = statusText.trim().ifEmpty { "Offline" }
+internal fun gatewayStatusForDisplay(statusText: String): String = statusText.trim().ifEmpty { "离线" }
 
 internal fun gatewayStatusHasDiagnostics(statusText: String): Boolean {
   val lower = gatewayStatusForDisplay(statusText).lowercase()

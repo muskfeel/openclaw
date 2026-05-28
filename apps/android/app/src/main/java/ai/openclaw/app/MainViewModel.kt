@@ -81,7 +81,7 @@ class MainViewModel(
 
   val isConnected: StateFlow<Boolean> = runtimeState(initial = false) { it.isConnected }
   val isNodeConnected: StateFlow<Boolean> = runtimeState(initial = false) { it.nodeConnected }
-  val statusText: StateFlow<String> = runtimeState(initial = "Offline") { it.statusText }
+  val statusText: StateFlow<String> = runtimeState(initial = "离线") { it.statusText }
   val serverName: StateFlow<String?> = runtimeState(initial = null) { it.serverName }
   val remoteAddress: StateFlow<String?> = runtimeState(initial = null) { it.remoteAddress }
   val gatewayVersion: StateFlow<String?> = runtimeState(initial = null) { it.gatewayVersion }

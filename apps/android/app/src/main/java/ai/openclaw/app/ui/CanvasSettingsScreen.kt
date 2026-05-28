@@ -60,7 +60,7 @@ internal fun CanvasSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Connection", if (isConnected) "Online" else "Offline"),
+          SettingsMetric("Connection", if (isConnected) "Online" else "离线"),
           SettingsMetric("Surface", canvasLabel),
           SettingsMetric("Bridge", if (hasLivePage && hydrated) "就绪" else "Standby"),
         ),

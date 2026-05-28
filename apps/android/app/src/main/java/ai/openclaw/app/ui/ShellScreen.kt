@@ -78,8 +78,8 @@ private enum class Tab(
   val key: String,
   val label: String,
 ) {
-  Overview(key = "overview", label = "Home"),
-  Chat(key = "chat", label = "Chat"),
+  Overview(key = "overview", label = "首页"),
+  Chat(key = "chat", label = "聊天"),
   Voice(key = "voice", label = "语音"),
   Sessions(key = "sessions", label = "会话列表"),
   Settings(key = "settings", label = "设置"),
@@ -262,7 +262,7 @@ private fun GatewayTrustDialog(
     text = { Text(message, style = ClawTheme.type.body, color = ClawTheme.colors.textMuted) },
     confirmButton = {
       TextButton(onClick = onAccept) {
-        Text("Trust")
+        Text("信任")
       }
     },
     dismissButton = {
@@ -335,24 +335,24 @@ private fun OverviewScreen(
           ModuleList(
             rows =
               listOf(
-                ModuleRow("Chat", null, null, Icons.Outlined.ChatBubbleOutline, Tab.Chat),
-                ModuleRow("会话列表", null, if (sessions.isEmpty()) "Empty" else "${sessions.size} recent", Icons.Outlined.AccessTime, Tab.Sessions),
-                ModuleRow("语音", null, if (isConnected) "就绪" else "Offline", Icons.Outlined.MicNone, Tab.Voice),
+                ModuleRow("聊天", null, null, Icons.Outlined.ChatBubbleOutline, Tab.Chat),
+                ModuleRow("会话列表", null, if (sessions.isEmpty()) "空" else "${sessions.size} recent", Icons.Outlined.AccessTime, Tab.Sessions),
+                ModuleRow("语音", null, if (isConnected) "就绪" else "离线", Icons.Outlined.MicNone, Tab.Voice),
                 ModuleRow(
                   title = "Providers & Models",
                   subtitle = null,
                   metadata =
                     when {
-                      !isConnected -> "Offline"
+                      !isConnected -> "离线"
                       readyProviderCount > 0 -> "$readyProviderCount ready"
                       models.isNotEmpty() -> "${models.size} models"
-                      else -> "Setup"
+                      else -> "设置"
                     },
                   icon = Icons.Outlined.Inventory2,
                   tab = Tab.ProvidersModels,
                 ),
                 ModuleRow("频道", null, channelsSummaryText(channelsSummary), Icons.Default.Notifications, Tab.Settings, SettingsRoute.Channels),
-                ModuleRow("智能体", null, if (agents.isEmpty()) "Load" else "${agents.size} ready", Icons.Default.Person, Tab.Settings, SettingsRoute.Agents),
+                ModuleRow("智能体", null, if (agents.isEmpty()) "加载" else "${agents.size} ready", Icons.Default.Person, Tab.Settings, SettingsRoute.Agents),
                 ModuleRow("审批", null, approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, Tab.Settings, SettingsRoute.Approvals),
                 ModuleRow("定时任务", null, cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, Tab.Settings, SettingsRoute.CronJobs),
                 ModuleRow("技能", null, skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, Tab.Settings, SettingsRoute.Skills),
@@ -439,7 +439,7 @@ private fun OverviewChatButton(
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       Icon(imageVector = Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-      Text(text = "Chat", style = ClawTheme.type.label.copy(fontSize = 16.sp, lineHeight = 20.sp))
+      Text(text = "聊天", style = ClawTheme.type.label.copy(fontSize = 16.sp, lineHeight = 20.sp))
     }
   }
 }
@@ -732,10 +732,10 @@ private fun SettingsShellScreen(
               SettingsRow("梦境模式", dreamingSummaryText(dreamingSummary), Icons.Default.Storage, status = dreamingStatus(dreamingSummary), route = SettingsRoute.Dreaming),
               SettingsRow("画布", "Screen surface", Icons.AutoMirrored.Filled.ScreenShare, status = isConnected, route = SettingsRoute.Canvas),
               SettingsRow("通知", if (notificationForwardingEnabled) "Smart delivery" else "关闭", Icons.Default.Notifications, route = SettingsRoute.Notifications),
-              SettingsRow("Phone Capabilities", if (cameraEnabled) "Camera enabled" else "Locked", Icons.Default.Lock, status = !cameraEnabled, route = SettingsRoute.PhoneCapabilities),
-              SettingsRow("Gateway", gatewaySummary(statusText, isConnected), Icons.Default.Cloud, status = isConnected, route = SettingsRoute.Gateway),
-              SettingsRow("Appearance", "Dark", Icons.Default.Palette, route = SettingsRoute.Appearance),
-              SettingsRow("健康状态", "Diagnostics", Icons.Default.Settings, status = isConnected, route = SettingsRoute.Health),
+              SettingsRow("手机功能", if (cameraEnabled) "相机已启用" else "已锁定", Icons.Default.Lock, status = !cameraEnabled, route = SettingsRoute.PhoneCapabilities),
+              SettingsRow("网关", gatewaySummary(statusText, isConnected), Icons.Default.Cloud, status = isConnected, route = SettingsRoute.Gateway),
+              SettingsRow("外观", "深色", Icons.Default.Palette, route = SettingsRoute.Appearance),
+              SettingsRow("健康状态", "诊断", Icons.Default.Settings, status = isConnected, route = SettingsRoute.Health),
               SettingsRow("关于", "Version and update", Icons.Default.Storage, route = SettingsRoute.About),
             ),
           onOpen = onRouteChange,
@@ -1009,7 +1009,7 @@ private fun statusDotColor(status: String): Color {
   val normalized = status.trim().lowercase()
   return when {
     normalized.contains("offline") || normalized.contains("not connected") -> Color(0xFFFF6B6B)
-    normalized.contains("ready") || normalized.contains("active") || normalized.contains("online") -> Color(0xFF3EDB82)
+    normalized.contains("就绪") || normalized.contains("active") || normalized.contains("online") -> Color(0xFF3EDB82)
     else -> Color(0xFF707070)
   }
 }

@@ -238,7 +238,7 @@ class PermissionRequester internal constructor(
                 Uri.fromParts("package", activity.packageName, null),
               )
             activity.startActivity(intent)
-          }.setNegativeButton("Cancel", null)
+          }.setNegativeButton("取消", null)
           .setOnDismissListener { removeObserver() }
           .show()
     }

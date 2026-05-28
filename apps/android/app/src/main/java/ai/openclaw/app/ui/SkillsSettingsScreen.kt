@@ -52,7 +52,7 @@ internal fun SkillsSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Installed", skills.size.toString()),
+          SettingsMetric("已安装", skills.size.toString()),
           SettingsMetric("就绪", readyCount.toString()),
           SettingsMetric("Needs Setup", needsSetupCount.toString()),
         ),
@@ -111,7 +111,7 @@ private fun skillNeedsSetup(skill: GatewaySkillSummary): Boolean = !skill.disabl
 private fun skillStatusText(skill: GatewaySkillSummary): String =
   when {
     skill.disabled -> "关闭"
-    skillNeedsSetup(skill) -> "Setup"
+    skillNeedsSetup(skill) -> "设置"
     else -> "就绪"
   }
 
@@ -125,7 +125,7 @@ private fun skillStatus(skill: GatewaySkillSummary): ClawStatus =
 private fun skillSubtitle(skill: GatewaySkillSummary): String {
   val issue =
     when {
-      skill.disabled -> "Disabled"
+      skill.disabled -> "已禁用"
       skill.blockedByAllowlist -> "Blocked"
       skill.missingCount > 0 -> "${skill.missingCount} missing"
       !skill.eligible -> "Needs setup"
@@ -137,7 +137,7 @@ private fun skillSubtitle(skill: GatewaySkillSummary): String {
 private fun skillSourceLabel(skill: GatewaySkillSummary): String =
   when (skill.source) {
     "openclaw-bundled" -> if (skill.bundled) "Built-in" else "Bundled"
-    "openclaw-managed" -> "Installed"
+    "openclaw-managed" -> "已安装"
     "openclaw-workspace" -> "Workspace"
     "openclaw-extra" -> "Extra"
     else -> "Skill"

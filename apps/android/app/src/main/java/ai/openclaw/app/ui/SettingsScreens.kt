@@ -536,7 +536,7 @@ private fun NotificationSettingsScreen(
           SettingsMetric("Policy", modeLabel),
           SettingsMetric("Selected Apps", packages.size.toString()),
           SettingsMetric("Rate Limit", "$maxEventsPerMinute/min"),
-          SettingsMetric("Access", if (listenerEnabled) "Granted" else "Setup"),
+          SettingsMetric("Access", if (listenerEnabled) "Granted" else "设置"),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -625,7 +625,7 @@ private fun PhoneCapabilitiesScreen(
     }
   }
 
-  SettingsDetailFrame(title = "Phone Capabilities", subtitle = "Choose what this phone can share.", icon = Icons.AutoMirrored.Filled.ScreenShare, onBack = onBack) {
+  SettingsDetailFrame(title = "手机功能", subtitle = "Choose what this phone can share.", icon = Icons.AutoMirrored.Filled.ScreenShare, onBack = onBack) {
     SettingsTogglePanel(
       rows =
         listOf(
@@ -672,13 +672,13 @@ private fun GatewaySettingsScreen(
   var passwordInput by remember { mutableStateOf("") }
   var validationText by remember { mutableStateOf<String?>(null) }
 
-  SettingsDetailFrame(title = "Gateway", subtitle = "Connection between this phone and OpenClaw.", icon = Icons.Default.Cloud, onBack = onBack) {
+  SettingsDetailFrame(title = "网关", subtitle = "Connection between this phone and OpenClaw.", icon = Icons.Default.Cloud, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Connection", if (isConnected) "已连接" else "Offline"),
+          SettingsMetric("Connection", if (isConnected) "已连接" else "离线"),
           SettingsMetric("Node", if (isNodeConnected) "Online" else "Not paired"),
-          SettingsMetric("Gateway", serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"),
+          SettingsMetric("网关", serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"),
           SettingsMetric("Address", remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"),
           SettingsMetric("状态", gatewayStatusLabel(statusText = statusText, isConnected = isConnected)),
         ),
@@ -771,11 +771,11 @@ private fun GatewaySettingsScreen(
 
 @Composable
 private fun AppearanceSettingsScreen(onBack: () -> Unit) {
-  SettingsDetailFrame(title = "Appearance", subtitle = "A calm, high-contrast OpenClaw interface.", icon = Icons.Default.Palette, onBack = onBack) {
+  SettingsDetailFrame(title = "外观", subtitle = "A calm, high-contrast OpenClaw interface.", icon = Icons.Default.Palette, onBack = onBack) {
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Theme", "Dark"),
+          SettingsMetric("Theme", "深色"),
           SettingsMetric("Contrast", "高"),
           SettingsMetric("Typography", "Readable"),
         ),
@@ -822,17 +822,17 @@ private fun AboutSettingsScreen(
           SettingsMetric("Android App", BuildConfig.VERSION_NAME),
           SettingsMetric("Build", BuildConfig.VERSION_CODE.toString()),
           SettingsMetric("频道", "Play"),
-          SettingsMetric("Gateway", currentGatewayVersion ?: "Not connected"),
+          SettingsMetric("网关", currentGatewayVersion ?: "Not connected"),
         ),
     )
     ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
       Column {
-        AboutStatusRow(title = "Gateway", value = serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway", healthy = isConnected)
+        AboutStatusRow(title = "网关", value = serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway", healthy = isConnected)
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         AboutStatusRow(title = "Runtime", value = currentGatewayVersion ?: "Waiting", healthy = currentGatewayVersion != null)
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         AboutStatusRow(
-          title = "Update",
+          title = "更新",
           value = latestVersion?.let { "v$it available" } ?: "Up to date",
           healthy = latestVersion == null,
         )
@@ -929,7 +929,7 @@ private fun ApprovalListRow(toolCall: ChatPendingToolCall) {
     title = approvalActionName(toolCall.name),
     subtitle = approvalSubtitle(toolCall, hasIssue),
     leading = { ClawIconBadge(icon = Icons.Default.Lock) },
-    trailing = { ClawStatusPill(text = if (hasIssue) "Issue" else "Review", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
+    trailing = { ClawStatusPill(text = if (hasIssue) "问题" else "Review", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
   )
 }
 
@@ -954,7 +954,7 @@ private fun UsageProviderListRow(provider: GatewayUsageProviderSummary) {
     title = provider.displayName,
     subtitle = usageProviderSubtitle(provider),
     leading = { ClawTextBadge(text = provider.displayName.firstOrNull()?.uppercase() ?: "U") },
-    trailing = { ClawStatusPill(text = if (hasIssue) "Issue" else "确定", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
+    trailing = { ClawStatusPill(text = if (hasIssue) "问题" else "确定", status = if (hasIssue) ClawStatus.Warning else ClawStatus.Success) },
   )
 }
 
@@ -1064,7 +1064,7 @@ private fun formatUsageUpdated(updatedAtMs: Long?): String {
 private fun cronJobStatusText(job: GatewayCronJobSummary): String {
   if (!job.enabled) return "关闭"
   return when (job.lastRunStatus?.lowercase()) {
-    "error" -> "Issue"
+    "error" -> "问题"
     "ok" -> "确定"
     "skipped" -> "Skipped"
     else -> "就绪"

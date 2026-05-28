@@ -53,10 +53,10 @@ private enum class HomeTab(
   val label: String,
   val icon: ImageVector,
 ) {
-  Connect(label = "Connect", icon = Icons.Default.CheckCircle),
-  Chat(label = "Chat", icon = Icons.Default.ChatBubble),
+  Connect(label = "连接", icon = Icons.Default.CheckCircle),
+  Chat(label = "聊天", icon = Icons.Default.ChatBubble),
   Voice(label = "语音", icon = Icons.Default.RecordVoiceOver),
-  Screen(label = "Screen", icon = Icons.AutoMirrored.Filled.ScreenShare),
+  Screen(label = "屏幕", icon = Icons.AutoMirrored.Filled.ScreenShare),
   Settings(label = "设置", icon = Icons.Default.Settings),
 }
 
@@ -284,7 +284,7 @@ private fun TopStatusBar(
             Box(modifier = Modifier.padding(4.dp))
           }
           Text(
-            text = statusText.trim().ifEmpty { "Offline" },
+            text = statusText.trim().ifEmpty { "离线" },
             style = mobileCaption1,
             color = chipText,
             maxLines = 1,

@@ -524,7 +524,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                   shape = RoundedCornerShape(14.dp),
                 ) {
                   Text(
-                    if (assistantRoleHeld) "Manage" else "Enable",
+                    if (assistantRoleHeld) "Manage" else "启用",
                     style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                   )
                 }
@@ -638,7 +638,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (notificationListenerEnabled) "Manage" else "Enable",
+                  if (notificationListenerEnabled) "Manage" else "启用",
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }

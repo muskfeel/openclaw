@@ -764,7 +764,7 @@ class TalkModeManager internal constructor(
     if (currentSessionId == null || sessionId != currentSessionId) return
 
     when (val type = obj["type"].asStringOrNull()) {
-      "ready" -> {
+      "就绪" -> {
         _isListening.value = true
         _statusText.value = "监听中"
       }

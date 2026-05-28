@@ -188,7 +188,7 @@ fun OnboardingFlow(
         },
         confirmButton = {
           TextButton(onClick = viewModel::acceptGatewayTrustPrompt) {
-            Text("Trust")
+            Text("信任")
           }
         },
         dismissButton = {

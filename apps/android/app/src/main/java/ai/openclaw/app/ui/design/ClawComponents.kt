@@ -463,7 +463,7 @@ internal fun ClawTextField(
 
 @Composable
 internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
-  var selected by rememberSaveable { mutableStateOf("Chat") }
+  var selected by rememberSaveable { mutableStateOf("聊天") }
   var prompt by rememberSaveable { mutableStateOf("") }
 
   ClawScaffold(modifier = modifier) {
@@ -490,7 +490,7 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
       }
 
       ClawSegmentedControl(
-        options = listOf("Chat", "语音", "会话列表"),
+        options = listOf("聊天", "语音", "会话列表"),
         selected = selected,
         onSelect = { selected = it },
         modifier = Modifier.fillMaxWidth(),
@@ -518,9 +518,9 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
       }
 
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ClawPill(text = "Realtime", selected = true)
-        ClawPill(text = "Dictation")
-        ClawPill(text = "Screen")
+        ClawPill(text = "实时", selected = true)
+        ClawPill(text = "听写")
+        ClawPill(text = "屏幕")
       }
 
       ClawEmptyState(
@@ -531,8 +531,8 @@ internal fun ClawComponentShowcase(modifier: Modifier = Modifier) {
       ClawBottomNav(
         items =
           listOf(
-            ClawNavItem(key = "overview", label = "Home", icon = Icons.Default.Home),
-            ClawNavItem(key = "chat", label = "Chat", icon = Icons.Default.ChatBubble),
+            ClawNavItem(key = "overview", label = "首页", icon = Icons.Default.Home),
+            ClawNavItem(key = "chat", label = "聊天", icon = Icons.Default.ChatBubble),
             ClawNavItem(key = "voice", label = "语音", icon = Icons.Default.Mic),
             ClawNavItem(key = "settings", label = "设置", icon = Icons.Default.Settings),
           ),

@@ -248,7 +248,7 @@ private fun providerSetupSubtitle(
 internal fun modelProviderReady(status: String): Boolean {
   val normalized = status.trim().lowercase()
   return normalized == "ok" ||
-    normalized == "ready" ||
+    normalized == "就绪" ||
     normalized == "healthy" ||
     normalized == "configured" ||
     normalized == "static"
@@ -312,7 +312,7 @@ private fun ProviderOverviewPanel(
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ProviderMetricTile(label = "就绪", value = readyCount.toString(), modifier = Modifier.weight(1f))
         ProviderMetricTile(label = "模型", value = modelCount.toString(), modifier = Modifier.weight(1f))
-        ProviderMetricTile(label = "Setup", value = needsSetupCount.toString(), modifier = Modifier.weight(1f))
+        ProviderMetricTile(label = "设置", value = needsSetupCount.toString(), modifier = Modifier.weight(1f))
       }
       Text(
         text = if (isConnected) "Choose a provider below, then finish credentials on your Gateway." else "Connect your Gateway before adding model providers.",
@@ -382,7 +382,7 @@ private fun ProviderSetupListRow(
       }
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (row.ready) ClawTheme.colors.success else ClawTheme.colors.warning))
-        Text(text = if (row.ready) "就绪" else "Setup", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
+        Text(text = if (row.ready) "就绪" else "设置", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted, maxLines = 1)
         Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Open ${row.name}", modifier = Modifier.size(17.dp), tint = ClawTheme.colors.text)
       }
     }

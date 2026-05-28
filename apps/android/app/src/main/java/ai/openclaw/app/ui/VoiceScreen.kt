@@ -248,7 +248,7 @@ private fun DictationScreen(
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
       VoicePlainIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to voice", onClick = onCancel)
       Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(text = "Dictation", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text)
+        Text(text = "听写", style = ClawTheme.type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = ClawTheme.colors.text)
         Text(text = "Transcribe then send", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       }
       VoicePlainIconButton(icon = Icons.Default.Settings, contentDescription = "Dictation settings", onClick = onOpenVoiceSettings)
@@ -298,9 +298,9 @@ private fun DictationScreen(
           Text(
             text =
               when {
-                sending -> "Sending"
+                sending -> "发送中"
                 speechProviderReady -> "就绪"
-                else -> "Offline"
+                else -> "离线"
               },
             style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp),
             color =
@@ -334,7 +334,7 @@ private fun DictationScreen(
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       ClawSecondaryButton(text = "取消", icon = Icons.Default.Close, onClick = onCancel, modifier = Modifier.weight(0.95f))
-      ClawPrimaryButton(text = if (sending) "Sending" else "Send to Chat", icon = Icons.AutoMirrored.Filled.Send, onClick = onSend, enabled = !sending, modifier = Modifier.weight(1.25f))
+      ClawPrimaryButton(text = if (sending) "发送中" else "发送到聊天", icon = Icons.AutoMirrored.Filled.Send, onClick = onSend, enabled = !sending, modifier = Modifier.weight(1.25f))
     }
   }
 }
@@ -417,8 +417,8 @@ private fun TalkSessionScreen(
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      TalkControl(icon = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, label = if (speakerEnabled) "Mute" else "Unmute", onClick = onToggleSpeaker)
-      TalkControl(icon = Icons.Default.PhoneDisabled, label = "End", primary = true, onClick = onEndTalk)
+      TalkControl(icon = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, label = if (speakerEnabled) "静音" else "取消静音", onClick = onToggleSpeaker)
+      TalkControl(icon = Icons.Default.PhoneDisabled, label = "结束", primary = true, onClick = onEndTalk)
       TalkControl(icon = Icons.Default.GraphicEq, label = "语音", onClick = onOpenVoiceSettings)
     }
   }
@@ -653,7 +653,7 @@ private fun VoiceHero(
         enabled = gatewayReady || talkModeEnabled,
       )
       VoiceModeRow(
-        title = if (micEnabled) "Stop Dictation" else "Dictation",
+        title = if (micEnabled) "停止听写" else "听写",
         subtitle =
           when {
             micEnabled -> "Listening for one turn"
@@ -765,7 +765,7 @@ private fun VoiceProviderCard(gatewayStatus: String) {
               .clip(CircleShape)
               .background(if (ready) ClawTheme.colors.success else ClawTheme.colors.textSubtle),
         )
-        Text(text = if (ready) "就绪" else "Offline", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted, maxLines = 1)
+        Text(text = if (ready) "就绪" else "离线", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted, maxLines = 1)
       }
     }
   }
@@ -922,7 +922,7 @@ private fun VoiceTurnCard(entry: VoiceConversationEntry) {
 private fun VoiceThinkingCard() {
   ClawPanel {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      ClawStatusPill(text = "Sending", status = ClawStatus.Warning)
+      ClawStatusPill(text = "发送中", status = ClawStatus.Warning)
       Text(text = "OpenClaw is preparing a response.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
     }
   }

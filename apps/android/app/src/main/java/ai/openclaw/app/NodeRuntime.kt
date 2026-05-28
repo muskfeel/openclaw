@@ -275,7 +275,7 @@ class NodeRuntime(
   private val _nodeConnected = MutableStateFlow(false)
   val nodeConnected: StateFlow<Boolean> = _nodeConnected.asStateFlow()
 
-  private val _statusText = MutableStateFlow("Offline")
+  private val _statusText = MutableStateFlow("离线")
   val statusText: StateFlow<String> = _statusText.asStateFlow()
 
   private val _pendingGatewayTrust = MutableStateFlow<GatewayTrustPrompt?>(null)
@@ -390,8 +390,8 @@ class NodeRuntime(
 
   @Volatile private var nodePresenceAliveLastSuccessAtMs: Long? = null
   private var operatorConnected = false
-  private var operatorStatusText: String = "Offline"
-  private var nodeStatusText: String = "Offline"
+  private var operatorStatusText: String = "离线"
+  private var nodeStatusText: String = "离线"
 
   private val operatorSession =
     GatewaySession(
@@ -665,12 +665,12 @@ class NodeRuntime(
         operatorConnected && _nodeConnected.value -> "已连接"
         operatorConnected && !_nodeConnected.value -> "Connected (node offline)"
         !operatorConnected && _nodeConnected.value ->
-          if (operator.isNotEmpty() && operator != "Offline") {
+          if (operator.isNotEmpty() && operator != "离线") {
             "Connected (operator: $operator)"
           } else {
             "Connected (operator offline)"
           }
-        operator.isNotBlank() && operator != "Offline" -> operator
+        operator.isNotBlank() && operator != "离线" -> operator
         else -> node
       }
     updateHomeCanvasState()
@@ -1411,7 +1411,7 @@ class NodeRuntime(
       )
     if (operatorAuth == null) {
       operatorConnected = false
-      operatorStatusText = "Offline"
+      operatorStatusText = "离线"
       operatorSession.disconnect()
       updateStatus()
     } else {
@@ -1531,7 +1531,7 @@ class NodeRuntime(
 
   fun declineGatewayTrustPrompt() {
     _pendingGatewayTrust.value = null
-    _statusText.value = "Offline"
+    _statusText.value = "离线"
   }
 
   private fun gatewayTlsProbeFailureMessage(failure: GatewayTlsProbeFailure?): String =
@@ -2465,7 +2465,7 @@ class NodeRuntime(
     val state = resolveHomeCanvasGatewayState()
     val gatewayName = normalized(_serverName.value)
     val gatewayAddress = normalized(_remoteAddress.value)
-    val gatewayLabel = gatewayName ?: gatewayAddress ?: "Gateway"
+    val gatewayLabel = gatewayName ?: gatewayAddress ?: "网关"
     val activeAgentId = resolveActiveAgentId()
     val agents = homeCanvasAgents(activeAgentId)
 

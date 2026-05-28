@@ -152,7 +152,7 @@ private fun NodeRow(node: GatewayNodeSummary) {
     badge = nodeBadge(node.displayName ?: node.id),
     title = node.displayName ?: node.id,
     subtitle = nodeSubtitle(node),
-    statusText = if (node.connected) "Online" else "Offline",
+    statusText = if (node.connected) "Online" else "离线",
     status = if (node.connected) ClawStatus.Success else ClawStatus.Warning,
   )
 }
@@ -200,7 +200,7 @@ private fun GatewayNodesDevicesSummary.isEmpty(): Boolean = nodes.isEmpty() && p
 private fun nodeSubtitle(node: GatewayNodeSummary): String {
   val kind = node.deviceFamily ?: "Node host"
   val version = node.version?.let { "OpenClaw $it" }
-  val status = if (node.paired) "Paired" else "Unpaired"
+  val status = if (node.paired) "已配对" else "未配对"
   val commands =
     node.commands
       .take(2)
@@ -225,7 +225,7 @@ private fun pairedDeviceSubtitle(device: GatewayPairedDeviceSummary): String {
 
 private fun pairedDeviceStatusText(tokens: List<GatewayDeviceTokenSummary>): String =
   when {
-    tokens.isEmpty() -> "Paired"
+    tokens.isEmpty() -> "已配对"
     tokens.any { !it.revoked } -> "活跃"
     else -> "Needs Token"
   }

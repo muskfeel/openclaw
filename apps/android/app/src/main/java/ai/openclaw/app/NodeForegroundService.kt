@@ -109,7 +109,7 @@ class NodeForegroundService : Service() {
           notification =
             buildNotification(
               title = "OpenClaw Node",
-              text = if (voiceCaptureMode == VoiceCaptureMode.TalkMode) "Talk mode active" else "Connected",
+              text = if (voiceCaptureMode == VoiceCaptureMode.TalkMode) "Talk mode active" else "已连接",
             ),
         )
       }
@@ -174,7 +174,7 @@ class NodeForegroundService : Service() {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-      .addAction(0, "Disconnect", stopPending)
+      .addAction(0, "断开", stopPending)
       .build()
   }
 

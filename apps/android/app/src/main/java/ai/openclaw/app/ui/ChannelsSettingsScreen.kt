@@ -119,8 +119,8 @@ private fun channelSubtitle(channel: GatewayChannelSummary): String {
   val lifecycle =
     when {
       channel.connected -> "已连接"
-      channel.running -> "Running"
-      channel.linked -> "Linked"
+      channel.running -> "运行中"
+      channel.linked -> "已连接"
       channel.configured -> "已配置"
       channel.enabled -> "已启用"
       else -> "关闭"
@@ -130,11 +130,11 @@ private fun channelSubtitle(channel: GatewayChannelSummary): String {
 
 private fun channelStatusText(channel: GatewayChannelSummary): String =
   when {
-    channel.error != null -> "Issue"
+    channel.error != null -> "问题"
     channel.connected -> "已连接"
-    channel.running -> "Running"
+    channel.running -> "运行中"
     channel.linked || channel.configured -> "就绪"
-    channel.enabled -> "Setup"
+    channel.enabled -> "设置"
     else -> "关闭"
   }
 

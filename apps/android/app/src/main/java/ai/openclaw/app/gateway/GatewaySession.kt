@@ -221,7 +221,7 @@ class GatewaySession(
         pluginSurfaceUrls = emptyMap()
         mainSessionKey = null
       }
-      onDisconnected("Offline")
+      onDisconnected("离线")
     }
   }
 

@@ -58,7 +58,7 @@ internal fun HealthLogsSettingsScreen(
     SettingsMetricPanel(
       rows =
         listOf(
-          SettingsMetric("Gateway", if (isConnected) "Online" else "Offline"),
+          SettingsMetric("网关", if (isConnected) "Online" else "离线"),
           SettingsMetric("Node", if (isNodeConnected) "Online" else "Waiting"),
           SettingsMetric("模型", modelCount.size.toString()),
           SettingsMetric("Logs", logsSummary.entries.size.toString()),
@@ -110,11 +110,11 @@ private fun HealthStatusPanel(
 ) {
   ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
     Column {
-      HealthStatusRow(title = "Gateway", value = gateway, healthy = isConnected)
+      HealthStatusRow(title = "网关", value = gateway, healthy = isConnected)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "Phone Node", value = node, healthy = isNodeConnected)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
-      HealthStatusRow(title = "Chat", value = chat, healthy = chatHealthOk)
+      HealthStatusRow(title = "聊天", value = chat, healthy = chatHealthOk)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
       HealthStatusRow(title = "模型", value = models, healthy = modelsReady)
       HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
