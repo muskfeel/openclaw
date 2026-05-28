@@ -178,10 +178,10 @@ fun OnboardingFlow(
       AlertDialog(
         onDismissRequest = viewModel::declineGatewayTrustPrompt,
         containerColor = ClawTheme.colors.surfaceRaised,
-        title = { Text("Trust this gateway?", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
+        title = { Text("信任此网关？", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
         text = {
           Text(
-            "Verify the certificate fingerprint before continuing.\n\n${prompt.fingerprintSha256}",
+            "继续前请验证证书指纹。\n\n${prompt.fingerprintSha256}",
             style = ClawTheme.type.body,
             color = ClawTheme.colors.textMuted,
           )
@@ -232,7 +232,7 @@ fun OnboardingFlow(
                   return@addOnSuccessListener
                 }
                 setupCode = scanned.setupCode
-              }.addOnFailureListener { setupError = "Could not open the scanner." }
+              }.addOnFailureListener { setupError = 无法打开扫描器。" }
           },
           onSetupCodeChange = {
             setupCode = it
@@ -266,7 +266,7 @@ fun OnboardingFlow(
                 password = password,
               )
             if (config == null) {
-              setupError = "Enter a setup code or a valid gateway URL."
+              setupError = 输入配置码或有效的网关 URL。"
               return@GatewaySetupScreen
             }
 
@@ -355,7 +355,7 @@ private fun WelcomeScreen(
           color = ClawTheme.colors.text,
         )
         Text(
-          text = "Your AI command center.\nPrivate. Local. Under your control.",
+          text = "您的 AI 指挥中心。\nPrivate. Local. Under your control.",
           style = ClawTheme.type.section,
           color = ClawTheme.colors.text,
           textAlign = TextAlign.Center,
@@ -369,7 +369,7 @@ private fun WelcomeScreen(
         OutlinedAction(title = "输入配置码", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onConnect)
         Surface(onClick = onConnect, color = Color.Transparent, contentColor = ClawTheme.colors.text) {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text(text = "Already have a setup?  ", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+            Text(text = "已有设置？  ", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
             Text(text = "登录", style = ClawTheme.type.body.copy(fontWeight = FontWeight.SemiBold), color = ClawTheme.colors.text)
           }
         }
@@ -443,13 +443,13 @@ private fun GatewaySetupScreen(
     Column(modifier = Modifier.fillMaxSize().imePadding(), verticalArrangement = Arrangement.SpaceBetween) {
       LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         item {
-          OnboardingHeader(title = "网关设置", subtitle = "Connect to your Gateway", onBack = onBack)
+          OnboardingHeader(title = "网关设置", subtitle = "连接到您的网关", onBack = onBack)
         }
         item {
           GatewayOption(
             icon = Icons.Default.QrCode2,
             title = "扫描配置码",
-            subtitle = "Use your Gateway QR or setup code",
+            subtitle = "使用网关二维码或配置码",
             onClick = onScan,
           )
         }
@@ -568,7 +568,7 @@ private fun GatewayRecoveryScreen(
       ClawPanel {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
           Text(text = "上次网关", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
-          Text(text = serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+          Text(text = serverName?.takeIf { it.isNotBlank() } ?: "家庭网关", style = ClawTheme.type.section, color = ClawTheme.colors.text)
           Text(text = recoveryGatewayDetail(ready = ready, remoteAddress = remoteAddress, statusText = statusText), style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
           ClawStatusPill(
             text =
@@ -576,7 +576,7 @@ private fun GatewayRecoveryScreen(
                 GatewayRecoveryUiState.Connected -> "健康"
                 GatewayRecoveryUiState.Pairing -> "配对"
                 GatewayRecoveryUiState.Finishing -> "连接中"
-                GatewayRecoveryUiState.Failed -> "Needs attention"
+                GatewayRecoveryUiState.Failed -> "需要关注"
               },
             status =
               when (recoveryState) {
@@ -591,7 +591,7 @@ private fun GatewayRecoveryScreen(
 
       Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ClawPrimaryButton(
-          text = if (ready) "继续" else "Retry connection",
+          text = if (ready) "继续" else "重试连接",
           icon = if (ready) Icons.Default.CheckCircle else Icons.Default.Refresh,
           onClick = if (ready) onContinue else onRetry,
           modifier = Modifier.fillMaxWidth(),
@@ -628,7 +628,7 @@ private fun PermissionSetupScreen(
               color = ClawTheme.colors.text,
             )
             Text(
-              text = "These permissions keep OpenClaw secure\nand useful.",
+              text = "这些权限确保 OpenClaw 安全\nand useful.",
               style = ClawTheme.type.body,
               color = ClawTheme.colors.textMuted,
             )
@@ -1002,7 +1002,7 @@ private fun copyGatewayDiagnostic(
     listOf(
       "OpenClaw Android网关诊断",
       "Status: $statusText",
-      "Gateway: ${serverName?.takeIf { it.isNotBlank() } ?: "Home Gateway"}",
+      "Gateway: ${serverName?.takeIf { it.isNotBlank() } ?: "家庭网关"}",
       "Address: ${remoteAddress?.takeIf { it.isNotBlank() } ?: "不可用"}",
       "Ready: ${if (ready) "yes" else "no"}",
     ).joinToString("\n")

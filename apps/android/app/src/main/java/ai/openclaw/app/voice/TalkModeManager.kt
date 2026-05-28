@@ -270,7 +270,7 @@ class TalkModeManager internal constructor(
       recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { it.setRecognitionListener(listener) }
       startListeningInternal(markListening = true)
     }
-    _statusText.value = "Listening (PTT)"
+    _statusText.value = 监听中 (PTT)"
     return TalkPttStartPayload(captureId = captureId)
   }
 
@@ -301,7 +301,7 @@ class TalkModeManager internal constructor(
       return finishPushToTalk(TalkPttStopPayload(captureId = captureId, transcript = transcript, status = "offline"))
     }
 
-    _statusText.value = "Thinking…"
+    _statusText.value = 思考中…"
     scope.launch {
       finalizeTranscript(transcript)
     }
@@ -373,7 +373,7 @@ class TalkModeManager internal constructor(
         if (!assistant.isNullOrBlank()) {
           val playbackToken = playbackGeneration.incrementAndGet()
           cancelActivePlayback()
-          _statusText.value = "Speaking…"
+          _statusText.value = "发言中…"
           runPlaybackSession(playbackToken) {
             playAssistant(assistant, playbackToken)
           }
@@ -528,7 +528,7 @@ class TalkModeManager internal constructor(
         startRealtimeRelay(generation)
       } catch (err: Throwable) {
         if (err is CancellationException) return@launch
-        _statusText.value = "Start failed: ${err.message ?: err::class.simpleName}"
+        _statusText.value = 启动失败: ${err.message ?: err::class.simpleName}"
         Log.w(tag, "start failed: ${err.message ?: err::class.simpleName}")
         stopRealtimeRelay(closeSession = false, preserveStatus = true)
         disableRealtimeModeAndNotifyOwner()
@@ -613,7 +613,7 @@ class TalkModeManager internal constructor(
       recognizer = null
     }
 
-    _statusText.value = "Connecting…"
+    _statusText.value = 连接中…"
     val params =
       buildJsonObject {
         put("sessionKey", JsonPrimitive(mainSessionKey.ifBlank { "main" }))
@@ -653,7 +653,7 @@ class TalkModeManager internal constructor(
     message: String,
   ) {
     if (realtimeSessionId != sessionId) return
-    _statusText.value = "Talk failed: $message"
+    _statusText.value = 对话失败: $message"
     stopRealtimeRelay(cancelCapture = false, cancelAppend = false, preserveStatus = true)
     disableRealtimeModeAndNotifyOwner()
   }
@@ -805,7 +805,7 @@ class TalkModeManager internal constructor(
         }
         if (isFinal && role == "user") {
           realtimeOutputSuppressed = false
-          _statusText.value = "Thinking…"
+          _statusText.value = 思考中…"
         } else if (isFinal && role == "assistant") {
           scheduleRealtimePlaybackIdle()
         }
@@ -823,7 +823,7 @@ class TalkModeManager internal constructor(
       "toolResult" -> Unit
       "error" -> {
         val message = obj["message"].asStringOrNull() ?: "realtime talk error"
-        _statusText.value = "Talk failed: $message"
+        _statusText.value = 对话失败: $message"
         Log.w(tag, "realtime error: $message")
       }
       "close" -> {
@@ -935,7 +935,7 @@ class TalkModeManager internal constructor(
         track.play()
       }
       _isSpeaking.value = true
-      _statusText.value = "Speaking…"
+      _statusText.value = "发言中…"
       val durationMs = ((writtenBytes / 2.0) / realtimeSampleRateHz * 1000.0).toLong()
       val now = SystemClock.elapsedRealtime()
       realtimePlaybackEndsAtMs = maxOf(now, realtimePlaybackEndsAtMs) + durationMs
@@ -1077,7 +1077,7 @@ class TalkModeManager internal constructor(
               messageEl = completion.messageEl,
             )
           } else {
-            _statusText.value = "Thinking…"
+            _statusText.value = 思考中…"
           }
         } else {
           submitRealtimeToolError(callId, "tool call returned no run id", relaySessionId)
@@ -1557,7 +1557,7 @@ class TalkModeManager internal constructor(
   private suspend fun finalizeTranscript(transcript: String) {
     listeningMode = false
     _isListening.value = false
-    _statusText.value = "Thinking…"
+    _statusText.value = 思考中…"
     lastTranscript = ""
     lastHeardAtMs = null
     // Release SpeechRecognizer before making the API call and playing TTS.
@@ -1610,7 +1610,7 @@ class TalkModeManager internal constructor(
         Log.d(tag, "finalize speech cancelled")
         return
       }
-      _statusText.value = "Talk failed: ${err.message ?: err::class.simpleName}"
+      _statusText.value = 对话失败: ${err.message ?: err::class.simpleName}"
       Log.w(tag, "finalize failed: ${err.message ?: err::class.simpleName}")
     }
 
@@ -1988,7 +1988,7 @@ class TalkModeManager internal constructor(
 
   private fun markAudioPlaybackStarting(playbackToken: Long) {
     ensurePlaybackActive(playbackToken)
-    _statusText.value = "Speaking…"
+    _statusText.value = "发言中…"
     _isSpeaking.value = true
     ensureInterruptListener()
     requestAudioFocusForTts()
@@ -2295,7 +2295,7 @@ class TalkModeManager internal constructor(
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别器忙碌"
             SpeechRecognizer.ERROR_SERVER -> "服务器错误"
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "监听中"
-            else -> "Speech error ($error)"
+            else -> 语音错误 ($error)"
           }
         scheduleRestart(delayMs = 600)
       }

@@ -164,7 +164,7 @@ fun VoiceScreen(
     verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     VoiceHeader(
-      statusText = if (voiceActive || !gatewayReady) activeStatus else "Your voice command center.",
+      statusText = if (voiceActive || !gatewayReady) activeStatus else 您的语音指挥中心。",
       speakerEnabled = speakerEnabled,
       onToggleSpeaker = { viewModel.setSpeakerEnabled(!speakerEnabled) },
       onOpenCommand = onOpenCommand,
@@ -262,7 +262,7 @@ private fun DictationScreen(
     ) {
       Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Text(
-          text = draftText.ifBlank { if (sending) "Sending to chat..." else "Start speaking..." },
+          text = draftText.ifBlank { if (sending) "发送到聊天..." else "开始说话..." },
           style = ClawTheme.type.title.copy(fontSize = 15.sp, lineHeight = 19.sp),
           color = if (draftText.isBlank()) ClawTheme.colors.textSubtle else ClawTheme.colors.text,
           maxLines = 7,
@@ -329,7 +329,7 @@ private fun DictationScreen(
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       Icon(imageVector = Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp), tint = ClawTheme.colors.textMuted)
-      Text(text = "Tip: stop listening to send the captured turn.", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
+      Text(text = 提示：停止监听以发送捕获的轮次。", style = ClawTheme.type.caption, color = ClawTheme.colors.textMuted)
     }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -432,13 +432,13 @@ private fun TalkTranscript(
   LazyColumn(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (entries.isEmpty()) {
       item {
-        TalkTranscriptCard(label = "OpenClaw", text = "Listening for your next turn.", muted = true)
+        TalkTranscriptCard(label = "OpenClaw", text = 正在监听您的下一轮。", muted = true)
       }
     } else {
       items(entries.takeLast(6), key = { it.id }) { entry ->
         TalkTranscriptCard(
           label = if (entry.role == VoiceConversationRole.User) "你" else "OpenClaw",
-          text = if (entry.isStreaming && entry.text.isBlank()) "Listening response..." else entry.text,
+          text = if (entry.isStreaming && entry.text.isBlank()) "监听回复中..." else entry.text,
           muted = entry.isStreaming,
         )
       }
@@ -543,7 +543,7 @@ private fun VoiceHeader(
       }
       VoicePlainIconButton(
         icon = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-        contentDescription = if (speakerEnabled) "静音扬声器" else "Unmute speaker",
+        contentDescription = if (speakerEnabled) "静音扬声器" else "取消扬声器静音",
         onClick = onToggleSpeaker,
       )
     }
@@ -879,7 +879,7 @@ private fun VoiceTranscript(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
               Text(text = "还没有转录", style = ClawTheme.type.section, color = ClawTheme.colors.text)
               Text(
-                text = "Your words and OpenClaw replies will appear here.",
+                text = 您的话语和 OpenClaw 回复将显示在这里。",
                 style = ClawTheme.type.body,
                 color = ClawTheme.colors.textMuted,
               )

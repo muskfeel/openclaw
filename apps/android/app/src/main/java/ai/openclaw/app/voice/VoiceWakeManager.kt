@@ -57,7 +57,7 @@ class VoiceWakeManager(
         startListeningInternal()
       } catch (err: Throwable) {
         _isListening.value = false
-        _statusText.value = "Start failed: ${err.message ?: err::class.simpleName}"
+        _statusText.value = 启动失败: ${err.message ?: err::class.simpleName}"
       }
     }
   }
@@ -153,7 +153,7 @@ class VoiceWakeManager(
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别器忙碌"
             SpeechRecognizer.ERROR_SERVER -> "服务器错误"
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "监听中"
-            else -> "Speech error ($error)"
+            else -> 语音错误 ($error)"
           }
         scheduleRestart(delayMs = 600)
       }

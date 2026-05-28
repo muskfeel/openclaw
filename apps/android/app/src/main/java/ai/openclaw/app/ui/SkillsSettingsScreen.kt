@@ -45,7 +45,7 @@ internal fun SkillsSettingsScreen(
 
   SettingsDetailFrame(
     title = "技能",
-    subtitle = "Installed capabilities available to OpenClaw.",
+    subtitle = OpenClaw 可用的已安装能力。",
     icon = Icons.Default.Settings,
     onBack = onBack,
   ) {
@@ -54,7 +54,7 @@ internal fun SkillsSettingsScreen(
         listOf(
           SettingsMetric("已安装", skills.size.toString()),
           SettingsMetric("就绪", readyCount.toString()),
-          SettingsMetric("Needs Setup", needsSetupCount.toString()),
+          SettingsMetric(需要设置", needsSetupCount.toString()),
         ),
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -73,13 +73,13 @@ internal fun SkillsSettingsScreen(
     when {
       !isConnected ->
         ClawPanel {
-          Text(text = "Connect the gateway to load skills.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+          Text(text = 连接网关以加载技能。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
       skills.isEmpty() ->
         ClawPanel {
           Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(text = "No skills installed.", style = ClawTheme.type.section, color = ClawTheme.colors.text)
-            Text(text = "Skills installed on the gateway will appear here.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+            Text(text = 未安装技能。", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+            Text(text = 网关上安装的技能将显示在这里。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
           }
         }
       else -> SkillsPanel(skills = skills)
@@ -136,10 +136,10 @@ private fun skillSubtitle(skill: GatewaySkillSummary): String {
 
 private fun skillSourceLabel(skill: GatewaySkillSummary): String =
   when (skill.source) {
-    "openclaw-bundled" -> if (skill.bundled) "Built-in" else "Bundled"
+    "openclaw-bundled" -> if (skill.bundled) 内置" else 捆绑"
     "openclaw-managed" -> "已安装"
     "openclaw-workspace" -> "工作区"
-    "openclaw-extra" -> "Extra"
+    "openclaw-extra" -> 额外"
     else -> "技能"
   }
 

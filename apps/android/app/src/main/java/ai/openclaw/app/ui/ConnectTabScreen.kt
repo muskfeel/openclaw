@@ -98,7 +98,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     AlertDialog(
       onDismissRequest = { viewModel.declineGatewayTrustPrompt() },
       containerColor = mobileCardSurface,
-      title = { Text("Trust this gateway?", style = mobileHeadline, color = mobileText) },
+      title = { Text("信任此网关？", style = mobileHeadline, color = mobileText) },
       text = {
         val message =
           if (prompt.previousFingerprintSha256.isNullOrBlank()) {

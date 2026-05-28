@@ -250,15 +250,15 @@ private fun GatewayTrustDialog(
 ) {
   val message =
     if (prompt.previousFingerprintSha256.isNullOrBlank()) {
-      "Verify the certificate fingerprint before trusting this gateway.\n\n${prompt.fingerprintSha256}"
+      "在信任此网关之前，请验证证书指纹。"\n\n${prompt.fingerprintSha256}"
     } else {
-      "The gateway certificate changed. Continue only if you expected this.\n\nOld SHA-256:\n${prompt.previousFingerprintSha256}\n\nNew SHA-256:\n${prompt.fingerprintSha256}"
+      "网关证书已更改。仅在您预期此更改时继续。"\n\nOld SHA-256:\n${prompt.previousFingerprintSha256}\n\nNew SHA-256:\n${prompt.fingerprintSha256}"
     }
 
   AlertDialog(
     onDismissRequest = onDecline,
     containerColor = ClawTheme.colors.surfaceRaised,
-    title = { Text("Trust this gateway?", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
+    title = { Text("信任此网关？", style = ClawTheme.type.section, color = ClawTheme.colors.text) },
     text = { Text(message, style = ClawTheme.type.body, color = ClawTheme.colors.textMuted) },
     confirmButton = {
       TextButton(onClick = onAccept) {
@@ -339,7 +339,7 @@ private fun OverviewScreen(
                 ModuleRow("会话列表", null, if (sessions.isEmpty()) "空" else "${sessions.size} recent", Icons.Outlined.AccessTime, Tab.Sessions),
                 ModuleRow("语音", null, if (isConnected) "就绪" else "离线", Icons.Outlined.MicNone, Tab.Voice),
                 ModuleRow(
-                  title = "Providers & Models",
+                  title = "提供商和模型",
                   subtitle = null,
                   metadata =
                     when {
@@ -356,7 +356,7 @@ private fun OverviewScreen(
                 ModuleRow("审批", null, approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, Tab.Settings, SettingsRoute.Approvals),
                 ModuleRow("定时任务", null, cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, Tab.Settings, SettingsRoute.CronJobs),
                 ModuleRow("技能", null, skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, Tab.Settings, SettingsRoute.Skills),
-                ModuleRow("Nodes & Devices", null, nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, Tab.Settings, SettingsRoute.NodesDevices),
+                ModuleRow("节点和设备", null, nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, Tab.Settings, SettingsRoute.NodesDevices),
                 ModuleRow("用量", null, usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, Tab.Settings, SettingsRoute.Usage),
                 ModuleRow("设置", null, null, Icons.Outlined.Settings, Tab.Settings, SettingsRoute.Home),
               ),
@@ -383,7 +383,7 @@ private fun OverviewScreen(
           item {
             ClawEmptyState(
               title = "没有最近会话",
-              body = "Start a chat and your active OpenClaw conversations will appear here.",
+              body = 开始聊天，您活跃的 OpenClaw 对话将显示在这里。",
               action = { ClawPrimaryButton(text = "开始聊天", onClick = { onSelectTab(Tab.Chat) }) },
             )
           }
@@ -395,7 +395,7 @@ private fun OverviewScreen(
                   RecentSessionListItem(
                     key = session.key,
                     title = displaySessionTitle(session.displayName),
-                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw session",
+                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw 会话",
                     metadata = session.updatedAtMs?.let(::relativeSessionTime) ?: "",
                   )
                 },
@@ -536,7 +536,7 @@ private fun ModuleListRow(
       }
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open ${row.title}",
+        contentDescription = "打开 ${row.title}",
         modifier = Modifier.size(17.dp),
         tint = ClawTheme.colors.textMuted,
       )
@@ -720,23 +720,23 @@ private fun SettingsShellScreen(
         SettingsGroup(
           rows =
             listOf(
-              SettingsRow("个人资料", displayName.ifBlank { "Local device" }, Icons.Default.Person, route = SettingsRoute.Profile),
-              SettingsRow("语音", if (speakerEnabled) "Speaker on" else "Speaker muted", Icons.Default.Mic, route = SettingsRoute.Voice),
-              SettingsRow("智能体", if (agents.isEmpty()) "Load from gateway" else "${agents.size} available", Icons.Default.Person, status = agents.isNotEmpty(), route = SettingsRoute.Agents),
+              SettingsRow("个人资料", displayName.ifBlank { "本地设备" }, Icons.Default.Person, route = SettingsRoute.Profile),
+              SettingsRow("语音", if (speakerEnabled) "扬声器开启" else "扬声器静音", Icons.Default.Mic, route = SettingsRoute.Voice),
+              SettingsRow("智能体", if (agents.isEmpty()) "从网关加载" else "${agents.size} available", Icons.Default.Person, status = agents.isNotEmpty(), route = SettingsRoute.Agents),
               SettingsRow("审批", approvalsSummary(pendingToolCalls.size), Icons.Default.Lock, status = approvalsStatus(pendingToolCalls.size), route = SettingsRoute.Approvals),
               SettingsRow("定时任务", cronJobsSummary(cronStatus.jobs), Icons.Outlined.AccessTime, status = if (cronStatus.jobs > 0) cronStatus.enabled else null, route = SettingsRoute.CronJobs),
               SettingsRow("用量", usageSummaryText(usageSummary.providers.size), Icons.Default.Storage, status = if (usageSummary.providers.isNotEmpty()) true else null, route = SettingsRoute.Usage),
               SettingsRow("技能", skillsSummaryText(skillsSummary.skills), Icons.Default.Settings, status = skillsStatus(skillsSummary.skills), route = SettingsRoute.Skills),
-              SettingsRow("Nodes & Devices", nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, status = nodesDevicesStatus(nodesDevicesSummary), route = SettingsRoute.NodesDevices),
+              SettingsRow("节点和设备", nodesDevicesSummaryText(nodesDevicesSummary), Icons.Default.Cloud, status = nodesDevicesStatus(nodesDevicesSummary), route = SettingsRoute.NodesDevices),
               SettingsRow("频道", channelsSummaryText(channelsSummary), Icons.Default.Notifications, status = channelsStatus(channelsSummary), route = SettingsRoute.Channels),
               SettingsRow("梦境模式", dreamingSummaryText(dreamingSummary), Icons.Default.Storage, status = dreamingStatus(dreamingSummary), route = SettingsRoute.Dreaming),
-              SettingsRow("画布", "Screen surface", Icons.AutoMirrored.Filled.ScreenShare, status = isConnected, route = SettingsRoute.Canvas),
-              SettingsRow("通知", if (notificationForwardingEnabled) "Smart delivery" else "关闭", Icons.Default.Notifications, route = SettingsRoute.Notifications),
+              SettingsRow("画布", "屏幕表面", Icons.AutoMirrored.Filled.ScreenShare, status = isConnected, route = SettingsRoute.Canvas),
+              SettingsRow("通知", if (notificationForwardingEnabled) "智能推送" else "关闭", Icons.Default.Notifications, route = SettingsRoute.Notifications),
               SettingsRow("手机功能", if (cameraEnabled) "相机已启用" else "已锁定", Icons.Default.Lock, status = !cameraEnabled, route = SettingsRoute.PhoneCapabilities),
               SettingsRow("网关", gatewaySummary(statusText, isConnected), Icons.Default.Cloud, status = isConnected, route = SettingsRoute.Gateway),
               SettingsRow("外观", "深色", Icons.Default.Palette, route = SettingsRoute.Appearance),
               SettingsRow("健康状态", "诊断", Icons.Default.Settings, status = isConnected, route = SettingsRoute.Health),
-              SettingsRow("关于", "Version and update", Icons.Default.Storage, route = SettingsRoute.About),
+              SettingsRow("关于", "版本和更新", Icons.Default.Storage, route = SettingsRoute.About),
             ),
           onOpen = onRouteChange,
         )
@@ -796,7 +796,7 @@ private fun usageSummaryText(count: Int): String =
 
 private fun skillsSummaryText(skills: List<GatewaySkillSummary>): String {
   val ready = skills.count { !it.disabled && it.eligible && it.missingCount == 0 }
-  return if (skills.isEmpty()) "No skills" else "$ready/${skills.size} ready"
+  return if (skills.isEmpty()) "没有技能" else "$ready/${skills.size} ready"
 }
 
 private fun skillsStatus(skills: List<GatewaySkillSummary>): Boolean? =
@@ -844,7 +844,7 @@ private fun channelsStatus(summary: GatewayChannelsSummary): Boolean? =
 
 private fun dreamingSummaryText(summary: GatewayDreamingSummary): String =
   when {
-    !summary.storeHealthy || !summary.phaseSignalHealthy -> "Needs attention"
+    !summary.storeHealthy || !summary.phaseSignalHealthy -> "需要关注"
     summary.enabled -> "${summary.shortTermCount} waiting"
     else -> "关闭"
   }
@@ -962,7 +962,7 @@ private fun SettingsListRow(
       if (row.route != null) {
         Icon(
           imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-          contentDescription = "Open ${row.title}",
+          contentDescription = "打开 ${row.title}",
           modifier = Modifier.size(17.dp),
           tint = ClawTheme.colors.text,
         )
@@ -1003,7 +1003,7 @@ private fun relativeSessionTime(updatedAtMs: Long): String {
   return "${hours / 24}d"
 }
 
-private fun displaySessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "Main session"
+private fun displaySessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "主会话"
 
 private fun statusDotColor(status: String): Color {
   val normalized = status.trim().lowercase()
@@ -1021,10 +1021,10 @@ private fun gatewaySummary(
   if (isConnected) return "在线并就绪"
   val status = statusText.trim().lowercase()
   return when {
-    status.contains("connecting") || status.contains("reconnecting") -> "Connecting..."
-    status.contains("pairing") -> "Waiting for pairing"
-    status.contains("auth") -> "Authentication needed"
-    status.contains("certificate") || status.contains("tls") -> "Certificate review needed"
+    status.contains("connecting") || status.contains("reconnecting") -> "连接中..."
+    status.contains("pairing") -> "等待配对"
+    status.contains("auth") -> "需要认证"
+    status.contains("certificate") || status.contains("tls") -> "需要证书审查"
     else -> "未连接"
   }
 }

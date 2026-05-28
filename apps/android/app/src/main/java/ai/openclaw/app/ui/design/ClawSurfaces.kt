@@ -99,7 +99,7 @@ internal fun ClawErrorState(
 ) {
   ClawPanel(modifier = modifier) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      ClawStatusPill(text = "Needs attention", status = ClawStatus.Danger)
+      ClawStatusPill(text = "需要关注", status = ClawStatus.Danger)
       Text(text = title, style = ClawTheme.type.section, color = ClawTheme.colors.text)
       Text(text = body, style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       action?.invoke()

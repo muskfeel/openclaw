@@ -66,7 +66,7 @@ class MainViewModel(
   val canvasRehydrateErrorText: StateFlow<String?> = runtimeState(initial = null) { it.canvasRehydrateErrorText }
 
   val gateways: StateFlow<List<GatewayEndpoint>> = runtimeState(initial = emptyList()) { it.gateways }
-  val discoveryStatusText: StateFlow<String> = runtimeState(initial = "Searching…") { it.discoveryStatusText }
+  val discoveryStatusText: StateFlow<String> = runtimeState(initial = "搜索中…") { it.discoveryStatusText }
   val notificationForwardingEnabled: StateFlow<Boolean> = prefs.notificationForwardingEnabled
   val notificationForwardingMode: StateFlow<NotificationPackageFilterMode> =
     prefs.notificationForwardingMode

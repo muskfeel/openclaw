@@ -117,7 +117,7 @@ internal fun SessionsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
           ) {
-            Text(text = "Sort: ${if (recentFirst) "Newest" else "Oldest"}", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+            Text(text = "Sort: ${if (recentFirst) 最新" else 最早"}", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
             Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(11.dp), tint = ClawTheme.colors.textMuted)
           }
           SessionOutlineIconButton(icon = Icons.Default.Storage, contentDescription = "切换会话布局", onClick = { compactLayout = !compactLayout })
@@ -125,7 +125,7 @@ internal fun SessionsScreen(
       }
 
       item {
-        Text(text = if (compactLayout) "Layout: Compact" else "Layout: Detailed", style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle)
+        Text(text = if (compactLayout) 布局：紧凑" else 布局：详细", style = ClawTheme.type.caption, color = ClawTheme.colors.textSubtle)
       }
 
       if (visibleSessions.isEmpty()) {
@@ -141,7 +141,7 @@ internal fun SessionsScreen(
           val active = session.key == chatSessionKey
           SessionRow(
             title = displaySessionTitle(session.displayName),
-            subtitle = if (active) "当前会话" else "OpenClaw session",
+            subtitle = if (active) 当前会话" else "OpenClaw 会话",
             metadata = session.updatedAtMs?.let(::relativeSessionTime) ?: "now",
             active = active,
             compact = compactLayout,
@@ -317,8 +317,8 @@ private fun emptySessionTitle(filter: SessionFilter): String =
 
 private fun emptySessionBody(filter: SessionFilter): String =
   when (filter) {
-    SessionFilter.Recent -> "Start a new conversation and it will show up here."
-    SessionFilter.Live -> "Open Chat to start or resume the current session."
+    SessionFilter.Recent -> 开始新对话，它将显示在这里。"
+    SessionFilter.Live -> 打开聊天以开始或恢复当前会话。"
   }
 
 private fun relativeSessionTime(updatedAtMs: Long): String {
@@ -331,4 +331,4 @@ private fun relativeSessionTime(updatedAtMs: Long): String {
   return "${hours / 24}d"
 }
 
-private fun displaySessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "Main session"
+private fun displaySessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "主会话"

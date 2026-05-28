@@ -160,7 +160,7 @@ class MicCaptureManager(
           }
         }
       if (pausedForTts) {
-        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "Speaking…"
+        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "发言中…"
         return
       }
       transcriptionDrainJob?.cancel()
@@ -209,7 +209,7 @@ class MicCaptureManager(
         _isListening.value = false
         _inputLevel.value = 0f
         _liveTranscript.value = null
-        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "Speaking…"
+        _statusText.value = if (_isSending.value) "发言中 · 等待回复" else "发言中…"
         true
       }
     if (!shouldPause) return
@@ -229,7 +229,7 @@ class MicCaptureManager(
             when {
               _micEnabled.value && _isSending.value -> "监听中 · 发送排队语音"
               _micEnabled.value -> "监听中"
-              _isSending.value -> "Mic off · sending…"
+              _isSending.value -> "麦克风关闭 · 发送中…"
               else -> "麦克风关闭"
             }
         }
@@ -361,7 +361,7 @@ class MicCaptureManager(
             restartAfterCancellation = _micEnabled.value && gatewayConnected && !stopRequested
             return@launch
           }
-          _statusText.value = "Transcription unavailable: ${err.message ?: err::class.simpleName}"
+          _statusText.value = 转写不可用: ${err.message ?: err::class.simpleName}"
           _micEnabled.value = false
           stopTranscription(preserveStatus = true)
         } finally {
@@ -400,7 +400,7 @@ class MicCaptureManager(
     _isListening.value = false
     _inputLevel.value = 0f
     if (!preserveStatus) {
-      _statusText.value = if (_isSending.value) "Mic off · sending…" else "麦克风关闭"
+      _statusText.value = if (_isSending.value) "麦克风关闭 · 发送中…" else "麦克风关闭"
     } else {
       _statusText.value = status
     }
@@ -499,7 +499,7 @@ class MicCaptureManager(
           if (!gatewayConnected) {
             queuedWaitingStatus()
           } else {
-            "Send failed: ${err.message ?: err::class.simpleName}"
+            发送失败: ${err.message ?: err::class.simpleName}"
           }
       }
     }
@@ -516,7 +516,7 @@ class MicCaptureManager(
         _isSending.value = false
         _statusText.value =
           if (gatewayConnected) {
-            "Voice reply timed out; retrying queued turn"
+            语音回复超时；重试排队轮次"
           } else {
             queuedWaitingStatus()
           }
@@ -734,7 +734,7 @@ class MicCaptureManager(
     message: String,
   ) {
     if (transcriptionSessionId != sessionId) return
-    _statusText.value = "Transcription failed: $message"
+    _statusText.value = 转写失败: $message"
     _micEnabled.value = false
     stopTranscription(preserveStatus = true)
   }
@@ -742,7 +742,7 @@ class MicCaptureManager(
   private fun listeningStatus(): String =
     when {
       _isSending.value -> "监听中 · 发送排队语音"
-      hasQueuedMessages() -> "Listening · ${queuedMessageCount()} queued"
+      hasQueuedMessages() -> 监听中 · ${queuedMessageCount()} 排队"
       else -> "监听中"
     }
 

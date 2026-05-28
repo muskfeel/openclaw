@@ -46,8 +46,8 @@ internal fun NodesDevicesSettingsScreen(
   }
 
   SettingsDetailFrame(
-    title = "Nodes & Devices",
-    subtitle = "Live nodes, paired phones, and pending device requests.",
+    title = "节点和设备",
+    subtitle = 实时节点、已配对手机和待处理设备请求。",
     icon = Icons.Default.Cloud,
     onBack = onBack,
   ) {
@@ -56,7 +56,7 @@ internal fun NodesDevicesSettingsScreen(
         listOf(
           SettingsMetric("节点", summary.nodes.size.toString()),
           SettingsMetric("在线", summary.nodes.count { it.connected }.toString()),
-          SettingsMetric("设备", if (summary.devicePairingAvailable) summary.pairedDevices.size.toString() else "Admin"),
+          SettingsMetric("设备", if (summary.devicePairingAvailable) summary.pairedDevices.size.toString() else 管理员"),
           SettingsMetric("待处理", summary.pendingDevices.size.toString()),
         ),
     )
@@ -76,13 +76,13 @@ internal fun NodesDevicesSettingsScreen(
     when {
       !isConnected ->
         ClawPanel {
-          Text(text = "Connect the gateway to load nodes and paired devices.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+          Text(text = 连接网关以加载节点和已配对设备。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
       summary.isEmpty() ->
         ClawPanel {
           Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(text = "No nodes or paired devices.", style = ClawTheme.type.section, color = ClawTheme.colors.text)
-            Text(text = "Linked phones and node hosts will appear here after pairing.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+            Text(text = 没有节点或已配对设备。", style = ClawTheme.type.section, color = ClawTheme.colors.text)
+            Text(text = 配对后链接的手机和节点主机将显示在这里。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
           }
         }
       else -> NodesDevicesPanel(summary = summary)
@@ -95,7 +95,7 @@ private fun NodesDevicesPanel(summary: GatewayNodesDevicesSummary) {
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     if (!summary.devicePairingAvailable) {
       ClawPanel {
-        Text(text = "Device pairing admin needs elevated access. Connected nodes still work.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+        Text(text = 设备配对管理员需要提升权限。已连接节点仍然工作。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
       }
     }
     if (summary.pendingDevices.isNotEmpty()) {
@@ -163,7 +163,7 @@ private fun PendingDeviceRow(device: GatewayPendingDeviceSummary) {
     badge = nodeBadge(device.displayName ?: device.deviceId),
     title = device.displayName ?: "新设备",
     subtitle = pendingDeviceSubtitle(device),
-    statusText = if (device.repair) "修复" else "Review",
+    statusText = if (device.repair) "修复" else 审查",
     status = ClawStatus.Warning,
   )
 }
@@ -227,7 +227,7 @@ private fun pairedDeviceStatusText(tokens: List<GatewayDeviceTokenSummary>): Str
   when {
     tokens.isEmpty() -> "已配对"
     tokens.any { !it.revoked } -> "活跃"
-    else -> "Needs Token"
+    else -> 需要令牌"
   }
 
 private fun pairedDeviceStatus(tokens: List<GatewayDeviceTokenSummary>): ClawStatus =

@@ -91,9 +91,9 @@ internal fun ProvidersModelsScreen(
               ProviderHeaderIconButton(icon = Icons.Default.Add, contentDescription = "添加提供商", outlined = true, onClick = onAddProvider)
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-              Text(text = "Providers & Models", style = ClawTheme.type.display.copy(fontSize = 14.8.sp, lineHeight = 18.sp), color = ClawTheme.colors.text, maxLines = 1)
+              Text(text = "提供商和模型", style = ClawTheme.type.display.copy(fontSize = 14.8.sp, lineHeight = 18.sp), color = ClawTheme.colors.text, maxLines = 1)
               Text(
-                text = "Connect and manage AI providers\nBrowse models and their capabilities.",
+                text = "连接和管理 AI 提供商\nBrowse models and their capabilities.",
                 style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp),
                 color = ClawTheme.colors.textMuted,
               )
@@ -126,7 +126,7 @@ internal fun ProvidersModelsScreen(
 
         item {
           if (!isConnected && providerRows.isEmpty()) {
-            ClawEmptyState(title = "网关离线", body = "Connect your Gateway to load provider readiness and model catalog.")
+            ClawEmptyState(title = "网关离线", body = 连接网关以加载提供商就绪状态和模型目录。")
           } else {
             ProviderList(rows = providerRows, refreshing = refreshing)
           }
@@ -147,8 +147,8 @@ internal fun ProvidersModelsScreen(
         if (modelGroups.isEmpty()) {
           item {
             ModelCatalogEmpty(
-              title = if (refreshing) "加载模型中" else "No models loaded",
-              body = if (isConnected) "Refresh after configuring a provider on the Gateway." else "Connect the Gateway to browse models.",
+              title = if (refreshing) "加载模型中" else 没有加载模型",
+              body = if (isConnected) 在网关上配置提供商后刷新。" else 连接网关以浏览模型。",
             )
           }
         } else {
@@ -201,7 +201,7 @@ private fun providerRows(
       ProviderRow(
         id = provider.id,
         name = provider.displayName,
-        status = if (ready) "就绪" else "Needs setup",
+        status = if (ready) "就绪" else 需要设置",
         ready = ready,
         modelCount = modelCounts[provider.id] ?: 0,
       )
@@ -240,8 +240,8 @@ private fun providerSetupSubtitle(
 ): String =
   when {
     row?.ready == true -> if (row.modelCount > 0) "${row.modelCount} models available" else "就绪"
-    row != null -> "Finish setup to use ${row.name}"
-    id == "ollama" -> "Use models running on your network"
+    row != null -> 完成设置以使用 ${row.name}"
+    id == "ollama" -> 使用在网络中运行的模型"
     else -> "在网关上添加提供商凭据"
   }
 
@@ -282,7 +282,7 @@ private fun ProviderList(
   ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
     Column {
       if (rows.isEmpty()) {
-        ProviderListRow(ProviderRow(id = "loading", name = "Provider catalog", status = if (refreshing) "加载中" else "No providers", ready = false, modelCount = 0))
+        ProviderListRow(ProviderRow(id = "loading", name = 提供商目录", status = if (refreshing) "加载中" else 没有提供商", ready = false, modelCount = 0))
       } else {
         val visibleRows = rows.take(5)
         visibleRows.forEachIndexed { index, row ->
@@ -315,7 +315,7 @@ private fun ProviderOverviewPanel(
         ProviderMetricTile(label = "设置", value = needsSetupCount.toString(), modifier = Modifier.weight(1f))
       }
       Text(
-        text = if (isConnected) "Choose a provider below, then finish credentials on your Gateway." else "Connect your Gateway before adding model providers.",
+        text = if (isConnected) 选择下面的提供商，然后在网关上完成凭据。" else 在添加模型提供商之前连接网关。",
         style = ClawTheme.type.body,
         color = ClawTheme.colors.textMuted,
       )

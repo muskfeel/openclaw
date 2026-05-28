@@ -73,7 +73,7 @@ internal fun CommandPalette(
       CommandItem("打开聊天", "Start or continue a conversation", Icons.Outlined.ChatBubbleOutline, onOpenChat),
       CommandItem("开始语音", "Talk or dictate with OpenClaw", Icons.Outlined.MicNone, onOpenVoice),
       CommandItem("浏览会话", "Find previous conversations", Icons.Outlined.AccessTime, onOpenSessions),
-      CommandItem("Providers & Models", providerCommandSubtitle(isConnected, providers, models), Icons.Outlined.Inventory2, onOpenProviders),
+      CommandItem("提供商和模型", providerCommandSubtitle(isConnected, providers, models), Icons.Outlined.Inventory2, onOpenProviders),
       CommandItem("设置", "Gateway, voice, notifications, privacy", Icons.Outlined.Settings, onOpenSettings),
     )
   val actionRows = quickActions.filter { it.matches(normalizedQuery) }
@@ -139,7 +139,7 @@ internal fun CommandPalette(
                   CommandSessionRow(
                     key = session.key,
                     title = commandSessionTitle(session.displayName),
-                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw session",
+                    subtitle = if (pendingRunCount > 0) "助手工作中" else "OpenClaw 会话",
                     metadata = session.updatedAtMs?.let(::commandRelativeTime) ?: "now",
                   )
                 },
@@ -198,7 +198,7 @@ private fun CommandActionRow(row: CommandItem) {
       }
       Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open ${row.title}",
+        contentDescription = "打开 ${row.title}",
         modifier = Modifier.size(17.dp),
         tint = ClawTheme.colors.textMuted,
       )
@@ -307,7 +307,7 @@ private fun providerCommandSubtitle(
   return "配置模型访问"
 }
 
-private fun commandSessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "Main session"
+private fun commandSessionTitle(displayName: String?): String = displayName?.takeIf { it.isNotBlank() } ?: "主会话"
 
 private fun commandRelativeTime(updatedAtMs: Long): String {
   val deltaMs = (System.currentTimeMillis() - updatedAtMs).coerceAtLeast(0L)

@@ -51,7 +51,7 @@ internal fun HealthLogsSettingsScreen(
 
   SettingsDetailFrame(
     title = "健康状态",
-    subtitle = "Gateway status, phone node readiness, and recent log stream.",
+    subtitle = 网关状态、手机节点就绪状态和最近日志流。",
     icon = Icons.Default.Settings,
     onBack = onBack,
   ) {
@@ -67,10 +67,10 @@ internal fun HealthLogsSettingsScreen(
     HealthStatusPanel(
       gateway = statusText,
       node = if (isNodeConnected) "在线" else "等待中",
-      chat = if (chatHealthOk) "就绪" else "Needs connection",
+      chat = if (chatHealthOk) "就绪" else 需要连接",
       models = "${modelCount.size} available",
       voice = talkStatus,
-      runs = if (pendingRunCount > 0) "$pendingRunCount active" else "Idle",
+      runs = if (pendingRunCount > 0) "$pendingRunCount active" else 空闲",
       isConnected = isConnected,
       isNodeConnected = isNodeConnected,
       chatHealthOk = chatHealthOk,
@@ -79,7 +79,7 @@ internal fun HealthLogsSettingsScreen(
     )
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       ClawSecondaryButton(
-        text = if (logsRefreshing) "刷新中" else "Refresh Logs",
+        text = if (logsRefreshing) "刷新中" else 刷新日志",
         onClick = viewModel::refreshHealthLogs,
         enabled = isConnected && !logsRefreshing,
         modifier = Modifier.weight(1f),
@@ -156,11 +156,11 @@ private fun GatewayLogsPanel(
     when {
       !isConnected ->
         ClawPanel {
-          Text(text = "Connect the gateway to load recent logs.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+          Text(text = 连接网关以加载最近日志。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
       summary.entries.isEmpty() ->
         ClawPanel {
-          Text(text = "No recent log entries.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+          Text(text = 没有最近日志条目。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
         }
       else ->
         ClawPanel(contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {

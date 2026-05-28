@@ -388,9 +388,9 @@ private fun EmptyChatHint(
       Text(
         text =
           if (healthOk) {
-            "Start with a prompt, or use voice."
+            输入提示或使用语音。"
           } else {
-            "Reconnect from Settings to send messages."
+            从设置重新连接以发送消息。"
           },
         style = ClawTheme.type.body,
         color = ClawTheme.colors.textMuted,
@@ -454,9 +454,9 @@ private data class StarterPrompt(
 
 private val starterPrompts =
   listOf(
-    StarterPrompt(mark = "1", title = "跟进一下", subtitle = "总结最近的会话和下一步", message = "Catch me up on my recent OpenClaw sessions and suggest next steps."),
-    StarterPrompt(mark = "2", title = "规划工作", subtitle = "把目标变成可执行清单", message = "Help me turn this goal into a practical checklist: "),
-    StarterPrompt(mark = "3", title = "用这部手机", subtitle = "让 OpenClaw 使用 Android 功能", message = "What can you help me do from this phone right now?"),
+    StarterPrompt(mark = "1", title = "跟进一下", subtitle = "总结最近的会话和下一步", message = 总结我最近的 OpenClaw 会话并建议下一步。"),
+    StarterPrompt(mark = "2", title = "规划工作", subtitle = "把目标变成可执行清单", message = 帮我把这个目标变成实际清单："),
+    StarterPrompt(mark = "3", title = "用这部手机", subtitle = "让 OpenClaw 使用 Android 功能", message = 你现在能帮我用这部手机做什么？"),
   )
 
 @Composable
@@ -493,7 +493,7 @@ private fun ChatBubble(
         Text(
           text =
             when {
-              live -> "OpenClaw · Live"
+              live -> "OpenClaw · 在线"
               isUser -> "你"
               normalizedRole == "system" -> "系统"
               else -> "OpenClaw"
@@ -557,7 +557,7 @@ private fun ChatThinkingBubble() {
   ClawPanel {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       ClawStatusPill(text = "思考中", status = ClawStatus.Warning)
-      Text(text = "OpenClaw is preparing a response.", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
+      Text(text = OpenClaw 正在准备回复。", style = ClawTheme.type.body, color = ClawTheme.colors.textMuted)
     }
   }
 }
@@ -664,7 +664,7 @@ private fun ChatContextMeter(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
         Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(12.dp), tint = ClawTheme.colors.textSubtle)
-        Text(text = "Context ${contextPercent(thinkingLevel)}%", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted)
+        Text(text = "上下文 ${contextPercent(thinkingLevel)}%", style = ClawTheme.type.caption.copy(fontSize = 12.5.sp, lineHeight = 16.sp), color = ClawTheme.colors.textMuted)
       }
     }
     Box(

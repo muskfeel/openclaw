@@ -93,13 +93,13 @@ private fun DreamingPanel(summary: GatewayDreamingSummary) {
       Column {
         DreamingHealthRow(
           title = "记忆存储",
-          value = if (summary.storeHealthy) "健康" else "Needs attention",
+          value = if (summary.storeHealthy) "健康" else "需要关注",
           healthy = summary.storeHealthy,
         )
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
         DreamingHealthRow(
           title = "Signal Index",
-          value = if (summary.phaseSignalHealthy) "健康" else "Needs attention",
+          value = if (summary.phaseSignalHealthy) "健康" else "需要关注",
           healthy = summary.phaseSignalHealthy,
         )
         HorizontalDivider(color = ClawTheme.colors.border, thickness = 1.dp)
@@ -192,9 +192,9 @@ private fun formatDreamingNextRun(nextRunAtMs: Long?): String {
   val deltaMinutes = ((next - System.currentTimeMillis()) / 60_000L).coerceAtLeast(0L)
   val hours = deltaMinutes / 60L
   return when {
-    hours >= 24L -> "In ${hours / 24L}d"
-    hours >= 1L -> "In ${hours}h"
-    deltaMinutes >= 1L -> "In ${deltaMinutes}m"
+    hours >= 24L -> "${hours / 24L}天后"
+    hours >= 1L -> "${hours}小时后"
+    deltaMinutes >= 1L -> "${deltaMinutes}分钟后"
     else -> "即将"
   }
 }

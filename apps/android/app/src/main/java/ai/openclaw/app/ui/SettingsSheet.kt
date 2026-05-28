@@ -118,15 +118,15 @@ fun SettingsSheet(viewModel: MainViewModel) {
       when (notificationForwardingMode) {
         NotificationPackageFilterMode.Allowlist ->
           if (notificationForwardingPackages.isEmpty()) {
-            "Selected: none — allowlist mode forwards nothing until you add apps."
+            已选择：无 — 白名单模式在添加应用前不转发任何内容。"
           } else {
-            "Selected: ${notificationForwardingPackages.size} app(s) allowed."
+            已选择：${notificationForwardingPackages.size} 个应用允许。"
           }
         NotificationPackageFilterMode.Blocklist ->
           if (notificationForwardingPackages.isEmpty()) {
-            "Selected: none — blocklist mode forwards all apps except OpenClaw."
+            已选择：无 — 黑名单模式转发除 OpenClaw 外的所有应用。"
           } else {
-            "Selected: ${notificationForwardingPackages.size} app(s) blocked."
+            已选择：${notificationForwardingPackages.size} 个应用阻止。"
           }
       }
     }
@@ -504,9 +504,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
               supportingContent = {
                 Text(
                   if (assistantRoleHeld) {
-                    "OpenClaw is registered as the device assistant."
+                    OpenClaw 已注册为设备助手。"
                   } else {
-                    "Let Android launch OpenClaw from the assistant gesture. Google Assistant App Actions still work separately."
+                    让 Android 从助手手势启动 OpenClaw。Google 助手应用操作仍然单独工作。"
                   },
                   style = mobileCallout,
                 )
@@ -550,7 +550,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
             headlineContent = { Text("麦克风", style = mobileHeadline) },
             supportingContent = {
               Text(
-                if (micPermissionGranted) "已授予" else "Required for voice transcription.",
+                if (micPermissionGranted) "已授予" else 语音转写所需。",
                 style = mobileCallout,
               )
             },
@@ -578,7 +578,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
             headlineContent = { Text("相机", style = mobileHeadline) },
-            supportingContent = { Text("Photos and video clips (foreground only).", style = mobileCallout) },
+            supportingContent = { Text(照片和视频片段（仅前台）。", style = mobileCallout) },
             trailingContent = { Switch(checked = cameraEnabled, onCheckedChange = ::setCameraEnabledChecked) },
           )
         }
@@ -599,7 +599,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
             colors = listItemColors,
             headlineContent = { Text("系统通知", style = mobileHeadline) },
             supportingContent = {
-              Text("Alerts and foreground service.", style = mobileCallout)
+              Text(提醒和前台服务。", style = mobileCallout)
             },
             trailingContent = {
               Button(

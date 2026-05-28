@@ -793,10 +793,10 @@ private fun gatewayStatusLabel(
   if (isConnected) return "就绪"
   val status = statusText.trim().lowercase()
   return when {
-    status.contains("connecting") || status.contains("reconnecting") -> "Connecting..."
+    status.contains("connecting") || status.contains("reconnecting") -> "连接中..."
     status.contains("pair") -> "Pairing needed"
-    status.contains("auth") -> "Authentication needed"
-    status.contains("certificate") || status.contains("tls") -> "Certificate review needed"
+    status.contains("auth") -> "需要认证"
+    status.contains("certificate") || status.contains("tls") -> "需要证书审查"
     status.contains("failed") || status.contains("error") || status.contains("offline") || status.contains("not connected") -> "Cannot reach gateway"
     status.isBlank() -> "未连接"
     else -> "未连接"
@@ -1033,7 +1033,7 @@ private fun approvalSubtitle(
   toolCall: ChatPendingToolCall,
   hasIssue: Boolean,
 ): String {
-  if (hasIssue) return "Needs attention"
+  if (hasIssue) return "需要关注"
   val ageMs = (System.currentTimeMillis() - toolCall.startedAtMs).coerceAtLeast(0L)
   val minutes = ageMs / 60_000L
   return if (minutes < 1) "等待审查" else "Waiting ${minutes}m"
