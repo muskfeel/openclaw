@@ -73,8 +73,6 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 @Composable
 fun ChatScreen(

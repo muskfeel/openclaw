@@ -13,8 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 @Composable
 fun CameraFlashOverlay(

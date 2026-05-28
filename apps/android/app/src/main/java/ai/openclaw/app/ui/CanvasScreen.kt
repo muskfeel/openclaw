@@ -25,8 +25,6 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.util.concurrent.atomic.AtomicReference
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 @SuppressLint("SetJavaScriptEnabled")
 @Suppress("DEPRECATION")

@@ -74,8 +74,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.max
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 @Composable
 fun VoiceTabScreen(viewModel: MainViewModel) {

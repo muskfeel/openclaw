@@ -48,8 +48,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 private enum class HomeTab(
   val label: String,

@@ -44,8 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 private data class ChatBubbleStyle(
   val alignEnd: Boolean,

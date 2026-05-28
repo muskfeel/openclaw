@@ -79,8 +79,6 @@ import java.net.URI
 import java.util.Locale
 import org.commonmark.node.Image as MarkdownImage
 import org.commonmark.node.Text as MarkdownTextNode
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 private const val LIST_INDENT_DP = 14
 private const val DATA_IMAGE_HEADER_MAX_CHARS = 64

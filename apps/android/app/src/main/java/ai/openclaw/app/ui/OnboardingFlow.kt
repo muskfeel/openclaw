@@ -103,8 +103,6 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.delay
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 private enum class OnboardingStep {
   Welcome,

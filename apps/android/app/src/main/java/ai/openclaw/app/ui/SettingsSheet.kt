@@ -71,8 +71,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.res.stringResource
-import ai.openclaw.app.R
 
 @Composable
 fun SettingsSheet(viewModel: MainViewModel) {
