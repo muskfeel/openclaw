@@ -1,4 +1,5 @@
 package ai.openclaw.app.ui
+import ai.openclaw.app.R
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
